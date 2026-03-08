@@ -1,0 +1,25 @@
+{
+  "name": "economic-agent",
+  "version": "2.0.0",
+  "description": "경제 뉴스 자동 수집 · AI 분석 · Telegram 알림 에이전트",
+  "main": "src/check-news.js",
+  "scripts": {
+    "start": "node --env-file=.env src/check-news.js",
+    "digest": "node --env-file=.env src/digest.js",
+    "report": "node --env-file=.env src/stock-report.js",
+    "test": "node --test"
+  },
+  "keywords": [
+    "economic",
+    "news",
+    "agent",
+    "telegram",
+    "ai",
+    "rss"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@huggingface/transformers": "^3.8.1",
+    "rss-parser": "^3.13.0"
+  }
+}

@@ -1,0 +1,217 @@
+# Economic Agent
+
+경제 뉴스를 자동으로 수집하고 AI로 요약하여 Telegram 다이제스트를 보내는 개인용 경제 뉴스 에이전트입니다.
+
+## 주요 기능
+
+- **실시간 뉴스 수집** — 연합뉴스, 매일경제, 한국경제, Bloomberg RSS 피드 (5분 간격)
+- **3단계 필터링** — 키워드 → 중요도 스코어링 → 개인 관련성 매칭
+- **FinBERT 감성 분석** — 영문 기사는 금융 특화 ML 모델로 호재/악재 판단 (로컬, 무료)
+- **감성 강도 표시** — 강한 호재/호재/약한 호재/중립/약한 악재/악재/강한 악재 7단계
+- **7개 섹터 자동 분류** — 반도체, 에너지·원자재, 금융·통화, 부동산, 거시경제, 테크, 무역·지정학
+- **하루 5회 AI 다이제스트** — 시장 이벤트 시간대에 맞춘 뉴스 요약 브리핑
+- **장 마감 종목 분석** — AI 기반 섹터/종목 인사이트 리포트
+- **일일 요약 아카이빙** — 매일 시장 데이터를 JSON으로 저장
+
+## 아키텍처
+
+```
+5분마다 ─ 뉴스 수집 파이프라인 (무료)
+  RSS 피드 (연합뉴스, 매경, 한경, Bloomberg)
+      ↓
+  1단계: 키워드 필터
+      ↓
+  2단계: 스코어링 (키워드 가중치 + FinBERT 감성 + 섹터 분류)
+      ↓
+  3단계: 개인 관련성 매칭
+      ↓
+  기사 버퍼에 저장
+
+하루 5회 ─ AI 다이제스트 (AI 5회/일)
+  버퍼 기사 수집 → AI 요약 → Telegram 발송
+
+하루 1회 ─ 종목 분석 (AI 1회/일)
+  당일 뉴스 종합 → AI 섹터/종목 분석 → Telegram 발송
+```
+
+## 다이제스트 스케줄
+
+| 시간 (KST) | 세션 | 의미 |
+|:---:|------|------|
+| 🌅 07:30 | 아침 브리핑 | 미국장 마감 결과 + 아시아 프리마켓 |
+| ☀️ 12:00 | 점심 브리핑 | 오전장 정리 |
+| 🔔 15:40 | 장 마감 브리핑 | 코스피/코스닥 마감 직후 |
+| 🌆 19:00 | 저녁 브리핑 | 유럽장 오픈 + 오후 뉴스 |
+| 🌙 23:30 | 마감 브리핑 | 미국장 오픈 + 하루 마무리 |
+
+## 프로젝트 구조
+
+```
+src/
+├── check-news.js              # 뉴스 수집 + 스코어링 → 버퍼 저장 (5분 간격)
+├── digest.js                  # AI 다이제스트 생성 + 발송 (하루 5회)
+├── stock-report.js            # 장 마감 종목 분석 (하루 1회)
+├── sources/
+│   ├── rss-fetcher.js         # RSS 수집 (4개 소스)
+│   ├── bok-api.js             # 한국은행 기준금리 API
+│   └── fred-api.js            # FRED 미국 경제지표 API
+├── filters/
+│   ├── keyword-filter.js      # 1단계: 키워드 필터
+│   ├── local-scorer.js        # 2단계: 로컬 스코어링 (FinBERT + 키워드)
+│   ├── finbert.js             # FinBERT 금융 감성 분석 (영문)
+│   ├── ai-scorer.js           # 2단계: AI 스코어링 (선택)
+│   └── relevance-matcher.js   # 3단계: 개인 관련성 매칭
+├── analysis/
+│   ├── digest.js              # AI 다이제스트 프롬프트
+│   └── stock-analyzer.js      # AI 종목/섹터 분석 프롬프트
+├── notify/
+│   └── telegram.js            # Telegram 포맷팅 및 전송
+├── config/
+│   ├── keywords.js            # 키워드 + 가중치 + 감성사전 + 섹터분류
+│   └── interests.js           # 개인 관심사
+└── utils/
+    ├── ai-client.js           # AI 제공자 추상화 (멀티 프로바이더)
+    ├── article-buffer.js      # 기사 버퍼 관리
+    ├── config.js              # 공통 설정
+    ├── seen-articles.js       # 중복 기사 관리
+    ├── indicators.js          # 경제지표 수집
+    └── daily-summary.js       # 일일 요약 저장
+```
+
+## 설치 및 실행
+
+### 요구 사항
+
+- Node.js 20+
+- Telegram Bot Token ([BotFather](https://t.me/BotFather)에서 발급)
+- AI API Key (다이제스트/종목분석용, 아래 지원 목록 참조)
+
+### 설치
+
+```bash
+git clone https://github.com/<your-username>/economic-agent.git
+cd economic-agent
+npm install
+```
+
+### 환경 변수 설정
+
+```bash
+cp .env.example .env
+```
+
+```env
+# AI 설정 (다이제스트 + 종목분석에 사용)
+AI_PROVIDER=anthropic          # anthropic | openai | groq | ollama | custom
+# AI_MODEL=                    # 모델 지정 (선택, 제공자별 기본값 있음)
+# AI_BASE_URL=                 # 커스텀 엔드포인트 (선택)
+
+# 사용하는 제공자의 키만 설정
+ANTHROPIC_API_KEY=sk-ant-...
+# OPENAI_API_KEY=sk-...
+# GROQ_API_KEY=gsk_...
+
+# Telegram (필수)
+TELEGRAM_BOT_TOKEN=123456:ABC...
+TELEGRAM_CHAT_ID=-100...
+
+# 경제지표 (선택)
+BOK_API_KEY=...
+FRED_API_KEY=...
+```
+
+### 실행
+
+```bash
+# 뉴스 수집 (5분마다 자동 실행, 버퍼에 저장)
+npm start
+
+# AI 다이제스트 발송 (시간대 자동 감지)
+npm run digest
+
+# 특정 세션 지정 (morning/lunch/close/evening/night)
+npm run digest -- morning
+
+# 장 마감 종목 분석
+npm run report
+```
+
+## AI 제공자 지원
+
+| 제공자 | 설정값 | 모델 예시 | 비용 |
+|--------|--------|-----------|------|
+| **Groq** | `groq` | llama-3.3-70b-versatile | 무료 티어 |
+| **Ollama** | `ollama` | llama3 | 완전 무료 (로컬) |
+| **Anthropic** | `anthropic` | claude-haiku-4-5-20251001 | ~$0.18/일 |
+| **OpenAI** | `openai` | gpt-4o-mini | ~$0.12/일 |
+| **Custom** | `custom` | - | AI_BASE_URL 설정 |
+
+## 감성 분석
+
+뉴스 스코어링은 AI API 없이 **로컬에서 무료**로 동작합니다:
+
+| 기사 언어 | 분석 방법 | 정확도 |
+|-----------|-----------|--------|
+| **영문** (Bloomberg 등) | FinBERT ML 모델 (로컬 CPU) | 높음 (문맥 이해) |
+| **한국어** | 키워드 감성 사전 | 보통 (단어 매칭) |
+
+감성 강도는 confidence 기반 7단계로 표시됩니다:
+
+| confidence | 호재 | 악재 |
+|:---:|------|------|
+| >= 85% | 🔴 강한 호재 | 🔵 강한 악재 |
+| 60~85% | 🔴 호재 | 🔵 악재 |
+| < 60% | 🟠 약한 호재 | 🟣 약한 악재 |
+| - | ⚪ 중립 | |
+
+## GitHub Actions 배포
+
+| 워크플로우 | 스케줄 | 설명 |
+|-----------|--------|------|
+| `news-alert.yml` | 평일 07:00~23:00 KST, 5분 간격 | 뉴스 수집 + 버퍼 저장 |
+| `digest.yml` | 평일 07:30, 12:00, 15:40, 19:00, 23:30 KST | AI 다이제스트 발송 |
+| `stock-report.yml` | 평일 16:00 KST | 장 마감 종목 분석 |
+
+GitHub 저장소의 **Settings > Secrets and variables > Actions**에 환경 변수를 등록하세요.
+
+## 커스터마이징
+
+### 키워드 / 가중치 / 감성 사전 / 섹터
+
+`src/config/keywords.js`에서 모든 필터링 규칙을 관리합니다:
+
+```javascript
+module.exports = {
+  must_include: ['금리', '환율', ...],             // 1단계 키워드
+  high_priority: ['속보', '폭락', ...],            // 무조건 통과
+  weight: { 5: [...], 4: [...], ... },             // 중요도 가중치
+  sentiment: { bullish: [...], bearish: [...] },   // 감성 사전
+  sectors: { '반도체': [...], '에너지·원자재': [...] }, // 섹터 분류
+};
+```
+
+### 관심사
+
+`src/config/interests.js`에서 개인 관심사를 수정합니다:
+
+```javascript
+module.exports = {
+  portfolio: ['ETF', '반도체', ...],
+  macro: ['금리', '환율', '인플레이션'],
+  career: ['프론트엔드', '금융IT', ...],
+};
+```
+
+## 월간 비용 (추정)
+
+| 구성 | 비용 |
+|------|------|
+| 수집 + 스코어링 (FinBERT + 키워드) | **무료** |
+| 다이제스트 + 종목분석 (Groq) | **$0/월** |
+| 다이제스트 + 종목분석 (Claude Haiku) | **~$5.4/월** |
+| GitHub Actions (Public) | 무료 |
+| Telegram / BOK / FRED API | 무료 |
+
+## 라이선스
+
+MIT

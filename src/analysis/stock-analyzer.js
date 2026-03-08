@@ -1,0 +1,84 @@
+const { chat, extractJSON } = require('../utils/ai-client');
+const MY_INTERESTS = require('../config/interests');
+
+async function analyzeStocks(articles, indicators) {
+  if (articles.length === 0) return null;
+
+  const articleSummaries = articles
+    .sort((a, b) => b.score - a.score)
+    .map((a, i) => {
+      const sentiment = a.sentiment || 'neutral';
+      const title = a.titleKo || a.title;
+      const reason = a.reason || '';
+      return `[${i}] (${sentiment}) ${title} — ${reason}`;
+    })
+    .join('\n');
+
+  const indicatorInfo = [];
+  if (indicators.baseRate) indicatorInfo.push(`Korea base rate: ${indicators.baseRate}%`);
+  if (indicators.fedRate) indicatorInfo.push(`US Fed rate: ${indicators.fedRate}%`);
+  if (indicators.cpi) indicatorInfo.push(`US CPI: ${indicators.cpi}`);
+  if (indicators.unemployment) indicatorInfo.push(`US unemployment: ${indicators.unemployment}%`);
+
+  // interests.js에서 포트폴리오 관심사 동적 로드
+  const interestList = Object.entries(MY_INTERESTS)
+    .map(([k, v]) => `${k}: ${v.join(', ')}`)
+    .join('\n');
+
+  const prompt = `You are a stock market analyst for Korean individual investors.
+Analyze today's economic news and indicators, then provide sector/stock investment insights.
+
+## Economic Indicators
+${indicatorInfo.length > 0 ? indicatorInfo.join('\n') : '(No data)'}
+
+## Today's Key News (${articles.length} articles)
+${articleSummaries}
+
+## User's Areas of Interest
+${interestList}
+
+## Instructions
+Based on the news and indicators above, respond with ONLY this JSON format:
+
+{
+  "market_summary": "One-line market assessment in Korean (under 50 chars)",
+  "sectors": [
+    {
+      "name": "Sector name in Korean (e.g. 반도체, 2차전지, 금융)",
+      "signal": "bullish or bearish or neutral",
+      "reason": "News-based reasoning in Korean (1-2 sentences)"
+    }
+  ],
+  "stocks": [
+    {
+      "name": "Stock name (Korean-listed)",
+      "ticker": "Ticker code if known, empty string otherwise",
+      "signal": "bullish or bearish or neutral",
+      "reason": "News-based reasoning in Korean (1-2 sentences)",
+      "related_news": [0, 1]
+    }
+  ],
+  "action_items": [
+    "Tomorrow's market watchpoint in Korean (1 sentence each)"
+  ]
+}
+
+Rules:
+- Respond with ONLY valid JSON
+- sectors: 2-4, stocks: 3-6, action_items: 2-4
+- Only recommend stocks directly mentioned or affected by the news
+- Focus on KOSPI/KOSDAQ listed stocks
+- This is for informational purposes, not investment advice`;
+
+  try {
+    const responseText = await chat(prompt);
+    if (!responseText) throw new Error('AI 응답이 비어있습니다');
+
+    return extractJSON(responseText, 'object');
+  } catch (err) {
+    console.error(`[종목분석] AI 분석 실패: ${err.message}`);
+    return null;
+  }
+}
+
+module.exports = { analyzeStocks };

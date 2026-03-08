@@ -1,0 +1,8 @@
+module.exports = {
+  BATCH_SIZE: 20,
+  MIN_SCORE: 4,
+  MAX_SEEN: 5000,
+  RSS_TIMEOUT_MS: 10000,
+  TELEGRAM_DELAY_MS: 1000,
+  TIMEZONE: 'Asia/Seoul',
+};
