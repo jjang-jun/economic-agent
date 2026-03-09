@@ -41,4 +41,5 @@ Claude Haiku만 유료 (~$0.002/호출 × ~50회/일). 나머지 전부 무료.
 
 ## 작업 규칙
 - **모든 작업 완료 시** `memory/changelog.md`에 날짜/내용/변경 파일 기록
+- **모든 작업 완료 시** `README.md`에 변경 내용 반영 후 remote push
 - 구조 변경 시 `memory/architecture.md`, `memory/MEMORY.md`도 업데이트
