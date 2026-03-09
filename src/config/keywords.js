@@ -16,8 +16,7 @@ const KEYWORDS = {
   high_priority: [
     '긴급', '속보', '폭락', '폭등', '서킷브레이커',
     '금리 인하', '금리 인상', '기준금리 변경',
-    '전쟁', '제재', '관세',
-    'executive order', 'sanction', 'tariff', 'ban',
+    '전쟁',
   ],
 
   // 키워드별 중요도 가중치
