@@ -1,0 +1,30 @@
+name: Digest 저녁 브리핑 (19:00 KST)
+
+on:
+  schedule:
+    - cron: '0 10 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/cache@v4
+        with:
+          path: data/
+          key: data-${{ github.run_id }}
+          restore-keys: data-
+      - run: npm ci
+      - run: node src/digest.js evening
+        env:
+          AI_PROVIDER: ${{ secrets.AI_PROVIDER }}
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          BOK_API_KEY: ${{ secrets.BOK_API_KEY }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}

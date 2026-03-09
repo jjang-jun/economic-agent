@@ -1,18 +1,8 @@
-name: News Digest (뉴스 다이제스트)
+name: Digest 점심 브리핑 (12:00 KST)
 
 on:
   schedule:
-    # 하루 5회 (KST = UTC+9)
-    # 07:30 KST = 22:30 UTC (전일) — 아침: 미국 장 마감 + 아시아 프리마켓
-    - cron: '30 22 * * 0-4'
-    # 12:00 KST = 03:00 UTC — 점심: 오전장 정리
     - cron: '0 3 * * 1-5'
-    # 15:40 KST = 06:40 UTC — 장 마감: 코스피/코스닥 마감 직후
-    - cron: '40 6 * * 1-5'
-    # 19:00 KST = 10:00 UTC — 저녁: 유럽장 오픈 + 오후 뉴스
-    - cron: '0 10 * * 1-5'
-    # 23:30 KST = 14:30 UTC — 마감: 미국장 오픈 + 하루 마무리
-    - cron: '30 14 * * 1-5'
   workflow_dispatch:
 
 jobs:
@@ -23,15 +13,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-
       - uses: actions/cache@v4
         with:
           path: data/
           key: data-${{ github.run_id }}
           restore-keys: data-
-
       - run: npm ci
-      - run: node src/digest.js
+      - run: node src/digest.js lunch
         env:
           AI_PROVIDER: ${{ secrets.AI_PROVIDER }}
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
