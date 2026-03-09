@@ -183,8 +183,8 @@ GitHub 저장소의 **Settings > Secrets and variables > Actions**에 환경 변
 ```javascript
 module.exports = {
   must_include: ['금리', '환율', ...],             // 1단계 키워드
-  high_priority: ['속보', '폭락', ...],            // 무조건 통과
-  weight: { 5: [...], 4: [...], ... },             // 중요도 가중치
+  high_priority: ['속보', '폭락', '전쟁', ...],   // 즉시 긴급 알림 (score 5)
+  weight: { 5: [...], 4: ['tariff', 'sanction', ...], ... }, // 중요도 가중치 (4점: 다이제스트, 5점: 즉시 알림)
   sentiment: { bullish: [...], bearish: [...] },   // 감성 사전
   sectors: { '반도체': [...], '에너지·원자재': [...] }, // 섹터 분류
 };
