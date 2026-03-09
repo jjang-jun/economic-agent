@@ -39,23 +39,19 @@ async function main() {
   const scored = await scoreArticles(keywordFiltered);
   console.log(`[스코어링] ${scored.length}건 통과`);
 
-  // 4. 개인 관련성 매칭
-  const relevant = filterByRelevance(scored);
-  console.log(`[관련성] ${relevant.length}건 최종 대상`);
+  // 4. 긴급(5점)은 개인 관련성 필터 후 즉시 알림, 나머지는 버퍼에 저장
+  const urgent = filterByRelevance(scored.filter(a => a.score >= 5));
+  const normal = scored.filter(a => a.score < 5);
 
-  // 5. 긴급 기사(5점)는 즉시 알림, 나머지는 버퍼에 저장
-  if (relevant.length > 0) {
-    const urgent = relevant.filter(a => a.score >= 5);
-    const normal = relevant.filter(a => a.score < 5);
+  console.log(`[관련성] 긴급 ${urgent.length}건`);
 
-    if (urgent.length > 0) {
-      const sent = await notifyArticles(urgent);
-      console.log(`[긴급알림] ${sent}건 즉시 전송`);
-    }
-
-    const added = addToBuffer(normal);
-    console.log(`[버퍼] ${added}건 추가 (다이제스트 대기)`);
+  if (urgent.length > 0) {
+    const sent = await notifyArticles(urgent);
+    console.log(`[긴급알림] ${sent}건 즉시 전송`);
   }
+
+  const added = addToBuffer(normal);
+  console.log(`[버퍼] ${added}건 추가 (다이제스트 대기)`);
 
   // 6. seen 업데이트
   for (const a of newArticles) seen.add(a.id);
