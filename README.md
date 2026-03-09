@@ -170,7 +170,11 @@ npm run report
 | 워크플로우 | 스케줄 | 설명 |
 |-----------|--------|------|
 | `news-alert.yml` | 평일 07:00~23:00 KST, 5분 간격 | 뉴스 수집 + 버퍼 저장 |
-| `digest.yml` | 평일 07:30, 12:00, 15:40, 19:00, 23:30 KST | AI 다이제스트 발송 |
+| `digest-morning.yml` | 평일 07:30 KST | 아침 브리핑 |
+| `digest-lunch.yml` | 평일 12:00 KST | 점심 브리핑 |
+| `digest-close.yml` | 평일 15:40 KST | 장 마감 브리핑 |
+| `digest-evening.yml` | 평일 19:00 KST | 저녁 브리핑 |
+| `digest-night.yml` | 평일 23:30 KST | 마감 브리핑 |
 | `stock-report.yml` | 평일 16:00 KST | 장 마감 종목 분석 |
 
 GitHub 저장소의 **Settings > Secrets and variables > Actions**에 환경 변수를 등록하세요.
