@@ -284,6 +284,80 @@ async function sendStockReport(report) {
   }
 }
 
+function formatActionReport(report) {
+  const portfolio = report.portfolio || {};
+  const portfolioLines = [
+    portfolio.totalAssetValue ? `총자산 ${formatKRW(portfolio.totalAssetValue)}` : '',
+    typeof portfolio.cashAmount === 'number' ? `현금 ${formatKRW(portfolio.cashAmount)} (${Math.round((portfolio.cashRatio || 0) * 100)}%)` : '',
+    typeof portfolio.unrealizedPnl === 'number' ? `평가손익 ${formatKRW(portfolio.unrealizedPnl)} (${portfolio.unrealizedPnlPct ?? 0}%)` : '',
+    `보유 ${portfolio.positionCount || 0}개`,
+  ].filter(Boolean).map(item => `▸ ${escapeHtml(item)}`);
+
+  const formatRecommendation = item => {
+    const risk = item.riskProfile || item.risk_profile || {};
+    const review = item.riskReview || item.risk_review || {};
+    const size = risk.suggestedAmount ? ` · 제안 ${formatKRW(risk.suggestedAmount)}` : '';
+    const rr = risk.riskReward ? ` · 손익비 ${risk.riskReward}:1` : '';
+    const blockers = (review.blockers || []).slice(0, 1).join(', ');
+    return `▸ ${escapeHtml(item.name || item.ticker)} ${escapeHtml(item.ticker || '')}${size}${rr}${blockers ? ` · 차단 ${escapeHtml(blockers)}` : ''}`;
+  };
+
+  const formatPosition = item => {
+    const pnl = typeof item.unrealizedPnl === 'number'
+      ? ` · 손익 ${formatKRW(item.unrealizedPnl)} (${item.unrealizedPnlPct}%)`
+      : '';
+    const weight = typeof item.weight === 'number' ? ` · 비중 ${Math.round(item.weight * 100)}%` : '';
+    const reasons = (item.actionReasons || []).slice(0, 2).join(', ');
+    return `▸ ${escapeHtml(item.name || item.ticker)}${pnl}${weight}${reasons ? ` · ${escapeHtml(reasons)}` : ''}`;
+  };
+
+  const sections = [
+    [
+      '📋 <b>일일 행동 리포트</b>',
+      `⏰ ${escapeHtml(report.date)}`,
+    ].join('\n'),
+    [
+      '<b>1. 포트폴리오</b>',
+      portfolioLines.join('\n') || '▸ 기록 없음',
+    ].join('\n'),
+    [
+      '<b>2. 신규 매수 후보</b>',
+      (report.newBuyCandidates || []).map(formatRecommendation).join('\n') || '▸ 없음',
+    ].join('\n'),
+    [
+      '<b>3. 관찰 후보</b>',
+      (report.watchOnlyCandidates || []).map(formatRecommendation).join('\n') || '▸ 없음',
+    ].join('\n'),
+    [
+      '<b>4. 보유 유지</b>',
+      (report.holdCandidates || []).slice(0, 5).map(formatPosition).join('\n') || '▸ 없음',
+    ].join('\n'),
+    [
+      '<b>5. 축소 후보</b>',
+      (report.reduceCandidates || []).map(formatPosition).join('\n') || '▸ 없음',
+    ].join('\n'),
+    [
+      '<b>6. 매도 후보</b>',
+      (report.sellCandidates || []).map(formatPosition).join('\n') || '▸ 없음',
+    ].join('\n'),
+    '<i>자동 주문이 아닙니다. 실제 매매 전 손절선, 유동성, 당일 수급을 다시 확인하세요.</i>',
+  ];
+
+  return sections.join('\n\n');
+}
+
+async function sendActionReport(report) {
+  const message = formatActionReport(report);
+  try {
+    await sendTelegramMessage(message);
+    console.log('[행동리포트] 전송 완료');
+    return true;
+  } catch (err) {
+    console.error(`[행동리포트] 전송 실패: ${err.message}`);
+    return false;
+  }
+}
+
 const SESSION_EMOJI = {
   preopen: '🌅',
   midday: '☀️',
@@ -467,6 +541,6 @@ async function sendPerformanceReview(review) {
 }
 
 module.exports = {
-  notifyArticles, sendStockReport, sendDigest, sendPerformanceReport, sendTradePerformanceReport, sendPerformanceReview,
-  formatMessage, formatStockReport, formatDigest, formatPerformanceReport, formatTradePerformanceReport, formatPerformanceReview,
+  notifyArticles, sendStockReport, sendDigest, sendPerformanceReport, sendTradePerformanceReport, sendPerformanceReview, sendActionReport,
+  formatMessage, formatStockReport, formatDigest, formatPerformanceReport, formatTradePerformanceReport, formatPerformanceReview, formatActionReport,
 };

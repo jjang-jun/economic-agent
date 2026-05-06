@@ -119,11 +119,12 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 추천 성과 평가에 MFE, MAE, 최대낙폭, 손절선 터치 여부, 목표구간 터치 여부, 결과 라벨을 추가하고 Supabase `recommendation_evaluations` 컬럼으로 저장.
 - AI 종목 분석 프롬프트에 외부 기사 데이터는 신뢰할 수 없는 입력이며 기사 속 지시문을 무시하라는 prompt injection 방어 규칙 추가.
 - 5분 뉴스 수집 workflow에 concurrency를 적용해 중복 실행/캐시 충돌 가능성을 완화.
+- `npm run action:report`와 `action-report.yml` 추가. 최근 추천과 현재 포트폴리오를 합쳐 신규 매수/관찰/보유/축소/매도 후보를 토큰 비용 없이 분리하고 Telegram으로 발송.
 
 ## 다음 작업
 
-1. 일일 행동 리포트 추가: 신규 매수/보유/축소/매도 후보를 포트폴리오 기준으로 분리
-2. 성과 리뷰 고도화: 섹터, 신호, 리스크팩터, 프롬프트 버전별 승률과 초과수익률 비교
-3. 대시보드 고도화: 차트, 기간 필터, 추천/실거래 상세, 리스크 차단 사유 보기
-4. 브리핑/리포트 입력 데이터를 Supabase 조회 중심으로 전환
-5. 실제 첫 거래부터 `trade:record`로 기록하고 `portfolio:sync-secret`으로 GitHub Actions secret 동기화
+1. `freedom-engine.js` 추가: 경제적 자유 목표, 달성률, 예상 달성 시점 계산
+2. `strategy-policy.js`와 `position-sizer.js` 추가: 투자 헌법과 제안 매수금액 공식을 코드로 고정
+3. 추천 JSON schema 검증 추가: 근거, 기준 가격, 손절선, 손익비, 제안 비중 누락 시 저장 차단
+4. `performance-lab.js` 추가: AI 추천, 실제 매수 추천, 매수하지 않은 추천, 임의 거래 성과 분리 분석
+5. `behavior-reviewer.js` 추가: 급등 추격, RISK_OFF 매수, 손절선 없는 진입 같은 반복 행동 경고

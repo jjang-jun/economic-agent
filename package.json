@@ -14,6 +14,7 @@
     "recommendations:list": "node --env-file=.env scripts/list-recommendations.js",
     "trade:record": "node --env-file=.env scripts/record-trade.js",
     "trade:performance": "node --env-file=.env scripts/trade-performance.js",
+    "action:report": "node --env-file=.env scripts/action-report.js",
     "review:weekly": "node --env-file=.env scripts/performance-review.js weekly",
     "review:monthly": "node --env-file=.env scripts/performance-review.js monthly",
     "dashboard": "node scripts/dashboard.js",
