@@ -112,6 +112,7 @@ src/
     ├── recommendation-log.js  # 추천 저장 및 성과 평가
     ├── action-report.js       # 신규 매수/관찰/보유/축소/매도 후보 분리
     ├── freedom-engine.js      # 경제적 자유 목표/달성률/예상 달성 시점 계산
+    ├── position-sizer.js      # 손실 허용액/현금/종목/섹터/레짐 기준 매수금액 계산
     ├── risk-reviewer.js       # 추천 전 리스크 관리자/factor 검토
     ├── market-snapshot.js     # 프리마켓/글로벌 가격 스냅샷
     ├── decision-engine.js     # 시장 레짐/행동 가드레일
@@ -404,6 +405,19 @@ Supabase 저장을 GitHub Actions에서도 활성화하려면 `SUPABASE_PROJECT_
 - `src/config/keywords.js`: 위 설정을 합쳐 기존 필터/스코어러에 제공
 
 한국어 감성 분석은 `src/filters/sentiment-dictionary.js`에서 처리합니다. 단순 키워드 개수 비교가 아니라 `자사주 소각`, `주주환원`, `유상증자`, `전환사채`, `거래정지` 같은 강한 투자 신호에 추가 가중치를 줍니다.
+
+### 투자 정책 / 포지션 사이징
+
+투자 헌법과 기본 리스크 한도는 `src/config/strategy-policy.js`에 둡니다. 추천 매수금액은 `src/utils/position-sizer.js`가 아래 한도 중 가장 작은 값을 사용합니다.
+
+```text
+손실 기준 금액
+신규 매수 상한
+종목별 최대 비중 잔여 한도
+섹터별 최대 비중 잔여 한도
+가용 현금
+시장 레짐별 신규 매수 한도
+```
 
 ### 관심사
 

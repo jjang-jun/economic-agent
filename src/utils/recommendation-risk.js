@@ -1,3 +1,6 @@
+const STRATEGY_POLICY = require('../config/strategy-policy');
+const { calculatePositionSize } = require('./position-sizer');
+
 function toNumber(value) {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value !== 'string') return null;
@@ -20,10 +23,7 @@ function firstNumber(...values) {
 
 function normalizeRecommendationRisk(stock, decision) {
   const portfolio = decision?.portfolio || {};
-  const riskBudget = portfolio.riskBudget || {};
   const totalAssetValue = portfolio.totalAssetValue || portfolio.summary?.totalAssetValue || null;
-  const maxNewBuyAmount = riskBudget.maxNewBuyAmount || portfolio.summary?.maxNewBuyAmount || null;
-  const maxRiskAmount = riskBudget.maxRisk1Pct || (totalAssetValue ? totalAssetValue * 0.01 : null);
 
   const expectedUpsidePct = firstNumber(
     stock.expected_upside_pct,
@@ -47,17 +47,15 @@ function normalizeRecommendationRisk(stock, decision) {
   const riskReward = expectedUpsidePct && expectedLossPct
     ? round(expectedUpsidePct / expectedLossPct)
     : null;
-
-  const formulaPositionAmount = maxRiskAmount && expectedLossPct
-    ? Math.floor(maxRiskAmount / (expectedLossPct / 100))
-    : null;
-  const suggestedAmount = [formulaPositionAmount, maxNewBuyAmount]
-    .filter(value => typeof value === 'number' && value > 0)
-    .reduce((min, value) => Math.min(min, value), Number.POSITIVE_INFINITY);
-  const finalSuggestedAmount = Number.isFinite(suggestedAmount) ? suggestedAmount : null;
-  const suggestedWeightPct = finalSuggestedAmount && totalAssetValue
-    ? round((finalSuggestedAmount / totalAssetValue) * 100)
-    : null;
+  const positionSize = calculatePositionSize({
+    portfolio,
+    market: decision?.market || {},
+    ticker: stock.ticker || '',
+    symbol: stock.symbol || '',
+    sector: stock.sector || stock.primary_sector || '',
+    expectedLossPct,
+    riskReward,
+  });
 
   const maxWeightPct = typeof portfolio.maxPositionRatio === 'number'
     ? round(portfolio.maxPositionRatio * 100)
@@ -70,10 +68,11 @@ function normalizeRecommendationRisk(stock, decision) {
   const momentumPass = typeof marketProfile.near20dHigh === 'boolean' ? marketProfile.near20dHigh : null;
   const tradeable = Boolean(
     riskReward !== null
-    && riskReward >= 2
+    && riskReward >= positionSize.regimePolicy.minRiskReward
     && expectedLossPct > 0
-    && expectedLossPct <= 10
-    && finalSuggestedAmount
+    && expectedLossPct <= STRATEGY_POLICY.recommendationRules.maxStopLossPct
+    && positionSize.suggestedAmount
+    && positionSize.blockers.length === 0
     && liquidityPass !== false
     && relativeStrengthPass !== false
     && momentumPass !== false
@@ -84,17 +83,17 @@ function normalizeRecommendationRisk(stock, decision) {
     expectedUpsidePct,
     expectedLossPct: expectedLossPct || null,
     riskReward,
-    suggestedAmount: finalSuggestedAmount,
-    suggestedWeightPct,
+    suggestedAmount: positionSize.suggestedAmount,
+    suggestedWeightPct: positionSize.suggestedWeightPct,
+    expectedRiskAmount: positionSize.expectedRiskAmount,
     maxWeightPct,
     invalidation: stock.invalidation || stock.invalidation_condition || stock.stop_condition || stock.risk || '',
+    positionSize,
     relativeStrengthPass,
     liquidityPass,
     momentumPass,
     tradeable,
-    sizingFormula: maxRiskAmount && expectedLossPct
-      ? `risk ${Math.round(maxRiskAmount).toLocaleString('ko-KR')} / stop ${expectedLossPct}%`
-      : '',
+    sizingFormula: positionSize.formula,
   };
 }
 

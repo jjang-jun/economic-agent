@@ -157,8 +157,8 @@ Telegram Bot
 - [ ] 종목/섹터 최대 비중 제한을 실제 보유 포트폴리오에 강제 적용
 - [ ] 손절/익절/리밸런싱 규칙을 보유 종목 행동 후보에 적용
 - [x] 추천 신호와 실제 매수/매도 실행 기록 분리
-- [ ] `position-sizer.js`로 포지션 사이징 공식을 독립 모듈화
-- [ ] `strategy-policy.js`로 투자 헌법/레버리지/비중 제한을 코드화
+- [x] `position-sizer.js`로 포지션 사이징 공식을 독립 모듈화
+- [x] `strategy-policy.js`로 투자 헌법/레버리지/비중 제한을 코드화
 
 ## Phase 4: 시장 레짐 고도화
 - [x] KOSPI/KOSDAQ/S&P/Nasdaq/반도체 5일·20일 추세 지표
@@ -221,11 +221,11 @@ Telegram Bot
 - [ ] Cloud Run 또는 Fly.io/Render 배포 문서 추가
 
 ## 현재 가장 중요한 다음 작업
-1. `strategy-policy.js`와 `position-sizer.js`를 추가해 투자 헌법과 제안 매수금액 공식을 코드로 고정한다.
-2. Supabase 포트폴리오 원본 테이블과 `pending_actions`, `conversation_messages` 테이블을 추가한다.
-3. `src/server/telegram-webhook.js`와 `src/agent/agent-router.js` 초안을 만든다.
-4. 추천 JSON schema 검증을 추가해 근거, 기준 가격, 손절선, 손익비, 제안 비중이 없는 추천 저장을 차단한다.
-5. `performance-lab.js`와 `behavior-reviewer.js`로 추천/실거래/행동 패턴을 분리 분석한다.
+1. Supabase 포트폴리오 원본 테이블과 `pending_actions`, `conversation_messages` 테이블을 추가한다.
+2. `src/server/telegram-webhook.js`와 `src/agent/agent-router.js` 초안을 만든다.
+3. 추천 JSON schema 검증을 추가해 근거, 기준 가격, 손절선, 손익비, 제안 비중이 없는 추천 저장을 차단한다.
+4. `performance-lab.js`와 `behavior-reviewer.js`로 추천/실거래/행동 패턴을 분리 분석한다.
+5. 대시보드 첫 탭을 Freedom 중심으로 재구성한다.
 
 ## 운영 루프
 

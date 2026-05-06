@@ -1,9 +1,12 @@
+const STRATEGY_POLICY = require('../config/strategy-policy');
+
 function addFactor(factors, name, passed, detail = '') {
   factors.push({ name, passed, detail });
 }
 
 function reviewStock(stock, decision = {}) {
   const profile = stock.risk_profile || {};
+  const positionSize = profile.positionSize || profile.position_size || {};
   const market = stock.market_profile || {};
   const marketRegime = decision.market?.regime || 'UNKNOWN';
   const marketTags = decision.market?.tags || [];
@@ -12,8 +15,9 @@ function reviewStock(stock, decision = {}) {
   const warnings = [];
 
   addFactor(factors, 'market_regime', marketRegime !== 'RISK_OFF', marketRegime);
-  addFactor(factors, 'risk_reward', typeof profile.riskReward === 'number' && profile.riskReward >= 2, profile.riskReward ? `${profile.riskReward}:1` : 'missing');
-  addFactor(factors, 'stop_width', typeof profile.expectedLossPct === 'number' && profile.expectedLossPct <= 10, profile.expectedLossPct ? `${profile.expectedLossPct}%` : 'missing');
+  const minRiskReward = positionSize.regimePolicy?.minRiskReward || STRATEGY_POLICY.recommendationRules.minRiskReward;
+  addFactor(factors, 'risk_reward', typeof profile.riskReward === 'number' && profile.riskReward >= minRiskReward, profile.riskReward ? `${profile.riskReward}:1 / min ${minRiskReward}:1` : 'missing');
+  addFactor(factors, 'stop_width', typeof profile.expectedLossPct === 'number' && profile.expectedLossPct <= STRATEGY_POLICY.recommendationRules.maxStopLossPct, profile.expectedLossPct ? `${profile.expectedLossPct}%` : 'missing');
   addFactor(factors, 'liquidity', market.liquid !== false, market.averageTurnover20d ? `${Math.round(market.averageTurnover20d).toLocaleString('ko-KR')} KRW` : 'missing');
   addFactor(factors, 'relative_strength', market.relativeStrength20d === null || market.relativeStrength20d === undefined || market.relativeStrength20d >= 0, typeof market.relativeStrength20d === 'number' ? `${market.relativeStrength20d}%p` : 'missing');
   addFactor(factors, 'momentum', market.near20dHigh !== false, typeof market.distanceFrom20dHighPct === 'number' ? `${market.distanceFrom20dHighPct}% from 20d high` : 'missing');
@@ -21,6 +25,12 @@ function reviewStock(stock, decision = {}) {
 
   for (const factor of factors) {
     if (!factor.passed) blockers.push(`${factor.name}: ${factor.detail}`);
+  }
+  for (const blocker of positionSize.blockers || []) {
+    blockers.push(blocker);
+  }
+  for (const warning of positionSize.warnings || []) {
+    warnings.push(warning);
   }
 
   if (marketTags.includes('OVERHEATED')) {
