@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { getKSTDate } = require('./article-archive');
-const { fetchQuote, fetchBenchmarkQuote, normalizeYahooSymbol } = require('../sources/yahoo-finance');
+const { fetchCurrentPrice, fetchBenchmarkQuote, normalizeYahooSymbol } = require('../sources/price-provider');
 const {
   persistRecommendations,
   persistRecommendationEvaluations,
@@ -56,7 +56,7 @@ function getRelatedArticleIds(stock, articles) {
 async function buildRecommendation(stock, articles, indicators, date) {
   const symbol = normalizeYahooSymbol(stock.ticker);
   const [quote, benchmark] = await Promise.all([
-    symbol ? fetchQuote(symbol) : null,
+    symbol ? fetchCurrentPrice(symbol) : null,
     fetchBenchmarkQuote(),
   ]);
 
@@ -221,8 +221,8 @@ async function evaluateRecommendations() {
     if (dueTargets.length === 0) continue;
 
     const [quote, benchmarkQuote] = await Promise.all([
-      fetchQuote(recommendation.symbol),
-      recommendation.benchmark?.symbol ? fetchQuote(recommendation.benchmark.symbol) : null,
+      fetchCurrentPrice(recommendation.symbol),
+      recommendation.benchmark?.symbol ? fetchCurrentPrice(recommendation.benchmark.symbol) : null,
     ]);
     if (!quote) continue;
 

@@ -1,5 +1,5 @@
 const { loadTradeExecutions } = require('./trade-log');
-const { fetchQuote } = require('../sources/yahoo-finance');
+const { fetchCurrentPrice } = require('../sources/price-provider');
 
 function round(value, digits = 2) {
   if (typeof value !== 'number' || !Number.isFinite(value)) return null;
@@ -26,7 +26,7 @@ function formatTradePosition(trade, quote) {
 async function buildTradePerformanceReport() {
   const trades = await loadTradeExecutions();
   const symbols = [...new Set(trades.map(trade => trade.symbol).filter(Boolean))];
-  const quoteEntries = await Promise.all(symbols.map(async symbol => [symbol, await fetchQuote(symbol)]));
+  const quoteEntries = await Promise.all(symbols.map(async symbol => [symbol, await fetchCurrentPrice(symbol)]));
   const quotes = new Map(quoteEntries);
   const positions = trades.map(trade => formatTradePosition(trade, quotes.get(trade.symbol)));
   const openBuys = positions.filter(item => item.trade.side === 'buy');

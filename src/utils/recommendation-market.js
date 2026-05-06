@@ -1,4 +1,4 @@
-const { fetchQuote, fetchBenchmarkQuote, normalizeYahooSymbol } = require('../sources/yahoo-finance');
+const { fetchCurrentPrice, fetchBenchmarkQuote, normalizeYahooSymbol } = require('../sources/price-provider');
 
 const MIN_AVG_TURNOVER_KRW = 5000000000;
 
@@ -51,7 +51,7 @@ async function applyRecommendationMarketData(report) {
   const benchmark = await fetchBenchmarkQuote();
   const quotes = await Promise.all(report.stocks.map(stock => {
     const symbol = normalizeYahooSymbol(stock.ticker || stock.symbol || '');
-    return symbol ? fetchQuote(symbol) : null;
+    return symbol ? fetchCurrentPrice(symbol) : null;
   }));
 
   report.stocks = report.stocks.map((stock, index) => ({

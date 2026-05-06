@@ -19,6 +19,7 @@ const TABLES = [
   'portfolio_snapshots',
   'performance_reviews',
   'market_snapshots',
+  'price_snapshots',
   'investor_flows',
   'decision_contexts',
 ];

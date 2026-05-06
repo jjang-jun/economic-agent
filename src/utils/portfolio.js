@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const DEFAULT_PORTFOLIO = require('../config/portfolio');
-const { fetchQuote, normalizeYahooSymbol } = require('../sources/yahoo-finance');
+const { fetchCurrentPrice, normalizeYahooSymbol } = require('../sources/price-provider');
 
 const DEFAULT_PORTFOLIO_FILE = path.join(__dirname, '..', '..', 'data', 'portfolio.json');
 const SNAPSHOT_DIR = path.join(__dirname, '..', '..', 'data', 'portfolio-snapshots');
@@ -133,13 +133,13 @@ function valuePosition(position, quote, fxRates = {}) {
 }
 
 async function enrichPortfolio(portfolio = loadPortfolio()) {
-  const usdKrw = await fetchQuote('KRW=X');
+  const usdKrw = await fetchCurrentPrice('KRW=X');
   const fxRates = {
     USDKRW: typeof usdKrw?.price === 'number' ? usdKrw.price : 1,
   };
   const valuedPositions = await Promise.all((portfolio.positions || []).map(async position => {
     const quote = position.symbol || position.ticker
-      ? await fetchQuote(position.symbol || position.ticker)
+      ? await fetchCurrentPrice(position.symbol || position.ticker)
       : null;
     return valuePosition(position, quote, fxRates);
   }));

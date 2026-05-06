@@ -283,6 +283,32 @@ async function persistMarketSnapshots(snapshots, session = '', capturedAt = new 
   return upsert('market_snapshots', rows, 'id');
 }
 
+async function persistPriceSnapshots(snapshots) {
+  const rows = (snapshots || [])
+    .filter(item => item && item.ticker && typeof item.price === 'number' && item.source && item.asOf)
+    .map(item => ({
+      ticker: item.ticker,
+      symbol: item.symbol || '',
+      name: item.name || '',
+      market: item.market || '',
+      price: item.price,
+      open: item.open ?? null,
+      high: item.high ?? null,
+      low: item.low ?? null,
+      close: item.close ?? item.price,
+      volume: item.volume ?? null,
+      trading_value: item.tradingValue ?? null,
+      currency: item.currency || '',
+      source: item.source,
+      price_type: item.priceType || 'current',
+      is_realtime: item.isRealtime ?? false,
+      is_adjusted: item.isAdjusted ?? false,
+      as_of: item.asOf,
+      payload: item.payload || item,
+    }));
+  return upsert('price_snapshots', rows, 'ticker,source,price_type,as_of');
+}
+
 async function persistInvestorFlow(flow) {
   if (!flow?.latest?.date) return { saved: 0 };
   const latest = flow.latest;
@@ -364,6 +390,7 @@ module.exports = {
   loadPersistedTradeExecutions,
   persistPortfolioSnapshot,
   persistMarketSnapshots,
+  persistPriceSnapshots,
   persistInvestorFlow,
   persistDecisionContext,
   persistPerformanceReview,

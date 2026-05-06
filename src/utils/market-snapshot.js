@@ -1,5 +1,5 @@
 const WATCHLIST = require('../config/watchlist');
-const { fetchQuote } = require('../sources/yahoo-finance');
+const { fetchCurrentPrice } = require('../sources/price-provider');
 
 function getSymbolsForSession(session) {
   const primary = WATCHLIST[session] || [];
@@ -16,7 +16,7 @@ async function fetchMarketSnapshot(session) {
 
   const results = await Promise.allSettled(
     items.map(async item => {
-      const quote = await fetchQuote(item.symbol);
+      const quote = await fetchCurrentPrice(item.symbol);
       if (!quote) return null;
       return {
         name: item.name,
@@ -28,6 +28,7 @@ async function fetchMarketSnapshot(session) {
         return20dPct: quote.return20dPct,
         currency: quote.currency,
         marketTime: quote.marketTime,
+        source: quote.source,
       };
     })
   );

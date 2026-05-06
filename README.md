@@ -81,8 +81,10 @@ src/
 │   ├── dart-api.js            # DART 공시 수집
 │   ├── bok-api.js             # 한국은행 기준금리 API
 │   ├── fred-api.js            # FRED 미국 경제지표 API
-│   ├── naver-finance.js       # 국내 종목 현재가 조회
-│   └── yahoo-finance.js       # 해외 종목/국내 fallback 가격 조회
+│   ├── price-provider.js      # 가격 소스 우선순위 라우터
+│   ├── kis-api.js             # 한국투자증권 Open API REST 가격 조회
+│   ├── naver-finance.js       # 국내 종목 현재가 fallback
+│   └── yahoo-finance.js       # 해외 종목/글로벌 fallback 가격 조회
 ├── filters/
 │   ├── keyword-filter.js      # 1단계: 키워드 필터
 │   ├── local-scorer.js        # 2단계: 로컬 스코어링 (FinBERT + 키워드)
@@ -102,6 +104,7 @@ src/
 │   ├── interests.js           # 개인 관심사
 │   ├── watchlist.js           # 프리마켓/시장 스냅샷 관심 종목
 │   ├── portfolio.js           # 포트폴리오/리스크 제약
+│   ├── price-source-policy.js # KIS/Naver/Yahoo 가격 소스 우선순위
 │   └── ai-budget.js           # AI 프롬프트 토큰 예산
 └── utils/
     ├── ai-client.js           # AI 제공자 추상화 (멀티 프로바이더)
@@ -159,7 +162,7 @@ Codex에서 작업할 때는 저장소 루트의 `AGENTS.md`를 기준으로 프
 - `data/portfolio-snapshots/YYYY-MM-DD.json`: 보유 종목 현재가/평가손익 스냅샷
 - `data/action-reports/YYYY-MM-DD.json`: 신규 매수/관찰/보유/축소/매도 후보 일일 행동 리포트
 - `data/freedom/freedom-status.json`: 경제적 자유 목표와 현재 달성률
-- Supabase tables: `articles`, `daily_summaries`, `stock_reports`, `recommendations`, `recommendation_evaluations`, `trade_executions`, `portfolio_snapshots`, `market_snapshots`, `investor_flows`, `decision_contexts`
+- Supabase tables: `articles`, `daily_summaries`, `stock_reports`, `recommendations`, `recommendation_evaluations`, `trade_executions`, `portfolio_snapshots`, `market_snapshots`, `price_snapshots`, `investor_flows`, `decision_contexts`
 - Agent/Supabase tables: `financial_freedom_goals`, `portfolio_accounts`, `positions`, `risk_policy`, `conversation_messages`, `pending_actions`
 - `data/supabase/*.json`: Supabase 데이터를 내려받은 로컬 JSON 미러
 - `data/economic-agent.db`: Supabase 데이터를 내려받은 로컬 SQLite 미러
@@ -435,9 +438,20 @@ module.exports = {
 
 ### 가격 데이터
 
-국내 6자리 종목코드는 Naver Finance realtime endpoint를 우선 사용합니다. Yahoo Finance는 해외 종목과 국내 fallback 용도로만 사용합니다. 국내 현재가가 Naver에서 확인된 경우 Yahoo의 국내 history 기반 5일/20일 수익률은 사용하지 않습니다.
+가격 조회는 `src/sources/price-provider.js`를 통해 호출합니다. 국내 6자리 종목코드는 한국투자증권 Open API REST를 1차로 사용하고, 키가 없거나 실패하면 Naver Finance, 마지막으로 Yahoo Finance fallback을 사용합니다. Yahoo Finance는 기본적으로 해외 종목과 글로벌 지수/환율 용도입니다. 국내 현재가가 KIS 또는 Naver에서 확인된 경우 Yahoo의 국내 history 기반 5일/20일 수익률은 사용하지 않습니다.
 
 포트폴리오에 미국 주식과 한국 주식이 섞여 있으면 USD 종목은 USD/KRW로 KRW 환산해 총자산을 계산합니다.
+
+사용한 가격은 Supabase `price_snapshots`에 `ticker`, `source`, `price_type`, `as_of`와 함께 저장합니다. 추천 성과와 포트폴리오 스냅샷은 나중에 어떤 가격 소스를 기준으로 계산됐는지 추적할 수 있어야 합니다.
+
+한국투자증권 Open API를 쓰려면 아래 환경 변수를 설정합니다.
+
+```bash
+KIS_APP_KEY=...
+KIS_APP_SECRET=...
+# 선택: 기본값은 실전 REST URL
+KIS_BASE_URL=https://openapi.koreainvestment.com:9443
+```
 
 ### 실제 포트폴리오
 

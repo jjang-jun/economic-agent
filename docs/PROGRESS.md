@@ -127,11 +127,12 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - `strategy-policy.js`와 `position-sizer.js` 추가. 투자 헌법, 레버리지 금지, 레짐별 신규 매수 한도, 손실 허용액/종목/섹터/현금 한도를 하나의 포지션 사이징 공식으로 통합.
 - 한국 주식 가격 소스를 Yahoo 우선에서 Naver Finance 우선으로 변경. 국내 6자리 종목코드는 Naver realtime 현재가를 사용하고, Yahoo의 국내 history 기반 5일/20일 수익률은 혼합 오류를 막기 위해 제외.
 - `current-portfolio.md`의 현재 포트폴리오를 `data/portfolio.json`에 반영하고 `PORTFOLIO_JSON_BASE64` GitHub Secret을 동기화. USD 보유 종목은 USD/KRW 환산 후 KRW 총자산으로 계산.
+- 가격 소스 계층을 `price-provider.js`로 분리. 국내 주식은 KIS REST -> Naver Finance -> Yahoo fallback 순서로 조회하고, 사용한 가격은 Supabase `price_snapshots`에 source/as_of와 함께 저장.
 
 ## 다음 작업
 
-1. Supabase 포트폴리오 원본 테이블과 `pending_actions`, `conversation_messages` 테이블 추가
-2. `src/server/telegram-webhook.js`와 `src/agent/agent-router.js` 초안 구현
-3. 추천 JSON schema 검증 추가: 근거, 기준 가격, 손절선, 손익비, 제안 비중 누락 시 저장 차단
-4. `performance-lab.js`, `behavior-reviewer.js` 추가: 추천/실거래/반복 행동 패턴 분리 분석
-5. 대시보드 첫 탭을 Freedom 중심으로 재구성
+1. `src/server/telegram-webhook.js`와 `src/agent/agent-router.js` 초안 구현
+2. KIS 계정/토큰 설정 후 국내 현재가 provider 실호출 검증
+3. KRX/공공데이터 일별 종가 백필 provider 추가
+4. 추천 JSON schema 검증 추가: 근거, 기준 가격, 손절선, 손익비, 제안 비중 누락 시 저장 차단
+5. `performance-lab.js`, `behavior-reviewer.js` 추가: 추천/실거래/반복 행동 패턴 분리 분석

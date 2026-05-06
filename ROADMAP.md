@@ -37,6 +37,8 @@ Economic Agent의 최종 목적은 오늘 살 종목을 찍는 것이 아니라,
 - RSS/DART 기사 수집
 - 시장 스냅샷과 주요 지표 수집
 - 투자자 수급 수집
+- 가격 provider 계층: KIS REST -> Naver Finance -> Yahoo fallback
+- 가격 사용 이력 `price_snapshots` 저장
 - Supabase/SQLite 히스토리 저장
 
 ### 2. Decision Engine
@@ -60,8 +62,11 @@ Economic Agent의 최종 목적은 오늘 살 종목을 찍는 것이 아니라,
 ### 4. Freedom Engine
 경제적 자유 목표, 순자산 성장률, 목표 달성률, 예상 달성 시점을 추적한다.
 
-현재 상태:
-- 아직 미구현. 다음 핵심 축으로 추가한다.
+현재 기반:
+- `freedom-engine.js`
+- `data/freedom/freedom-status.json`
+- Supabase `financial_freedom_goals`
+- 월간 리뷰와 로컬 대시보드 연결
 
 초기 입력값:
 
@@ -144,7 +149,22 @@ Telegram Bot
 - [x] 로컬 파일시스템 질의를 위한 JSON/SQLite 미러 추가
 - [x] 기존 JSON 데이터 마이그레이션
 - [x] 추천/성과 평가를 DB 기준으로 변경
+- [x] 가격 사용 이력 `price_snapshots` 저장
 - [ ] 브리핑/리포트 입력 데이터도 DB에서 조회 가능하게 변경
+
+## Phase 2.5: 가격 데이터 엔진
+- [x] 한국 주식 Yahoo 의존 축소
+- [x] Naver Finance 국내 현재가 fallback 추가
+- [x] `price-provider.js`로 가격 소스 우선순위 분리
+- [x] 한국투자증권 Open API REST provider 골격 추가
+- [x] 국내 현재가 우선순위: KIS REST -> Naver Finance -> Yahoo fallback
+- [x] 해외 종목/환율/글로벌 지수는 Yahoo fallback 유지
+- [x] 사용 가격의 source/as_of/price_type 저장
+- [ ] KIS 계정 키 설정 후 국내 현재가 실호출 검증
+- [ ] KIS 일봉 데이터를 추천 성과 평가에 연결
+- [ ] KRX Open API 또는 공공데이터포털로 공식 일별 종가 백필
+- [ ] pykrx/FinanceDataReader는 로컬 백테스트 worker로 분리
+- [ ] 가격 source별 품질/오류율 모니터링
 
 ## Phase 3: 포트폴리오 기반 의사결정
 - [x] 비공개 포트폴리오 파일/Secret 로딩 구조
@@ -211,8 +231,8 @@ Telegram Bot
 - [x] Telegram을 대화 UI로 유지하고 Agent Server를 별도 런타임으로 분리하는 방향 결정
 - [x] `docs/AGENT_PLATFORM.md` 작성
 - [x] 공유방/비공개방 Telegram 라우팅 분리: `TELEGRAM_CHAT_ID`, `TELEGRAM_PRIVATE_CHAT_ID`
-- [ ] Supabase 원본 포트폴리오 테이블 추가: `portfolio_accounts`, `positions`, `risk_policy`
-- [ ] 대화/승인 테이블 추가: `conversation_messages`, `pending_actions`
+- [x] Supabase 원본 포트폴리오 테이블 추가: `portfolio_accounts`, `positions`, `risk_policy`
+- [x] 대화/승인 테이블 추가: `conversation_messages`, `pending_actions`
 - [ ] `src/server/telegram-webhook.js` 추가
 - [ ] `src/agent/agent-router.js`와 기본 명령어 라우팅 추가
 - [ ] `/portfolio`, `/goal`, `/risk` 조회 명령 구현
@@ -221,11 +241,11 @@ Telegram Bot
 - [ ] Cloud Run 또는 Fly.io/Render 배포 문서 추가
 
 ## 현재 가장 중요한 다음 작업
-1. Supabase 포트폴리오 원본 테이블과 `pending_actions`, `conversation_messages` 테이블을 추가한다.
+1. KIS 계정 키를 설정하고 국내 현재가 provider 실호출을 검증한다.
 2. `src/server/telegram-webhook.js`와 `src/agent/agent-router.js` 초안을 만든다.
-3. 추천 JSON schema 검증을 추가해 근거, 기준 가격, 손절선, 손익비, 제안 비중이 없는 추천 저장을 차단한다.
-4. `performance-lab.js`와 `behavior-reviewer.js`로 추천/실거래/행동 패턴을 분리 분석한다.
-5. 대시보드 첫 탭을 Freedom 중심으로 재구성한다.
+3. KRX/공공데이터 일별 종가 백필 provider를 추가한다.
+4. 추천 JSON schema 검증을 추가해 근거, 기준 가격, 손절선, 손익비, 제안 비중이 없는 추천 저장을 차단한다.
+5. `performance-lab.js`와 `behavior-reviewer.js`로 추천/실거래/행동 패턴을 분리 분석한다.
 
 ## 운영 루프
 
