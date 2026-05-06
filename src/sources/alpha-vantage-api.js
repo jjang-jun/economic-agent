@@ -6,8 +6,10 @@ function isAlphaVantageConfigured() {
 }
 
 function normalizeAlphaSymbol(symbol) {
-  const cleaned = String(symbol || '').trim().toUpperCase().replace(/[^A-Z0-9.-]/g, '');
-  if (!cleaned || cleaned.includes('=') || cleaned.startsWith('^') || /^\d{6}(\.(KS|KQ))?$/.test(cleaned)) return '';
+  const raw = String(symbol || '').trim().toUpperCase();
+  if (!raw || raw.includes('=') || raw.startsWith('^') || /^\d{6}(\.(KS|KQ))?$/.test(raw)) return '';
+  const cleaned = raw.replace(/[^A-Z0-9.-]/g, '');
+  if (!cleaned) return '';
   return cleaned;
 }
 

@@ -6,8 +6,10 @@ function isTiingoConfigured() {
 }
 
 function normalizeTiingoSymbol(symbol) {
-  const cleaned = String(symbol || '').trim().toLowerCase().replace(/[^a-z0-9.-]/g, '');
-  if (!cleaned || cleaned.includes('=') || cleaned.startsWith('^') || /^\d{6}(\.(ks|kq))?$/.test(cleaned)) return '';
+  const raw = String(symbol || '').trim().toLowerCase();
+  if (!raw || raw.includes('=') || raw.startsWith('^') || /^\d{6}(\.(ks|kq))?$/.test(raw)) return '';
+  const cleaned = raw.replace(/[^a-z0-9.-]/g, '');
+  if (!cleaned) return '';
   return cleaned;
 }
 
