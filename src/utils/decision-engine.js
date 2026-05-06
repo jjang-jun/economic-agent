@@ -38,6 +38,52 @@ function getTrendSignal(snapshot, symbols) {
   return { weak, strong, details };
 }
 
+function formatEok(value) {
+  if (typeof value !== 'number') return 'n/a';
+  return `${Math.round(value).toLocaleString('ko-KR')}억원`;
+}
+
+function scoreInvestorFlow(flow) {
+  if (!flow?.latest) return { score: 0, reasons: [] };
+
+  const latest = flow.latest;
+  const sums5d = flow.sums5d || {};
+  const combined = (latest.foreign || 0) + (latest.institution || 0);
+  const combined5d = (sums5d.foreign || 0) + (sums5d.institution || 0);
+  let score = 0;
+  const reasons = [];
+
+  if (combined <= -10000) {
+    score -= 2;
+    reasons.push(`수급 악화: 외국인+기관 ${formatEok(combined)} 순매도`);
+  } else if (combined <= -5000) {
+    score -= 1;
+    reasons.push(`수급 부담: 외국인+기관 ${formatEok(combined)} 순매도`);
+  } else if (combined >= 15000) {
+    score += 2;
+    reasons.push(`수급 개선: 외국인+기관 ${formatEok(combined)} 순매수`);
+  } else if (combined >= 5000) {
+    score += 1;
+    reasons.push(`수급 우호: 외국인+기관 ${formatEok(combined)} 순매수`);
+  }
+
+  if (combined5d <= -20000) {
+    score -= 1;
+    reasons.push(`5일 누적 수급 약세: 외국인+기관 ${formatEok(combined5d)}`);
+  } else if (combined5d >= 20000) {
+    score += 1;
+    reasons.push(`5일 누적 수급 강세: 외국인+기관 ${formatEok(combined5d)}`);
+  }
+
+  if (latest.foreign > 0 && latest.institution < 0) {
+    reasons.push(`수급 엇갈림: 외국인 ${formatEok(latest.foreign)} 순매수, 기관 ${formatEok(latest.institution)} 순매도`);
+  } else if (latest.foreign < 0 && latest.institution > 0) {
+    reasons.push(`수급 엇갈림: 외국인 ${formatEok(latest.foreign)} 순매도, 기관 ${formatEok(latest.institution)} 순매수`);
+  }
+
+  return { score, reasons };
+}
+
 function scoreMarketRegime({ articles, indicators }) {
   const sentiment = countBySentiment(articles);
   const snapshot = indicators.marketSnapshot || [];
@@ -98,6 +144,10 @@ function scoreMarketRegime({ articles, indicators }) {
     score -= 1;
     reasons.push(`미국 기준금리 ${indicators.fedRate}%로 고금리 부담`);
   }
+
+  const investorFlow = scoreInvestorFlow(indicators.investorFlow);
+  score += investorFlow.score;
+  reasons.push(...investorFlow.reasons);
 
   if (score <= -2) return { regime: 'RISK_OFF', score, reasons, sentiment };
   if (score >= 2) return { regime: 'RISK_ON', score, reasons, sentiment };
@@ -200,5 +250,6 @@ module.exports = {
   scoreMarketRegime,
   summarizePortfolio,
   formatKRW,
+  scoreInvestorFlow,
   getTrendSignal,
 };

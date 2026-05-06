@@ -101,7 +101,7 @@ src/
     ├── portfolio.js           # 로컬 포트폴리오 파일 로딩
     ├── persistence.js         # Supabase 히스토리 저장
     ├── seen-articles.js       # 중복 기사 관리
-    ├── indicators.js          # 경제지표 수집
+    ├── indicators.js          # 경제지표/투자자 수급 수집
     └── daily-summary.js       # 일일 요약 저장
 ```
 
@@ -121,11 +121,11 @@ Codex에서 작업할 때는 저장소 루트의 `AGENTS.md`를 기준으로 프
 - `data/daily-articles/YYYY-MM-DD.json`: 수집 중 점수화된 당일 기사 누적 아카이브
 - `data/daily-summary/YYYY-MM-DD.json`: 다이제스트/종목 리포트 요약
 - `data/recommendations/recommendations.json`: 추천/성과 평가 로컬 미러. 기준 저장소는 Supabase `recommendations`, `recommendation_evaluations`
-- Supabase tables: `articles`, `daily_summaries`, `stock_reports`, `recommendations`, `recommendation_evaluations`, `market_snapshots`, `decision_contexts`
+- Supabase tables: `articles`, `daily_summaries`, `stock_reports`, `recommendations`, `recommendation_evaluations`, `market_snapshots`, `investor_flows`, `decision_contexts`
 - `data/supabase/*.json`: Supabase 데이터를 내려받은 로컬 JSON 미러
 - `data/economic-agent.db`: Supabase 데이터를 내려받은 로컬 SQLite 미러
 
-다이제스트는 AI 생성과 Telegram 전송이 모두 성공한 뒤에만 버퍼를 비웁니다. 장 마감 종목 분석은 `daily-articles` 아카이브를 우선 사용하므로, 5분 수집기가 이미 seen 처리한 기사와 DART 공시도 하루 단위 분석에 포함됩니다.
+다이제스트는 AI 생성과 Telegram 전송이 모두 성공한 뒤에만 버퍼를 비웁니다. 장 마감 종목 분석은 `daily-articles` 아카이브를 우선 사용하므로, 5분 수집기가 이미 seen 처리한 기사와 DART 공시도 하루 단위 분석에 포함됩니다. 외국인/기관 수급은 네이버 금융의 일자별 순매수 표를 보조 소스로 사용하고, 단위는 억원입니다.
 
 ## 영구 저장소
 

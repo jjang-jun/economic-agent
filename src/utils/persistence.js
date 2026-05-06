@@ -204,6 +204,23 @@ async function persistMarketSnapshots(snapshots, session = '', capturedAt = new 
   return upsert('market_snapshots', rows, 'id');
 }
 
+async function persistInvestorFlow(flow) {
+  if (!flow?.latest?.date) return { saved: 0 };
+  const latest = flow.latest;
+  return upsert('investor_flows', [{
+    id: `${flow.market || 'KOSPI'}:${latest.date}`,
+    date: latest.date,
+    market: flow.market || 'KOSPI',
+    individual: latest.individual ?? null,
+    foreign_net_buy: latest.foreign ?? null,
+    institution_net_buy: latest.institution ?? null,
+    pension_net_buy: latest.pension ?? null,
+    unit: flow.unit || '억원',
+    payload: flow,
+    updated_at: new Date().toISOString(),
+  }], 'id');
+}
+
 async function persistDecisionContext(context, date = getKSTDate()) {
   if (!context?.market) return { saved: 0 };
   return upsert('decision_contexts', [{
@@ -226,5 +243,6 @@ module.exports = {
   loadPersistedRecommendations,
   persistRecommendationEvaluations,
   persistMarketSnapshots,
+  persistInvestorFlow,
   persistDecisionContext,
 };

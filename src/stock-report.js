@@ -16,6 +16,7 @@ const {
   persistDailySummary,
   persistStockReport,
   persistMarketSnapshots,
+  persistInvestorFlow,
   persistDecisionContext,
 } = require('./utils/persistence');
 
@@ -39,6 +40,7 @@ async function main() {
   const indicators = await fetchAllIndicators();
   indicators.marketSnapshot = await fetchMarketSnapshot('close');
   await persistMarketSnapshots(indicators.marketSnapshot, 'close');
+  await persistInvestorFlow(indicators.investorFlow);
 
   const archivedArticles = loadScoredArticles();
   console.log(`[아카이브] 오늘 누적 기사 ${archivedArticles.length}건`);

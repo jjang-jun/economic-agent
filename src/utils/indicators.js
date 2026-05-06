@@ -1,10 +1,12 @@
 const { fetchBaseRate } = require('../sources/bok-api');
 const { fetchKeyIndicators } = require('../sources/fred-api');
+const { fetchInvestorFlow } = require('../sources/naver-investor');
 
 async function fetchAllIndicators() {
-  const [baseRate, fredIndicators] = await Promise.allSettled([
+  const [baseRate, fredIndicators, investorFlow] = await Promise.allSettled([
     fetchBaseRate(),
     fetchKeyIndicators(),
+    fetchInvestorFlow(),
   ]);
 
   const indicators = {};
@@ -28,6 +30,12 @@ async function fetchAllIndicators() {
       indicators.unemployment = fi.unemployment.value;
       console.log(`[지표] 미국 실업률: ${fi.unemployment.value}%`);
     }
+  }
+
+  if (investorFlow.status === 'fulfilled' && investorFlow.value) {
+    indicators.investorFlow = investorFlow.value;
+    const latest = investorFlow.value.latest;
+    console.log(`[지표] ${investorFlow.value.market} 수급: 외국인 ${latest.foreign}억원, 기관 ${latest.institution}억원 (${latest.date})`);
   }
 
   return indicators;

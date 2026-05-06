@@ -16,6 +16,7 @@ const TABLES = [
   'recommendations',
   'recommendation_evaluations',
   'market_snapshots',
+  'investor_flows',
   'decision_contexts',
 ];
 

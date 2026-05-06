@@ -61,6 +61,12 @@ async function generateDigest(articles, indicators, session) {
       indicatorInfo.push(line);
     }
   }
+  if (indicators.investorFlow?.latest) {
+    const flow = indicators.investorFlow;
+    indicatorInfo.push(
+      `Investor flow (${flow.market}, ${flow.unit}): foreign ${flow.latest.foreign}, institution ${flow.latest.institution}, individual ${flow.latest.individual}, 5d foreign ${flow.sums5d?.foreign}, 5d institution ${flow.sums5d?.institution}`
+    );
+  }
 
   const sessionFocus = SESSION_FOCUS[session] || [];
 

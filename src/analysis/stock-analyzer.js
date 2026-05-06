@@ -26,6 +26,12 @@ async function analyzeStocks(articles, indicators) {
       indicatorInfo.push(line);
     }
   }
+  if (indicators.investorFlow?.latest) {
+    const flow = indicators.investorFlow;
+    indicatorInfo.push(
+      `Investor flow (${flow.market}, ${flow.unit}): foreign ${flow.latest.foreign}, institution ${flow.latest.institution}, individual ${flow.latest.individual}, 5d foreign ${flow.sums5d?.foreign}, 5d institution ${flow.sums5d?.institution}`
+    );
+  }
 
   // interests.js에서 포트폴리오 관심사 동적 로드
   const interestList = Object.entries(MY_INTERESTS)

@@ -82,6 +82,19 @@ create table if not exists market_snapshots (
   payload jsonb not null default '{}'::jsonb
 );
 
+create table if not exists investor_flows (
+  id text primary key,
+  date date not null,
+  market text not null,
+  individual numeric,
+  foreign_net_buy numeric,
+  institution_net_buy numeric,
+  pension_net_buy numeric,
+  unit text,
+  payload jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists decision_contexts (
   id text primary key,
   date date not null,
@@ -94,3 +107,4 @@ create table if not exists decision_contexts (
 create index if not exists articles_date_idx on articles(date);
 create index if not exists recommendations_date_idx on recommendations(date);
 create index if not exists market_snapshots_captured_at_idx on market_snapshots(captured_at);
+create index if not exists investor_flows_date_idx on investor_flows(date);
