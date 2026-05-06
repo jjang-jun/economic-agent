@@ -308,6 +308,8 @@ cp docs/portfolio.example.json data/portfolio.json
 
 `cashAmount`와 `totalAssetValue`를 넣으면 현금 비중이 자동 계산됩니다. 종목별 `weight`를 넣으면 장 마감 리포트의 행동 가드레일에서 종목/섹터 쏠림을 점검합니다.
 
+초기 현금 2,000만원, `maxNewBuyRatio=0.05` 기준이면 장 마감 리포트의 1회 신규 매수 상한은 100만원으로 표시됩니다.
+
 ## 월간 비용 (추정)
 
 | 구성 | 비용 |

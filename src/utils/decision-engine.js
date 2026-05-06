@@ -57,6 +57,9 @@ function scoreMarketRegime({ articles, indicators }) {
 function summarizePortfolio(portfolio) {
   const positionCount = portfolio.positions.length;
   const cashPct = Math.round((portfolio.cashRatio || 0) * 100);
+  const maxNewBuyAmount = portfolio.totalAssetValue
+    ? Math.floor(portfolio.totalAssetValue * portfolio.maxNewBuyRatio)
+    : null;
   const overweight = portfolio.positions
     .filter(position => typeof position.weight === 'number' && position.weight > portfolio.maxPositionRatio)
     .map(position => `${position.name || position.ticker} 비중 ${Math.round(position.weight * 100)}%`);
@@ -73,18 +76,29 @@ function summarizePortfolio(portfolio) {
   return {
     positionCount,
     cashPct,
+    cashAmount: portfolio.cashAmount,
+    totalAssetValue: portfolio.totalAssetValue,
+    maxNewBuyAmount,
     overweight,
     overweightSectors,
   };
+}
+
+function formatKRW(value) {
+  if (typeof value !== 'number') return '';
+  return `${Math.round(value).toLocaleString('ko-KR')}원`;
 }
 
 function buildActions(regime, portfolio) {
   const summary = summarizePortfolio(portfolio);
   const portfolioChecks = [
     `현재 현금 비중 약 ${summary.cashPct}%, 보유 종목 ${summary.positionCount}개 기준으로 판단`,
+    summary.maxNewBuyAmount
+      ? `1회 신규 매수 상한 ${formatKRW(summary.maxNewBuyAmount)}`
+      : '',
     ...summary.overweight.map(item => `${item}: 신규 매수보다 비중 점검 우선`),
     ...summary.overweightSectors.map(item => `${item}: 섹터 쏠림 완화 후보 점검`),
-  ];
+  ].filter(Boolean);
 
   if (regime === 'RISK_OFF') {
     return [
@@ -131,4 +145,4 @@ function buildDecisionContext({ articles, indicators }) {
   };
 }
 
-module.exports = { buildDecisionContext, scoreMarketRegime, summarizePortfolio };
+module.exports = { buildDecisionContext, scoreMarketRegime, summarizePortfolio, formatKRW };

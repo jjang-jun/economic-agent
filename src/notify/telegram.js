@@ -14,6 +14,11 @@ const SENTIMENT = {
   neutral: { bar: '⚪', label: '중립' },
 };
 
+function formatKRW(value) {
+  if (typeof value !== 'number') return '';
+  return `${Math.round(value).toLocaleString('ko-KR')}원`;
+}
+
 // FinBERT confidence 기반 강도 표시
 function getSentimentDisplay(article) {
   const base = SENTIMENT[article.sentiment] || SENTIMENT.neutral;
@@ -172,6 +177,14 @@ function formatStockReport(report) {
   const regimeScore = typeof decision.market?.score === 'number' ? ` (${decision.market.score})` : '';
   const decisionReasons = (decision.market?.reasons || []).map(item => `└ ${escapeHtml(item)}`);
   const decisionActions = (decision.actions || []).map(item => `▸ ${escapeHtml(item)}`);
+  const portfolio = decision.portfolio || {};
+  const portfolioSummary = portfolio.summary || {};
+  const portfolioLines = [
+    portfolioSummary.totalAssetValue ? `총자산: ${formatKRW(portfolioSummary.totalAssetValue)}` : '',
+    portfolioSummary.cashAmount ? `현금: ${formatKRW(portfolioSummary.cashAmount)} (${portfolioSummary.cashPct}%)` : `현금 비중: ${portfolioSummary.cashPct ?? 0}%`,
+    portfolioSummary.maxNewBuyAmount ? `1회 신규 매수 상한: ${formatKRW(portfolioSummary.maxNewBuyAmount)}` : '',
+    `보유 종목: ${portfolioSummary.positionCount ?? 0}개`,
+  ].filter(Boolean).map(item => `▸ ${escapeHtml(item)}`);
 
   const sections = [
     [
@@ -188,29 +201,34 @@ function formatStockReport(report) {
     ].join('\n'),
 
     [
-      `<b>2. 섹터 동향</b>`,
+      `<b>2. 내 포트폴리오 기준</b>`,
+      portfolioLines.join('\n'),
+    ].join('\n'),
+
+    [
+      `<b>3. 섹터 동향</b>`,
       sectorLines.join('\n\n'),
     ].join('\n'),
 
     [
-      `<b>3. 후보 종목</b>`,
+      `<b>4. 후보 종목</b>`,
       stockLines.join('\n\n'),
     ].join('\n'),
 
     [
-      `<b>4. 내일 체크포인트</b>`,
+      `<b>5. 내일 체크포인트</b>`,
       actionLines.slice(0, 4).join('\n'),
     ].join('\n'),
 
     riskLines.length > 0
       ? [
-          `<b>5. 리스크 플래그</b>`,
+          `<b>6. 리스크 플래그</b>`,
           riskLines.slice(0, 4).join('\n'),
         ].join('\n')
       : null,
 
     [
-      `<b>6. 행동 가드레일</b>`,
+      `<b>7. 행동 가드레일</b>`,
       decisionActions.slice(0, 4).join('\n'),
     ].join('\n'),
 
