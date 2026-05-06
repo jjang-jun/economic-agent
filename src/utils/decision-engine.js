@@ -1,4 +1,4 @@
-const PORTFOLIO = require('../config/portfolio');
+const { loadPortfolio } = require('./portfolio');
 
 function countBySentiment(articles) {
   return articles.reduce((acc, article) => {
@@ -54,43 +54,81 @@ function scoreMarketRegime({ articles, indicators }) {
   return { regime: 'NEUTRAL', score, reasons, sentiment };
 }
 
-function buildActions(regime) {
+function summarizePortfolio(portfolio) {
+  const positionCount = portfolio.positions.length;
+  const cashPct = Math.round((portfolio.cashRatio || 0) * 100);
+  const overweight = portfolio.positions
+    .filter(position => typeof position.weight === 'number' && position.weight > portfolio.maxPositionRatio)
+    .map(position => `${position.name || position.ticker} 비중 ${Math.round(position.weight * 100)}%`);
+
+  const sectorWeights = portfolio.positions.reduce((acc, position) => {
+    if (!position.sector || typeof position.weight !== 'number') return acc;
+    acc[position.sector] = (acc[position.sector] || 0) + position.weight;
+    return acc;
+  }, {});
+  const overweightSectors = Object.entries(sectorWeights)
+    .filter(([, weight]) => weight > portfolio.maxSectorRatio)
+    .map(([sector, weight]) => `${sector} 섹터 ${Math.round(weight * 100)}%`);
+
+  return {
+    positionCount,
+    cashPct,
+    overweight,
+    overweightSectors,
+  };
+}
+
+function buildActions(regime, portfolio) {
+  const summary = summarizePortfolio(portfolio);
+  const portfolioChecks = [
+    `현재 현금 비중 약 ${summary.cashPct}%, 보유 종목 ${summary.positionCount}개 기준으로 판단`,
+    ...summary.overweight.map(item => `${item}: 신규 매수보다 비중 점검 우선`),
+    ...summary.overweightSectors.map(item => `${item}: 섹터 쏠림 완화 후보 점검`),
+  ];
+
   if (regime === 'RISK_OFF') {
     return [
       '신규 매수 중단 또는 최소화',
-      `보유 종목은 손절 기준(${PORTFOLIO.stopLossPct}%)과 악재 공시 여부 우선 점검`,
+      `보유 종목은 손절 기준(${portfolio.stopLossPct}%)과 악재 공시 여부 우선 점검`,
       '현금 비중 유지, 고변동 성장주는 비중 축소 후보로 분류',
+      ...portfolioChecks,
     ];
   }
   if (regime === 'RISK_ON') {
     return [
-      `high 확신도 추천만 총 자산의 ${Math.round(PORTFOLIO.maxNewBuyRatio * 100)}% 이내 분할 매수 후보`,
+      `high 확신도 추천만 총 자산의 ${Math.round(portfolio.maxNewBuyRatio * 100)}% 이내 분할 매수 후보`,
       '섹터 쏠림과 종목별 최대 비중을 넘기지 않음',
       '호재 공시가 있는 종목은 다음날 거래량 확인 후 진입',
+      ...portfolioChecks,
     ];
   }
   return [
-    `신규 매수는 총 자산의 ${Math.round(PORTFOLIO.maxNewBuyRatio * 100)}% 이하로 제한`,
+    `신규 매수는 총 자산의 ${Math.round(portfolio.maxNewBuyRatio * 100)}% 이하로 제한`,
     '추천 종목은 관찰 목록에 두고 가격/거래량 확인 후 분할 접근',
     '시장 방향성이 확인될 때까지 현금 비중을 유지',
+    ...portfolioChecks,
   ];
 }
 
 function buildDecisionContext({ articles, indicators }) {
   const market = scoreMarketRegime({ articles, indicators });
+  const portfolio = loadPortfolio();
   return {
     market,
     portfolio: {
-      cashRatio: PORTFOLIO.cashRatio,
-      maxNewBuyRatio: PORTFOLIO.maxNewBuyRatio,
-      maxPositionRatio: PORTFOLIO.maxPositionRatio,
-      maxSectorRatio: PORTFOLIO.maxSectorRatio,
-      stopLossPct: PORTFOLIO.stopLossPct,
-      trimProfitPct: PORTFOLIO.trimProfitPct,
-      positions: PORTFOLIO.positions,
+      cashRatio: portfolio.cashRatio,
+      cashAmount: portfolio.cashAmount,
+      totalAssetValue: portfolio.totalAssetValue,
+      maxNewBuyRatio: portfolio.maxNewBuyRatio,
+      maxPositionRatio: portfolio.maxPositionRatio,
+      maxSectorRatio: portfolio.maxSectorRatio,
+      stopLossPct: portfolio.stopLossPct,
+      trimProfitPct: portfolio.trimProfitPct,
+      positions: portfolio.positions,
+      summary: summarizePortfolio(portfolio),
     },
-    actions: buildActions(market.regime),
+    actions: buildActions(market.regime, portfolio),
   };
 }
 
-module.exports = { buildDecisionContext, scoreMarketRegime };
+module.exports = { buildDecisionContext, scoreMarketRegime, summarizePortfolio };

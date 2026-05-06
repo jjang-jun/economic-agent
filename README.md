@@ -97,6 +97,7 @@ src/
     ├── recommendation-log.js  # 추천 저장 및 성과 평가
     ├── market-snapshot.js     # 프리마켓/글로벌 가격 스냅샷
     ├── decision-engine.js     # 시장 레짐/행동 가드레일
+    ├── portfolio.js           # 로컬 포트폴리오 파일 로딩
     ├── persistence.js         # Supabase 히스토리 저장
     ├── seen-articles.js       # 중복 기사 관리
     ├── indicators.js          # 경제지표 수집
@@ -193,6 +194,9 @@ SUPABASE_PUBLISHABLE_KEY=...
 SUPABASE_DB_PASSWORD=...
 # SUPABASE_DB_URL=postgresql://postgres.your-project-ref:password@aws-0-region.pooler.supabase.com:6543/postgres
 # SUPABASE_DNS_RESOLVER=https
+
+# 로컬 포트폴리오 파일 (선택, 커밋 금지)
+# PORTFOLIO_FILE=data/portfolio.json
 ```
 
 ### 실행
@@ -293,6 +297,16 @@ module.exports = {
   career: ['프론트엔드', '금융IT', ...],
 };
 ```
+
+### 실제 포트폴리오
+
+실제 보유 종목과 현금 비중은 커밋하지 않는 로컬 파일 `data/portfolio.json`에 둡니다. 형식은 `docs/portfolio.example.json`을 복사해 맞추면 됩니다.
+
+```bash
+cp docs/portfolio.example.json data/portfolio.json
+```
+
+`cashAmount`와 `totalAssetValue`를 넣으면 현금 비중이 자동 계산됩니다. 종목별 `weight`를 넣으면 장 마감 리포트의 행동 가드레일에서 종목/섹터 쏠림을 점검합니다.
 
 ## 월간 비용 (추정)
 

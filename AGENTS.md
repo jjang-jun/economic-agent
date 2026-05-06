@@ -38,6 +38,7 @@ RSS feeds
 - AI digest/report provider: `AI_PROVIDER`, optional `AI_MODEL`, `AI_BASE_URL`, and provider key such as `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GROQ_API_KEY`, or generic `AI_API_KEY`
 - Optional indicators/data: `BOK_API_KEY`, `FRED_API_KEY`, `DART_API_KEY`
 - Optional history store: `SUPABASE_PROJECT_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_DB_PASSWORD` or `SUPABASE_DB_URL` for schema pushes
+- Optional private portfolio file: `PORTFOLIO_FILE`, defaulting to ignored `data/portfolio.json`
 - `.env` is private and must not be committed.
 
 ## File Map
@@ -59,6 +60,7 @@ RSS feeds
 - `src/utils/article-archive.js`: daily scored article archive used by stock reports and later performance review
 - `src/utils/recommendation-log.js`: stores stock signals and evaluates returns against KOSPI benchmark when available
 - `src/utils/decision-engine.js`: rule-based market regime and action guardrails
+- `src/utils/portfolio.js`: loads ignored local portfolio data and derives cash/position risk inputs
 - `src/utils/persistence.js`: optional Supabase REST persistence for articles, summaries, reports, recommendations, snapshots, decisions
 - `src/config/keywords.js`: keyword weights, sentiment dictionary, sectors
 - `src/config/interests.js`: user interests
@@ -71,6 +73,7 @@ RSS feeds
 - `.github/workflows/`: collector, five digest schedules, stock report schedule
 - `docs/README.md`: docs index and folder roles
 - `docs/PROGRESS.md`: human-readable development progress and current operating context
+- `docs/portfolio.example.json`: private `data/portfolio.json` template
 - `ROADMAP.md`: long-term product and investing-system roadmap
 
 ## Data And Generated Files

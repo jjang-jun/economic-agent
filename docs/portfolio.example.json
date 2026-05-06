@@ -1,0 +1,21 @@
+{
+  "cashAmount": 5000000,
+  "totalAssetValue": 10000000,
+  "maxNewBuyRatio": 0.05,
+  "maxPositionRatio": 0.2,
+  "maxSectorRatio": 0.35,
+  "stopLossPct": -7,
+  "trimProfitPct": 20,
+  "positions": [
+    {
+      "name": "삼성전자",
+      "ticker": "005930",
+      "avgPrice": 70000,
+      "quantity": 10,
+      "sector": "반도체",
+      "weight": 0.12,
+      "thesis": "메모리 업황 회복",
+      "stopLossPct": -7
+    }
+  ]
+}
