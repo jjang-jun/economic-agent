@@ -1,0 +1,28 @@
+name: Performance Review Weekly (주간 성과 리뷰)
+
+on:
+  schedule:
+    # KST Friday 18:10 = UTC 09:10
+    - cron: '10 9 * * 5'
+  workflow_dispatch:
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - uses: actions/cache@v5
+        with:
+          path: data/
+          key: data-${{ github.run_id }}
+          restore-keys: data-
+      - run: npm ci
+      - run: node scripts/performance-review.js weekly
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}

@@ -68,9 +68,12 @@ Based on the news and indicators above, respond with ONLY this JSON format:
       "ticker": "Ticker code if known, empty string otherwise",
       "signal": "bullish or bearish or neutral",
       "conviction": "high or medium or low",
+      "thesis": "Core investment thesis in Korean, 1 sentence",
+      "target_horizon": "1d or 1w or 1m",
       "reason": "News-based reasoning in Korean (1-2 sentences)",
       "risk": "Main downside risk in Korean (1 sentence)",
       "invalidation": "What would prove the thesis wrong, in Korean",
+      "failure_reason": "Most likely way this recommendation can fail, in Korean",
       "upside_probability_pct": 55,
       "expected_upside_pct": 12,
       "expected_loss_pct": 6,
@@ -100,6 +103,7 @@ Rules:
 - For aggressive candidates, mention split-entry and the condition that would invalidate the setup
 - Every bullish stock must include expected_upside_pct, expected_loss_pct, stop_loss_pct, risk_reward, and invalidation. If the data is insufficient, set signal to neutral or conviction to low
 - Prefer candidates with risk_reward >= 2.0 and expected_loss_pct <= 10. Avoid illiquid stocks or recommendations based only on sector labels
+- Every stock must include thesis, target_horizon, invalidation, and failure_reason. target_horizon must be one of 1d, 1w, 1m
 - This is for informational purposes, not investment advice`;
 
   try {

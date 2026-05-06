@@ -44,9 +44,12 @@ create table if not exists recommendations (
   symbol text,
   signal text,
   conviction text,
+  thesis text,
+  target_horizon text,
   reason text,
   risk text,
   invalidation text,
+  failure_reason text,
   risk_profile jsonb,
   market_profile jsonb,
   risk_review jsonb,
@@ -141,9 +144,22 @@ create table if not exists decision_contexts (
   created_at timestamptz not null default now()
 );
 
+create table if not exists performance_reviews (
+  id text primary key,
+  period text not null,
+  start_date date,
+  end_date date,
+  recommendation_summary jsonb not null default '{}'::jsonb,
+  trade_summary jsonb not null default '{}'::jsonb,
+  notes jsonb not null default '[]'::jsonb,
+  payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
 create index if not exists articles_date_idx on articles(date);
 create index if not exists recommendations_date_idx on recommendations(date);
 create index if not exists trade_executions_date_idx on trade_executions(date);
 create index if not exists portfolio_snapshots_date_idx on portfolio_snapshots(date);
 create index if not exists market_snapshots_captured_at_idx on market_snapshots(captured_at);
 create index if not exists investor_flows_date_idx on investor_flows(date);
+create index if not exists performance_reviews_period_idx on performance_reviews(period, end_date);

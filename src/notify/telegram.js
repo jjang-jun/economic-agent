@@ -439,7 +439,34 @@ async function sendTradePerformanceReport(report) {
   }
 }
 
+function formatPerformanceReview(review) {
+  const title = review.period === 'monthly' ? '월간 성과 리뷰' : '주간 성과 리뷰';
+  const rec = review.recommendationSummary || {};
+  const trade = review.tradeSummary || {};
+  const notes = (review.notes || []).map(item => `▸ ${escapeHtml(item)}`);
+  return [
+    `🧾 <b>${title}</b>`,
+    `${escapeHtml(review.startDate)} ~ ${escapeHtml(review.endDate)}`,
+    `추천: ${rec.total ?? 0}건 · 평가완료 ${rec.evaluated ?? 0}건`,
+    `승률: ${rec.winRatePct ?? 'n/a'}% · 평균 신호수익률 ${rec.avgSignalReturnPct ?? 'n/a'}% · 평균 초과수익 ${rec.avgAlphaPct ?? 'n/a'}%`,
+    `실제 거래: ${trade.total ?? 0}건 · 추천 연결 ${trade.linked ?? 0}건 (${trade.linkedRatePct ?? 'n/a'}%)`,
+    notes.length > 0 ? [`<b>점검</b>`, ...notes].join('\n') : '',
+  ].filter(Boolean).join('\n');
+}
+
+async function sendPerformanceReview(review) {
+  const message = formatPerformanceReview(review);
+  try {
+    await sendTelegramMessage(message);
+    console.log('[성과리뷰] 리포트 전송 완료');
+    return true;
+  } catch (err) {
+    console.error(`[성과리뷰] 전송 실패: ${err.message}`);
+    return false;
+  }
+}
+
 module.exports = {
-  notifyArticles, sendStockReport, sendDigest, sendPerformanceReport, sendTradePerformanceReport,
-  formatMessage, formatStockReport, formatDigest, formatPerformanceReport, formatTradePerformanceReport,
+  notifyArticles, sendStockReport, sendDigest, sendPerformanceReport, sendTradePerformanceReport, sendPerformanceReview,
+  formatMessage, formatStockReport, formatDigest, formatPerformanceReport, formatTradePerformanceReport, formatPerformanceReview,
 };

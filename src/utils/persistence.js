@@ -129,9 +129,12 @@ function recommendationRow(recommendation) {
     symbol: recommendation.symbol || '',
     signal: recommendation.signal || 'neutral',
     conviction: recommendation.conviction || 'low',
+    thesis: recommendation.thesis || '',
+    target_horizon: recommendation.targetHorizon || recommendation.target_horizon || '',
     reason: recommendation.reason || '',
     risk: recommendation.risk || '',
     invalidation: recommendation.invalidation || '',
+    failure_reason: recommendation.failureReason || recommendation.failure_reason || '',
     risk_profile: recommendation.riskProfile || recommendation.risk_profile || null,
     market_profile: recommendation.marketProfile || recommendation.market_profile || null,
     risk_review: recommendation.riskReview || recommendation.risk_review || null,
@@ -301,6 +304,21 @@ async function persistDecisionContext(context, date = getKSTDate()) {
   }], 'id');
 }
 
+async function persistPerformanceReview(review) {
+  if (!review?.id) return { saved: 0 };
+  return upsert('performance_reviews', [{
+    id: review.id,
+    period: review.period || '',
+    start_date: review.startDate || null,
+    end_date: review.endDate || null,
+    recommendation_summary: review.recommendationSummary || {},
+    trade_summary: review.tradeSummary || {},
+    notes: review.notes || [],
+    payload: review,
+    created_at: new Date().toISOString(),
+  }], 'id');
+}
+
 module.exports = {
   isPersistenceEnabled,
   selectRows,
@@ -316,4 +334,5 @@ module.exports = {
   persistMarketSnapshots,
   persistInvestorFlow,
   persistDecisionContext,
+  persistPerformanceReview,
 };

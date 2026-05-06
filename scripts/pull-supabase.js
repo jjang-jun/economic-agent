@@ -17,6 +17,7 @@ const TABLES = [
   'recommendation_evaluations',
   'trade_executions',
   'portfolio_snapshots',
+  'performance_reviews',
   'market_snapshots',
   'investor_flows',
   'decision_contexts',

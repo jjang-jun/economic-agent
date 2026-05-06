@@ -28,6 +28,8 @@ RSS feeds
 - Evaluate recommendation performance: `npm run evaluate`
 - Record an actual manual trade execution: `npm run trade:record -- --side buy --ticker 005930 --quantity 3 --price 266000`
 - Review actual trade performance: `npm run trade:performance`
+- Build weekly/monthly performance reviews: `npm run review:weekly`, `npm run review:monthly`
+- Build local HTML dashboard from pulled Supabase mirrors: `npm run dashboard`
 - Create a current portfolio valuation snapshot: `npm run portfolio:snapshot`
 - Push Supabase schema: `npm run db:push`
 - Import existing local `data/*.json` history into Supabase: `npm run db:import-local`
@@ -52,6 +54,8 @@ RSS feeds
 - `src/evaluate-recommendations.js`: evaluates logged stock signals after 1/5/20 days
 - `scripts/record-trade.js`: records a manual buy/sell execution separately from AI recommendations
 - `scripts/trade-performance.js`: evaluates actual trade executions with current quotes and sends a Telegram report when trades exist
+- `scripts/performance-review.js`: writes weekly/monthly recommendation-vs-trade performance reviews
+- `scripts/dashboard.js`: generates ignored local HTML dashboard from `data/supabase/*.json`
 - `src/sources/`: RSS, DART, BOK, FRED integrations
 - `src/sources/dart-api.js`: OpenDART disclosure fetcher, optional `DART_API_KEY`
 - `src/sources/yahoo-finance.js`: Yahoo chart quote fetcher for recommendation performance tracking and 5/20 day trend fields
@@ -69,6 +73,7 @@ RSS feeds
 - `src/utils/article-identity.js`: normalized article identity keys for duplicate suppression across RSS/DART, URLs, and titles
 - `src/utils/recommendation-log.js`: stores stock signals and evaluates returns against KOSPI benchmark when available
 - `src/utils/risk-reviewer.js`: rule-based risk manager for recommendation factor pass/fail and blockers
+- `src/utils/performance-review.js`: summarizes recommendation and trade performance over weekly/monthly windows
 - `src/utils/trade-log.js`: stores actual manual trade executions in ignored local data and Supabase
 - `src/utils/decision-engine.js`: rule-based market regime, index trend scoring, and action guardrails
 - Market regime can include tags such as `OVERHEATED`, `CONCENTRATED_LEADERSHIP`, `SEMICONDUCTOR_LEADERSHIP`, and `MOMENTUM_ALLOWED`. Treat these as risk controls, not pure buy signals.
