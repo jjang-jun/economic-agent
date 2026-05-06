@@ -14,6 +14,25 @@ function readPortfolioFile(filePath) {
   }
 }
 
+function readPortfolioEnv() {
+  if (process.env.PORTFOLIO_JSON_BASE64) {
+    try {
+      const json = Buffer.from(process.env.PORTFOLIO_JSON_BASE64, 'base64').toString('utf-8');
+      return JSON.parse(json);
+    } catch (err) {
+      console.warn(`[Portfolio] PORTFOLIO_JSON_BASE64 파싱 실패: ${err.message}`);
+    }
+  }
+  if (process.env.PORTFOLIO_JSON) {
+    try {
+      return JSON.parse(process.env.PORTFOLIO_JSON);
+    } catch (err) {
+      console.warn(`[Portfolio] PORTFOLIO_JSON 파싱 실패: ${err.message}`);
+    }
+  }
+  return null;
+}
+
 function normalizePosition(position) {
   return {
     name: position.name || '',
@@ -54,7 +73,7 @@ function normalizePortfolio(raw) {
 
 function loadPortfolio() {
   const filePath = process.env.PORTFOLIO_FILE || DEFAULT_PORTFOLIO_FILE;
-  const local = readPortfolioFile(filePath);
+  const local = readPortfolioEnv() || readPortfolioFile(filePath);
   return normalizePortfolio(local);
 }
 

@@ -41,6 +41,7 @@ RSS feeds
 - Optional indicators/data: `BOK_API_KEY`, `FRED_API_KEY`, `DART_API_KEY`
 - Optional history store: `SUPABASE_PROJECT_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_DB_PASSWORD` or `SUPABASE_DB_URL` for schema pushes
 - Optional private portfolio file: `PORTFOLIO_FILE`, defaulting to ignored `data/portfolio.json`
+- Optional private portfolio env for GitHub Actions: `PORTFOLIO_JSON_BASE64` or `PORTFOLIO_JSON`
 - `.env` is private and must not be committed.
 
 ## File Map

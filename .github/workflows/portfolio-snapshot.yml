@@ -24,5 +24,7 @@ jobs:
       - run: npm ci
       - run: node scripts/portfolio-snapshot.js
         env:
+          PORTFOLIO_JSON_BASE64: ${{ secrets.PORTFOLIO_JSON_BASE64 }}
+          PORTFOLIO_JSON: ${{ secrets.PORTFOLIO_JSON }}
           SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}

@@ -38,5 +38,7 @@ jobs:
           BOK_API_KEY: ${{ secrets.BOK_API_KEY }}
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
           DART_API_KEY: ${{ secrets.DART_API_KEY }}
+          PORTFOLIO_JSON_BASE64: ${{ secrets.PORTFOLIO_JSON_BASE64 }}
+          PORTFOLIO_JSON: ${{ secrets.PORTFOLIO_JSON }}
           SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}

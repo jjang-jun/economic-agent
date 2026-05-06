@@ -324,6 +324,12 @@ module.exports = {
 cp docs/portfolio.example.json data/portfolio.json
 ```
 
+GitHub Actions에서도 실제 포트폴리오를 평가하려면 같은 JSON을 secret으로 넣습니다. 권장 방식은 base64입니다.
+
+```bash
+base64 -i data/portfolio.json | gh secret set PORTFOLIO_JSON_BASE64 --body-file -
+```
+
 `cashAmount`와 `totalAssetValue`를 넣으면 현금 비중이 자동 계산됩니다. 종목별 `weight`를 넣으면 장 마감 리포트의 행동 가드레일에서 종목/섹터 쏠림을 점검합니다.
 
 초기 현금 2,000만원, `maxNewBuyRatio=0.05` 기준이면 장 마감 리포트의 1회 신규 매수 상한은 100만원으로 표시됩니다.
