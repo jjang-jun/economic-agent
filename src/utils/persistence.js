@@ -10,12 +10,13 @@ function isPersistenceEnabled() {
 }
 
 function getHeaders(prefer = 'resolution=merge-duplicates') {
-  return {
+  const headers = {
     apikey: SUPABASE_KEY,
     Authorization: `Bearer ${SUPABASE_KEY}`,
     'Content-Type': 'application/json',
-    Prefer: prefer,
   };
+  if (prefer) headers.Prefer = prefer;
+  return headers;
 }
 
 async function upsert(table, rows, onConflict) {
@@ -38,6 +39,31 @@ async function upsert(table, rows, onConflict) {
   } catch (err) {
     console.warn(`[DB] ${table} 저장 실패: ${err.message}`);
     return { saved: 0, error: err };
+  }
+}
+
+async function selectRows(table, params = {}) {
+  if (!isPersistenceEnabled()) return { rows: null, disabled: true };
+
+  const url = new URL(`/rest/v1/${table}`, SUPABASE_URL);
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null) {
+      url.searchParams.set(key, value);
+    }
+  }
+
+  try {
+    const res = await fetch(url, {
+      headers: getHeaders(''),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`${res.status} ${body}`);
+    }
+    return { rows: await res.json() };
+  } catch (err) {
+    console.warn(`[DB] ${table} 조회 실패: ${err.message}`);
+    return { rows: null, error: err };
   }
 }
 
@@ -120,6 +146,19 @@ async function persistRecommendations(recommendations) {
   return upsert('recommendations', rows, 'id');
 }
 
+async function loadPersistedRecommendations() {
+  const result = await selectRows('recommendations', {
+    select: 'payload',
+    order: 'date.desc,updated_at.desc',
+  });
+  if (!result.rows) return result;
+
+  const recommendations = result.rows
+    .map(row => row.payload)
+    .filter(Boolean);
+  return { rows: recommendations };
+}
+
 function evaluationRow(item) {
   const recommendation = item.recommendation;
   const evaluation = item.evaluation;
@@ -177,10 +216,12 @@ async function persistDecisionContext(context, date = getKSTDate()) {
 
 module.exports = {
   isPersistenceEnabled,
+  selectRows,
   persistArticles,
   persistDailySummary,
   persistStockReport,
   persistRecommendations,
+  loadPersistedRecommendations,
   persistRecommendationEvaluations,
   persistMarketSnapshots,
   persistDecisionContext,

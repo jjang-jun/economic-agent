@@ -2,13 +2,17 @@ const fs = require('fs');
 const path = require('path');
 const { getKSTDate } = require('./article-archive');
 const { fetchQuote, fetchBenchmarkQuote, normalizeYahooSymbol } = require('../sources/yahoo-finance');
-const { persistRecommendations, persistRecommendationEvaluations } = require('./persistence');
+const {
+  persistRecommendations,
+  persistRecommendationEvaluations,
+  loadPersistedRecommendations,
+} = require('./persistence');
 
 const DATA_DIR = path.join(__dirname, '..', '..', 'data', 'recommendations');
 const LOG_FILE = path.join(DATA_DIR, 'recommendations.json');
 const EVALUATION_DAYS = [1, 5, 20];
 
-function loadRecommendations() {
+function loadLocalRecommendations() {
   try {
     return JSON.parse(fs.readFileSync(LOG_FILE, 'utf-8'));
   } catch {
@@ -19,6 +23,22 @@ function loadRecommendations() {
 function saveRecommendations(recommendations) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   fs.writeFileSync(LOG_FILE, JSON.stringify(recommendations, null, 2));
+}
+
+async function loadRecommendations() {
+  const local = loadLocalRecommendations();
+  const persisted = await loadPersistedRecommendations();
+  if (persisted.error || persisted.disabled || !persisted.rows) {
+    return local;
+  }
+
+  const byId = new Map(local.filter(r => r.id).map(r => [r.id, r]));
+  for (const recommendation of persisted.rows) {
+    if (recommendation?.id) byId.set(recommendation.id, recommendation);
+  }
+  const merged = [...byId.values()];
+  saveRecommendations(merged);
+  return merged;
 }
 
 function getRecommendationId(date, stock) {
@@ -78,7 +98,7 @@ async function logRecommendations(report, context = {}) {
   if (stocks.length === 0) return { added: 0, skipped: 0 };
 
   const date = getKSTDate();
-  const existing = loadRecommendations();
+  const existing = await loadRecommendations();
   const byId = new Map(existing.map(r => [r.id, r]));
   let added = 0;
   let skipped = 0;
@@ -124,7 +144,7 @@ function calculateBenchmarkReturn(entryPrice, currentPrice) {
 }
 
 async function evaluateRecommendations() {
-  const recommendations = loadRecommendations();
+  const recommendations = await loadRecommendations();
   const completed = [];
 
   for (const recommendation of recommendations) {
@@ -186,6 +206,7 @@ async function evaluateRecommendations() {
 module.exports = {
   EVALUATION_DAYS,
   loadRecommendations,
+  loadLocalRecommendations,
   saveRecommendations,
   logRecommendations,
   evaluateRecommendations,

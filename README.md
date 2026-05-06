@@ -118,7 +118,7 @@ Codex에서 작업할 때는 저장소 루트의 `AGENTS.md`를 기준으로 프
 - `data/article-buffer.json`: 다음 다이제스트에서 처리할 score 4 기사
 - `data/daily-articles/YYYY-MM-DD.json`: 수집 중 점수화된 당일 기사 누적 아카이브
 - `data/daily-summary/YYYY-MM-DD.json`: 다이제스트/종목 리포트 요약
-- `data/recommendations/recommendations.json`: 종목 리포트 추천과 1일/5일/20일 성과 평가
+- `data/recommendations/recommendations.json`: 추천/성과 평가 로컬 미러. 기준 저장소는 Supabase `recommendations`, `recommendation_evaluations`
 - Supabase tables: `articles`, `daily_summaries`, `stock_reports`, `recommendations`, `recommendation_evaluations`, `market_snapshots`, `decision_contexts`
 - `data/supabase/*.json`: Supabase 데이터를 내려받은 로컬 JSON 미러
 - `data/economic-agent.db`: Supabase 데이터를 내려받은 로컬 SQLite 미러
