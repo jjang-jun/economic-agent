@@ -1,6 +1,6 @@
 # Development Progress
 
-이 문서는 현재 개발 상태, 운영 판단, 다음 작업을 사람이 빠르게 확인하기 위한 진행 기록입니다. `memory/`는 에이전트 작업 메모리이고, `docs/PROGRESS.md`는 프로젝트 운영/개발 컨텍스트 문서입니다.
+이 문서는 현재 개발 상태, 운영 판단, 다음 작업을 사람이 빠르게 확인하기 위한 진행 기록입니다. 현재 운영 기준 문서는 `AGENTS.md`, `README.md`, `ROADMAP.md`, `docs/PROGRESS.md`입니다.
 
 ## 목표
 
@@ -39,6 +39,7 @@
 - 시장 레짐과 행동 가드레일 추가
 - Supabase 히스토리 저장소와 로컬 SQLite 미러 추가
 - Telegram 문구를 의사결정 중심 템플릿으로 재정렬
+- 현재 운영/AI 참조 기준에서 제외된 `memory/`, `CLAUDE.md`, `.claude/` 정리
 
 ## 데이터 저장 전략
 
@@ -76,16 +77,16 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - GitHub Actions 실행 후 Supabase 테이블에 row가 쌓이는지 확인
 - `npm run db:pull`로 로컬 JSON/SQLite 미러 생성 확인
 
-## 현재 블로커
+## 현재 검증 상태
 
-- 2026-05-06 로컬에서 `npm run db:push`를 시도했지만 Supabase direct DB 호스트가 IPv6 라우팅/DNS 문제로 연결되지 않았다.
-- `npm run db:pull`은 Supabase REST API까지 도달했으나 아직 `public.articles` 테이블이 없어 실패했다.
-- 해결: Supabase Dashboard > Project Settings > Database > Connection string에서 pooler URI를 복사해 `.env`에 `SUPABASE_DB_URL`로 추가한 뒤 `npm run db:push`를 다시 실행한다.
-- 이후 순서: `npm run db:push` -> `npm run db:import-local` -> `npm run db:pull`
+- Supabase Session pooler URL로 `npm run db:push` 성공
+- `npm run db:import-local` 성공: articles 8건, daily summaries 2건 업로드
+- `npm run db:pull` 성공: `data/supabase/*.json`, `data/economic-agent.db` 생성
+- SQLite 확인: `articles=8`, `daily_summaries=2`, `stock_reports=2`, `recommendations=0`
 
 ## 다음 작업
 
-1. 기존 `data/*.json`을 Supabase로 마이그레이션
+1. GitHub Actions 수동 실행으로 원격 자동 적재 검증
 2. 추천/성과 평가의 기준 저장소를 JSON에서 DB로 전환
 3. 실제 보유 종목/현금 비중을 포트폴리오 설정에 반영
 4. 시장 레짐 점수에 수급, 추세, 변동성 지표 추가

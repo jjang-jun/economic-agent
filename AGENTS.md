@@ -69,9 +69,8 @@ RSS feeds
 - `scripts/push-supabase.js`, `scripts/pull-supabase.js`: Supabase CLI push and local history mirror scripts
 - `scripts/import-local-history.js`: uploads existing ignored `data/*.json` history into Supabase after schema creation
 - `.github/workflows/`: collector, five digest schedules, stock report schedule
-- `memory/`: project memory, architecture notes, changelog
+- `docs/README.md`: docs index and folder roles
 - `docs/PROGRESS.md`: human-readable development progress and current operating context
-- `CLAUDE.md`: legacy Claude-facing project guide, keep aligned with this file when architecture or schedules change
 - `ROADMAP.md`: long-term product and investing-system roadmap
 
 ## Data And Generated Files
@@ -88,9 +87,8 @@ RSS feeds
 - Prefer existing CommonJS style: `require`, `module.exports`, async functions, and small utility modules.
 - Keep changes focused. Avoid broad refactors unless the task needs them.
 - When changing behavior, update `README.md` if user-facing usage, architecture, schedules, or environment variables change.
-- Record completed work in `memory/changelog.md` with date, summary, and changed files.
 - Keep `docs/PROGRESS.md` current when milestones, storage strategy, operating checklist, or next priorities change.
-- If architecture or operating assumptions change, update `memory/architecture.md` and `memory/MEMORY.md`.
+- Keep `README.md`, `AGENTS.md`, `ROADMAP.md`, and docs aligned when architecture, schedules, commands, or environment variables change.
 - Do not push to remote unless the user explicitly asks for it.
 
 ## Verification Notes
