@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const DATA_DIR = path.join(__dirname, '..', 'data', 'supabase');
+const FREEDOM_FILE = path.join(__dirname, '..', 'data', 'freedom', 'freedom-status.json');
 const OUT_DIR = path.join(__dirname, '..', 'data', 'dashboard');
 const OUT_FILE = path.join(OUT_DIR, 'index.html');
 
@@ -10,6 +11,14 @@ function readTable(name) {
     return JSON.parse(fs.readFileSync(path.join(DATA_DIR, `${name}.json`), 'utf-8'));
   } catch {
     return [];
+  }
+}
+
+function readJson(file) {
+  try {
+    return JSON.parse(fs.readFileSync(file, 'utf-8'));
+  } catch {
+    return null;
   }
 }
 
@@ -37,6 +46,7 @@ function buildDashboard() {
   const latestPortfolio = portfolio[0] || {};
   const latestFlow = investorFlows[0] || {};
   const latestRecommendations = recommendations.slice(0, 12);
+  const freedom = readJson(FREEDOM_FILE) || {};
 
   return `<!doctype html>
 <html lang="ko">
@@ -67,6 +77,9 @@ function buildDashboard() {
   </header>
   <main>
     <div class="grid">
+      ${metric('Freedom Progress', freedom.targetProgressPct !== undefined ? `${freedom.targetProgressPct}%` : 'n/a')}
+      ${metric('Target Net Worth', freedom.goal?.targetNetWorth ? `${Number(freedom.goal.targetNetWorth).toLocaleString('ko-KR')}원` : 'n/a')}
+      ${metric('Estimated Freedom Date', freedom.estimatedTargetDate || 'n/a')}
       ${metric('Articles', articles.length)}
       ${metric('Recommendations', recommendations.length)}
       ${metric('Trade Executions', trades.length)}

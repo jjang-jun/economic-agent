@@ -517,10 +517,12 @@ function formatPerformanceReview(review) {
   const title = review.period === 'monthly' ? '월간 성과 리뷰' : '주간 성과 리뷰';
   const rec = review.recommendationSummary || {};
   const trade = review.tradeSummary || {};
+  const freedom = review.freedomStatus || {};
   const notes = (review.notes || []).map(item => `▸ ${escapeHtml(item)}`);
   return [
     `🧾 <b>${title}</b>`,
     `${escapeHtml(review.startDate)} ~ ${escapeHtml(review.endDate)}`,
+    freedom.goal ? `경제적 자유: ${formatKRW(freedom.currentNetWorth)} / ${formatKRW(freedom.goal.targetNetWorth)} (${freedom.targetProgressPct ?? 'n/a'}%) · 예상 ${escapeHtml(freedom.estimatedTargetDate || 'n/a')}` : '',
     `추천: ${rec.total ?? 0}건 · 평가완료 ${rec.evaluated ?? 0}건`,
     `승률: ${rec.winRatePct ?? 'n/a'}% · 평균 신호수익률 ${rec.avgSignalReturnPct ?? 'n/a'}% · 평균 초과수익 ${rec.avgAlphaPct ?? 'n/a'}%`,
     `실제 거래: ${trade.total ?? 0}건 · 추천 연결 ${trade.linked ?? 0}건 (${trade.linkedRatePct ?? 'n/a'}%)`,

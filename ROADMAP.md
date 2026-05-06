@@ -103,6 +103,29 @@ freedomGoal: {
 5. Semi-Auto Mode: 검증된 조건에서만 주문 후보 생성
 6. Auto Mode: 충분히 검증된 전략만 제한적으로 자동 실행, 기본 비활성
 
+## 실행 플랫폼 방향
+
+대화 매개체는 Telegram을 유지한다. 다만 실시간 질의응답과 포트폴리오 변경 승인을 처리하려면 GitHub Actions가 아니라 항상 요청을 받을 수 있는 Node.js Agent Server가 필요하다.
+
+```text
+Telegram Bot
+  -> Node.js Agent API Server
+  -> Supabase/Postgres
+```
+
+역할 분리:
+- GitHub Actions: 뉴스 수집, 다이제스트, 장마감 리포트, 성과평가, 주간/월간 리뷰
+- Agent Server: Telegram webhook, 포트폴리오 조회, 매수/매도 기록 초안, 승인 버튼, 리스크 질의
+- Supabase: 기사, 추천, 실제 거래, 포트폴리오, 경제적 자유 목표, 대화 로그, pending action 기준 저장소
+- 로컬 JSON/SQLite: 분석 캐시와 백업
+
+권장 배포:
+1. Cloud Run
+2. Fly.io 또는 Render
+3. 개인 미니PC/NAS + Docker
+
+상세 설계는 `docs/AGENT_PLATFORM.md`를 기준으로 한다.
+
 ## Phase 1: 의사결정 구조화
 - [x] RSS/DART/가격/지표 수집
 - [x] 일별 중요 기사 아카이브
@@ -176,20 +199,32 @@ freedomGoal: {
 - [ ] `behavior-reviewer.js`로 원칙 위반 거래와 반복 행동 패턴을 경고
 
 ## Phase 7: 경제적 자유 엔진
-- [ ] `freedom-engine.js` 추가
-- [ ] 월 생활비, 월 저축액, 목표 인출률, 목표 순자산 설정
-- [ ] 현재 순자산과 목표 달성률 계산
-- [ ] 예상 달성 시점 계산
-- [ ] 최대낙폭 발생 시 목표 지연 기간 추정
-- [ ] 월간 리뷰에 경제적 자유 목표 달성률 포함
+- [x] `freedom-engine.js` 추가
+- [x] 월 생활비, 월 저축액, 목표 인출률, 목표 순자산 설정
+- [x] 현재 순자산과 목표 달성률 계산
+- [x] 예상 달성 시점 계산
+- [x] 최대낙폭 발생 시 목표 지연 기간 추정
+- [x] 월간 리뷰에 경제적 자유 목표 달성률 포함
 - [ ] 대시보드 첫 탭을 Freedom 중심으로 재구성
 
+## Phase 8: 대화형 Agent 플랫폼
+- [x] Telegram을 대화 UI로 유지하고 Agent Server를 별도 런타임으로 분리하는 방향 결정
+- [x] `docs/AGENT_PLATFORM.md` 작성
+- [ ] Supabase 원본 포트폴리오 테이블 추가: `portfolio_accounts`, `positions`, `risk_policy`
+- [ ] 대화/승인 테이블 추가: `conversation_messages`, `pending_actions`
+- [ ] `src/server/telegram-webhook.js` 추가
+- [ ] `src/agent/agent-router.js`와 기본 명령어 라우팅 추가
+- [ ] `/portfolio`, `/goal`, `/risk` 조회 명령 구현
+- [ ] `/buy`, `/sell`, `/cash`를 pending action + 버튼 승인 방식으로 구현
+- [ ] Telegram `chat_id` allowlist와 webhook secret 검증
+- [ ] Cloud Run 또는 Fly.io/Render 배포 문서 추가
+
 ## 현재 가장 중요한 다음 작업
-1. `freedom-engine.js`를 추가해 경제적 자유 목표, 달성률, 예상 달성 시점을 계산한다.
-2. `strategy-policy.js`와 `position-sizer.js`를 추가해 투자 헌법과 제안 매수금액 공식을 코드로 고정한다.
-3. 추천 JSON schema 검증을 추가해 근거, 기준 가격, 손절선, 손익비, 제안 비중이 없는 추천 저장을 차단한다.
-4. `performance-lab.js`를 추가해 AI 추천, 실제 매수 추천, 매수하지 않은 추천, 임의 거래 성과를 분리 분석한다.
-5. `behavior-reviewer.js`를 추가해 급등 추격, RISK_OFF 매수, 손절선 없는 진입 같은 반복 행동을 경고한다.
+1. `strategy-policy.js`와 `position-sizer.js`를 추가해 투자 헌법과 제안 매수금액 공식을 코드로 고정한다.
+2. Supabase 포트폴리오 원본 테이블과 `pending_actions`, `conversation_messages` 테이블을 추가한다.
+3. `src/server/telegram-webhook.js`와 `src/agent/agent-router.js` 초안을 만든다.
+4. 추천 JSON schema 검증을 추가해 근거, 기준 가격, 손절선, 손익비, 제안 비중이 없는 추천 저장을 차단한다.
+5. `performance-lab.js`와 `behavior-reviewer.js`로 추천/실거래/행동 패턴을 분리 분석한다.
 
 ## 운영 루프
 
@@ -199,9 +234,10 @@ freedomGoal: {
 1. 개장 전/장중/장마감/미국장 다이제스트로 시장 상태 확인
 2. 추천 후보 확인: `npm run recommendations:list`
 3. 일일 행동 후보 확인: `npm run action:report`
-4. 실제 매매 기록: `npm run trade:record -- --side buy --symbol 005930 --name 삼성전자 --qty 1 --price 70000`
-5. GitHub Actions 포트폴리오 동기화: `npm run portfolio:sync-secret`
-6. 평가손익 스냅샷: `npm run portfolio:snapshot`
+4. 경제적 자유 상태 확인: `npm run freedom:report`
+5. 실제 매매 기록: `npm run trade:record -- --side buy --symbol 005930 --name 삼성전자 --qty 1 --price 70000`
+6. GitHub Actions 포트폴리오 동기화: `npm run portfolio:sync-secret`
+7. 평가손익 스냅샷: `npm run portfolio:snapshot`
 
 ### 매주
 1. 실제 거래 성과 확인: `npm run trade:performance`

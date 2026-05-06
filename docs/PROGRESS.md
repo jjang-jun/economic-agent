@@ -120,11 +120,14 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - AI 종목 분석 프롬프트에 외부 기사 데이터는 신뢰할 수 없는 입력이며 기사 속 지시문을 무시하라는 prompt injection 방어 규칙 추가.
 - 5분 뉴스 수집 workflow에 concurrency를 적용해 중복 실행/캐시 충돌 가능성을 완화.
 - `npm run action:report`와 `action-report.yml` 추가. 최근 추천과 현재 포트폴리오를 합쳐 신규 매수/관찰/보유/축소/매도 후보를 토큰 비용 없이 분리하고 Telegram으로 발송.
+- `freedom-engine.js`와 `npm run freedom:report` 추가. 월 생활비, 목표 인출률, 월 저축액, 현재 순자산 기준으로 목표 순자산, 달성률, 예상 달성 시점, 하락 스트레스 지연 기간을 계산.
+- 월간 성과 리뷰와 로컬 대시보드가 최신 `data/freedom/freedom-status.json`을 표시하도록 연결.
+- 대화형 Agent 플랫폼 방향 확정. Telegram은 대화 UI, GitHub Actions는 정기 루틴, 별도 Node.js Agent Server는 webhook/질의응답/승인 처리, Supabase는 포트폴리오와 대화 상태의 기준 저장소로 둠. 상세 설계는 `docs/AGENT_PLATFORM.md`.
 
 ## 다음 작업
 
-1. `freedom-engine.js` 추가: 경제적 자유 목표, 달성률, 예상 달성 시점 계산
-2. `strategy-policy.js`와 `position-sizer.js` 추가: 투자 헌법과 제안 매수금액 공식을 코드로 고정
-3. 추천 JSON schema 검증 추가: 근거, 기준 가격, 손절선, 손익비, 제안 비중 누락 시 저장 차단
-4. `performance-lab.js` 추가: AI 추천, 실제 매수 추천, 매수하지 않은 추천, 임의 거래 성과 분리 분석
-5. `behavior-reviewer.js` 추가: 급등 추격, RISK_OFF 매수, 손절선 없는 진입 같은 반복 행동 경고
+1. `strategy-policy.js`와 `position-sizer.js` 추가: 투자 헌법과 제안 매수금액 공식을 코드로 고정
+2. Supabase 포트폴리오 원본 테이블과 `pending_actions`, `conversation_messages` 테이블 추가
+3. `src/server/telegram-webhook.js`와 `src/agent/agent-router.js` 초안 구현
+4. 추천 JSON schema 검증 추가: 근거, 기준 가격, 손절선, 손익비, 제안 비중 누락 시 저장 차단
+5. `performance-lab.js`, `behavior-reviewer.js` 추가: 추천/실거래/반복 행동 패턴 분리 분석

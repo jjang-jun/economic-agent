@@ -3,6 +3,8 @@ const path = require('path');
 const { loadRecommendations } = require('./recommendation-log');
 const { loadTradeExecutions } = require('./trade-log');
 const { getKSTDate } = require('./article-archive');
+const { loadPortfolio } = require('./portfolio');
+const { buildFreedomStatus, saveFreedomStatus } = require('./freedom-engine');
 
 const REVIEW_DIR = path.join(__dirname, '..', '..', 'data', 'performance-reviews');
 
@@ -92,6 +94,10 @@ async function buildPerformanceReview(period = 'weekly') {
   const periodTrades = filterByWindow(trades, 'date', startDate);
   const recommendationSummary = summarizeRecommendations(periodRecommendations);
   const tradeSummary = summarizeTrades(periodTrades, periodRecommendations);
+  const freedomStatus = period === 'monthly'
+    ? buildFreedomStatus({ portfolio: loadPortfolio() })
+    : null;
+  if (freedomStatus) saveFreedomStatus(freedomStatus);
 
   return {
     id: `${getKSTDate()}:${period}`,
@@ -101,6 +107,7 @@ async function buildPerformanceReview(period = 'weekly') {
     generatedAt: new Date().toISOString(),
     recommendationSummary,
     tradeSummary,
+    freedomStatus,
     notes: buildNotes(recommendationSummary, tradeSummary),
   };
 }

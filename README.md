@@ -23,6 +23,7 @@
 - **추천 성과 추적** — 종목 신호를 저장하고 1일/5일/20일 후 수익률 평가
 - **추천 리스크 평가** — 추천 후 최대상승률, 최대하락률, 손절선/목표구간 터치 여부 추적
 - **일일 행동 리포트** — 신규 매수/관찰/보유/축소/매도 후보를 포트폴리오 기준으로 분리
+- **경제적 자유 추적** — 목표 순자산, 현재 달성률, 예상 달성 시점 계산
 - **히스토리 영구 저장** — Supabase/Postgres에 기사, 리포트, 추천, 성과, 시장 스냅샷 저장
 - **로컬 분석 미러** — Supabase 데이터를 JSON과 SQLite로 내려받아 로컬 파일시스템에서 직접 질의
 - **AI 토큰 예산 관리** — 중요도 상위 기사와 핵심 가격 스냅샷만 AI 프롬프트에 투입
@@ -110,6 +111,7 @@ src/
     ├── config.js              # 공통 설정
     ├── recommendation-log.js  # 추천 저장 및 성과 평가
     ├── action-report.js       # 신규 매수/관찰/보유/축소/매도 후보 분리
+    ├── freedom-engine.js      # 경제적 자유 목표/달성률/예상 달성 시점 계산
     ├── risk-reviewer.js       # 추천 전 리스크 관리자/factor 검토
     ├── market-snapshot.js     # 프리마켓/글로벌 가격 스냅샷
     ├── decision-engine.js     # 시장 레짐/행동 가드레일
@@ -129,6 +131,8 @@ Codex에서 작업할 때는 저장소 루트의 `AGENTS.md`를 기준으로 프
 경제적 자유를 목표로 시장 파악, 주식 후보 도출, 리스크 관리, 성과 검증을 강화하는 장기 계획은 `ROADMAP.md`에 정리되어 있습니다.
 
 개발 진행 상황과 현재 운영 컨텍스트는 `docs/PROGRESS.md`에 기록합니다.
+
+대화형 Agent 실행 플랫폼과 Telegram webhook 서버 방향은 `docs/AGENT_PLATFORM.md`에 정리되어 있습니다. 현재 결론은 Telegram을 대화 UI로 유지하고, GitHub Actions는 정기 작업, 별도 Node.js Agent Server는 실시간 대화 처리, Supabase는 기준 저장소로 두는 구조입니다.
 
 ## 운영 모드
 
@@ -152,6 +156,7 @@ Codex에서 작업할 때는 저장소 루트의 `AGENTS.md`를 기준으로 프
 - `data/trades/trade-executions.json`: 실제 매수/매도 기록 로컬 미러. 추천과 실제 실행은 분리합니다.
 - `data/portfolio-snapshots/YYYY-MM-DD.json`: 보유 종목 현재가/평가손익 스냅샷
 - `data/action-reports/YYYY-MM-DD.json`: 신규 매수/관찰/보유/축소/매도 후보 일일 행동 리포트
+- `data/freedom/freedom-status.json`: 경제적 자유 목표와 현재 달성률
 - Supabase tables: `articles`, `daily_summaries`, `stock_reports`, `recommendations`, `recommendation_evaluations`, `trade_executions`, `portfolio_snapshots`, `market_snapshots`, `investor_flows`, `decision_contexts`
 - `data/supabase/*.json`: Supabase 데이터를 내려받은 로컬 JSON 미러
 - `data/economic-agent.db`: Supabase 데이터를 내려받은 로컬 SQLite 미러
@@ -182,6 +187,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 npm run trade:record -- --side buy --ticker 005930 --name 삼성전자 --quantity 3 --price 266000 --notes "1차 분할 진입"
 npm run recommendations:list
 npm run action:report
+npm run freedom:report
 npm run trade:performance
 npm run review:weekly
 npm run review:monthly
@@ -426,6 +432,16 @@ npm run portfolio:sync-secret
 ```
 
 `cashAmount`와 `totalAssetValue`를 넣으면 현금 비중이 자동 계산됩니다. 종목별 `weight`를 넣으면 장 마감 리포트의 행동 가드레일에서 종목/섹터 쏠림을 점검합니다.
+
+### 경제적 자유 목표
+
+`src/config/freedom.js`에서 월 생활비, 월 저축액, 목표 인출률, 목표일, 기대 연수익률을 수정합니다.
+
+```bash
+npm run freedom:report
+```
+
+기본 목표 순자산은 `월 생활비 * 12 / 목표 인출률`로 계산합니다. 현재 순자산은 로컬 포트폴리오의 `totalAssetValue`를 우선 사용합니다.
 
 초기 현금 2,000만원, `maxNewBuyRatio=0.05` 기준이면 장 마감 리포트의 1회 신규 매수 상한은 100만원으로 표시됩니다.
 

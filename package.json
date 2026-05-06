@@ -18,6 +18,7 @@
     "review:weekly": "node --env-file=.env scripts/performance-review.js weekly",
     "review:monthly": "node --env-file=.env scripts/performance-review.js monthly",
     "dashboard": "node scripts/dashboard.js",
+    "freedom:report": "node --env-file=.env scripts/freedom-report.js",
     "portfolio:snapshot": "node --env-file=.env scripts/portfolio-snapshot.js",
     "portfolio:sync-secret": "bash scripts/sync-portfolio-secret.sh",
     "db:push": "node --env-file=.env scripts/push-supabase.js",
