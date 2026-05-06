@@ -7,6 +7,10 @@ on:
     - cron: '*/5 0-14 * * 5'
   workflow_dispatch:
 
+concurrency:
+  group: economic-agent-news-alert
+  cancel-in-progress: false
+
 jobs:
   collect:
     runs-on: ubuntu-latest

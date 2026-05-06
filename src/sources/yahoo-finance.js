@@ -25,9 +25,14 @@ async function fetchQuote(ticker) {
 
     const meta = result.meta || {};
     const quote = result.indicators?.quote?.[0] || {};
-    const closes = (quote.close || []).filter(v => typeof v === 'number');
-    const highs = (quote.high || []).filter(v => typeof v === 'number');
-    const volumes = (quote.volume || []).filter(v => typeof v === 'number');
+    const timestamps = result.timestamp || [];
+    const rawCloses = quote.close || [];
+    const rawHighs = quote.high || [];
+    const rawLows = quote.low || [];
+    const rawVolumes = quote.volume || [];
+    const closes = rawCloses.filter(v => typeof v === 'number');
+    const highs = rawHighs.filter(v => typeof v === 'number');
+    const volumes = rawVolumes.filter(v => typeof v === 'number');
     const price = meta.regularMarketPrice || closes[closes.length - 1];
     if (typeof price !== 'number') throw new Error('no price');
     const previousClose = meta.previousClose || closes[closes.length - 2] || null;
@@ -61,6 +66,15 @@ async function fetchQuote(ticker) {
     const breakout20d = priorHigh20d
       ? price >= priorHigh20d
       : null;
+    const history = timestamps
+      .map((timestamp, index) => ({
+        date: new Date(timestamp * 1000).toISOString(),
+        close: rawCloses[index],
+        high: rawHighs[index],
+        low: rawLows[index],
+        volume: rawVolumes[index],
+      }))
+      .filter(row => typeof row.close === 'number');
 
     return {
       symbol,
@@ -79,6 +93,7 @@ async function fetchQuote(ticker) {
       distanceFrom60dHighPct,
       near20dHigh,
       breakout20d,
+      history,
       currency: meta.currency || '',
       marketTime: meta.regularMarketTime
         ? new Date(meta.regularMarketTime * 1000).toISOString()

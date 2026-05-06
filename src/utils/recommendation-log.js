@@ -150,6 +150,63 @@ function calculateBenchmarkReturn(entryPrice, currentPrice) {
   return Number((((currentPrice - entryPrice) / entryPrice) * 100).toFixed(2));
 }
 
+function roundPct(value) {
+  return Number(value.toFixed(2));
+}
+
+function getEvaluationStats(recommendation, quote) {
+  const entryPrice = recommendation.entry?.price;
+  const history = Array.isArray(quote?.history) ? quote.history : [];
+  if (!entryPrice || history.length === 0) return {};
+
+  const startAt = recommendation.entry?.marketTime
+    ? new Date(recommendation.entry.marketTime).getTime()
+    : new Date(`${recommendation.date}T00:00:00+09:00`).getTime();
+  const rows = history.filter(row => new Date(row.date).getTime() >= startAt);
+  if (rows.length === 0) return {};
+
+  const highs = rows.map(row => row.high).filter(value => typeof value === 'number');
+  const lows = rows.map(row => row.low).filter(value => typeof value === 'number');
+  if (highs.length === 0 || lows.length === 0) return {};
+
+  const maxPriceAfter = Math.max(...highs);
+  const minPriceAfter = Math.min(...lows);
+  const isBearish = recommendation.signal === 'bearish';
+  const maxFavorableExcursionPct = isBearish
+    ? ((entryPrice - minPriceAfter) / entryPrice) * 100
+    : ((maxPriceAfter - entryPrice) / entryPrice) * 100;
+  const maxAdverseExcursionPct = isBearish
+    ? ((entryPrice - maxPriceAfter) / entryPrice) * 100
+    : ((minPriceAfter - entryPrice) / entryPrice) * 100;
+  const expectedLossPct = recommendation.riskProfile?.expectedLossPct || null;
+  const expectedUpsidePct = recommendation.riskProfile?.expectedUpsidePct || null;
+  const stopTouched = expectedLossPct
+    ? maxAdverseExcursionPct <= -Math.abs(expectedLossPct)
+    : null;
+  const targetTouched = expectedUpsidePct
+    ? maxFavorableExcursionPct >= expectedUpsidePct
+    : null;
+
+  return {
+    maxPriceAfter,
+    minPriceAfter,
+    maxFavorableExcursionPct: roundPct(maxFavorableExcursionPct),
+    maxAdverseExcursionPct: roundPct(maxAdverseExcursionPct),
+    maxDrawdownPct: roundPct(maxAdverseExcursionPct),
+    stopTouched,
+    targetTouched,
+  };
+}
+
+function getResultLabel(evaluation) {
+  if (evaluation.stopTouched && evaluation.targetTouched) return 'target_and_stop_touched';
+  if (evaluation.stopTouched) return 'stop_touched';
+  if (evaluation.targetTouched) return 'target_touched';
+  if (typeof evaluation.alphaPct === 'number' && evaluation.alphaPct > 0) return 'beat_benchmark';
+  if (typeof evaluation.signalReturnPct === 'number' && evaluation.signalReturnPct > 0) return 'positive';
+  return 'negative_or_flat';
+}
+
 async function evaluateRecommendations() {
   const recommendations = await loadRecommendations();
   const completed = [];
@@ -182,6 +239,7 @@ async function evaluateRecommendations() {
         currency: quote.currency,
         marketTime: quote.marketTime,
         ...result,
+        ...getEvaluationStats(recommendation, quote),
       };
       if (recommendation.benchmark?.entryPrice && benchmarkQuote?.price) {
         const benchmarkReturnPct = calculateBenchmarkReturn(
@@ -197,6 +255,9 @@ async function evaluateRecommendations() {
           (result.signalReturnPct - benchmarkReturnPct).toFixed(2)
         );
       }
+      recommendation.evaluations[String(day)].resultLabel = getResultLabel(
+        recommendation.evaluations[String(day)]
+      );
       completed.push({ recommendation, day, evaluation: recommendation.evaluations[String(day)] });
     }
 
@@ -219,4 +280,6 @@ module.exports = {
   evaluateRecommendations,
   calculateReturn,
   calculateBenchmarkReturn,
+  getEvaluationStats,
+  getResultLabel,
 };

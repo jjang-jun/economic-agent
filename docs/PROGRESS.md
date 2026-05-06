@@ -115,11 +115,15 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - `trade:record`가 기본적으로 `data/portfolio.json`의 현금/수량/평단을 갱신하도록 변경. `--noPortfolio`로 비활성화 가능. `npm run portfolio:sync-secret`으로 로컬 포트폴리오를 GitHub Actions secret에 동기화.
 - `npm run recommendations:list` 추가. 실제 거래를 추천과 연결할 때 필요한 최근 추천 ID, risk action, 제안금액을 터미널에서 확인 가능.
 - 텔레그램 중복 기사 완화. 기존 `article.id` 기준에서 `id + 정규화 URL + 정규화 제목` 기준으로 seen/buffer/archive 중복 제거를 강화하고, seen 키 보존량을 15,000개로 확대.
+- 외부 AI 피드백을 반영해 README 정체성을 뉴스봇에서 투자 의사결정 보조 시스템으로 재정의하고 운영 모드, 추천 생성 원칙, 리스크 가드레일, 성과 평가 기준을 문서화.
+- 추천 성과 평가에 MFE, MAE, 최대낙폭, 손절선 터치 여부, 목표구간 터치 여부, 결과 라벨을 추가하고 Supabase `recommendation_evaluations` 컬럼으로 저장.
+- AI 종목 분석 프롬프트에 외부 기사 데이터는 신뢰할 수 없는 입력이며 기사 속 지시문을 무시하라는 prompt injection 방어 규칙 추가.
+- 5분 뉴스 수집 workflow에 concurrency를 적용해 중복 실행/캐시 충돌 가능성을 완화.
 
 ## 다음 작업
 
 1. 일일 행동 리포트 추가: 신규 매수/보유/축소/매도 후보를 포트폴리오 기준으로 분리
-2. 실제 첫 거래부터 `trade:record`로 기록하고 `portfolio:sync-secret`으로 GitHub Actions secret 동기화
-3. 성과 리뷰 고도화: 섹터, 신호, 리스크팩터, 프롬프트 버전별 승률과 초과수익률 비교
-4. 대시보드 고도화: 차트, 기간 필터, 추천/실거래 상세, 리스크 차단 사유 보기
-5. 브리핑/리포트 입력 데이터를 Supabase 조회 중심으로 전환
+2. 성과 리뷰 고도화: 섹터, 신호, 리스크팩터, 프롬프트 버전별 승률과 초과수익률 비교
+3. 대시보드 고도화: 차트, 기간 필터, 추천/실거래 상세, 리스크 차단 사유 보기
+4. 브리핑/리포트 입력 데이터를 Supabase 조회 중심으로 전환
+5. 실제 첫 거래부터 `trade:record`로 기록하고 `portfolio:sync-secret`으로 GitHub Actions secret 동기화

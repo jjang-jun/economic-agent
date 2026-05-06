@@ -69,6 +69,14 @@ create table if not exists recommendation_evaluations (
   return_pct numeric,
   signal_return_pct numeric,
   alpha_pct numeric,
+  max_price_after numeric,
+  min_price_after numeric,
+  max_favorable_excursion_pct numeric,
+  max_adverse_excursion_pct numeric,
+  max_drawdown_pct numeric,
+  stop_touched boolean,
+  target_touched boolean,
+  result_label text,
   benchmark jsonb,
   payload jsonb not null default '{}'::jsonb
 );
