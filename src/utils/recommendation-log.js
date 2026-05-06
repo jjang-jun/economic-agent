@@ -71,6 +71,8 @@ async function buildRecommendation(stock, articles, indicators, date) {
     conviction: stock.conviction || 'low',
     reason: stock.reason || '',
     risk: stock.risk || '',
+    invalidation: stock.invalidation || stock.risk_profile?.invalidation || '',
+    riskProfile: stock.risk_profile || null,
     relatedNews: getRelatedArticleIds(stock, articles),
     indicators,
     entry: quote

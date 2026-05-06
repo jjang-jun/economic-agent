@@ -11,6 +11,7 @@ const { archiveScoredArticles, loadScoredArticles } = require('./utils/article-a
 const { logRecommendations } = require('./utils/recommendation-log');
 const { fetchMarketSnapshot } = require('./utils/market-snapshot');
 const { buildDecisionContext } = require('./utils/decision-engine');
+const { applyRecommendationRisk } = require('./utils/recommendation-risk');
 const {
   persistArticles,
   persistDailySummary,
@@ -81,6 +82,7 @@ async function main() {
     return;
   }
   report.decision = buildDecisionContext({ articles: scored, indicators });
+  applyRecommendationRisk(report, report.decision);
   await persistStockReport(report);
   await persistDecisionContext(report.decision);
 

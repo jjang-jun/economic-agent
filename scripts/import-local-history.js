@@ -7,6 +7,7 @@ const {
   persistStockReport,
   persistRecommendations,
   persistRecommendationEvaluations,
+  persistTradeExecutions,
   persistMarketSnapshots,
   persistDecisionContext,
 } = require('../src/utils/persistence');
@@ -121,6 +122,14 @@ async function importRecommendations() {
   return { recommendations: recommendations.length, evaluations: evaluations.length };
 }
 
+async function importTradeExecutions() {
+  const file = path.join(DATA_DIR, 'trades', 'trade-executions.json');
+  const trades = readJSON(file, []);
+  if (trades.length === 0) return 0;
+  await persistOrThrow(persistTradeExecutions(trades), 'trade executions');
+  return trades.length;
+}
+
 async function main() {
   if (!isPersistenceEnabled()) {
     console.error('SUPABASE_PROJECT_URL/SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY/SUPABASE_PUBLISHABLE_KEY are required.');
@@ -130,11 +139,13 @@ async function main() {
   const articles = await importArticles();
   const summaries = await importDailySummaries();
   const recommendationResult = await importRecommendations();
+  const trades = await importTradeExecutions();
 
   console.log(`[DB] imported articles: ${articles}`);
   console.log(`[DB] imported daily summaries: ${summaries}`);
   console.log(`[DB] imported recommendations: ${recommendationResult.recommendations}`);
   console.log(`[DB] imported recommendation evaluations: ${recommendationResult.evaluations}`);
+  console.log(`[DB] imported trade executions: ${trades}`);
 }
 
 main().catch(err => {

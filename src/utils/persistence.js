@@ -131,6 +131,8 @@ function recommendationRow(recommendation) {
     conviction: recommendation.conviction || 'low',
     reason: recommendation.reason || '',
     risk: recommendation.risk || '',
+    invalidation: recommendation.invalidation || '',
+    risk_profile: recommendation.riskProfile || recommendation.risk_profile || null,
     entry: recommendation.entry || null,
     benchmark: recommendation.benchmark || null,
     status: recommendation.status || '',
@@ -181,6 +183,39 @@ async function persistRecommendationEvaluations(completed) {
     .filter(item => item?.recommendation?.id && item?.evaluation)
     .map(evaluationRow);
   return upsert('recommendation_evaluations', rows, 'id');
+}
+
+function tradeExecutionRow(trade) {
+  const amount = typeof trade.amount === 'number'
+    ? trade.amount
+    : (typeof trade.quantity === 'number' && typeof trade.price === 'number'
+        ? trade.quantity * trade.price
+        : null);
+  return {
+    id: trade.id,
+    date: trade.date,
+    executed_at: trade.executedAt || trade.executed_at || new Date().toISOString(),
+    side: trade.side,
+    ticker: trade.ticker || '',
+    symbol: trade.symbol || '',
+    name: trade.name || '',
+    quantity: trade.quantity ?? null,
+    price: trade.price ?? null,
+    amount,
+    fees: trade.fees ?? null,
+    taxes: trade.taxes ?? null,
+    recommendation_id: trade.recommendationId || trade.recommendation_id || null,
+    notes: trade.notes || '',
+    payload: trade,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+async function persistTradeExecutions(trades) {
+  const rows = (trades || [])
+    .filter(trade => trade?.id && trade?.date && trade?.side)
+    .map(tradeExecutionRow);
+  return upsert('trade_executions', rows, 'id');
 }
 
 async function persistMarketSnapshots(snapshots, session = '', capturedAt = new Date().toISOString()) {
@@ -242,6 +277,7 @@ module.exports = {
   persistRecommendations,
   loadPersistedRecommendations,
   persistRecommendationEvaluations,
+  persistTradeExecutions,
   persistMarketSnapshots,
   persistInvestorFlow,
   persistDecisionContext,

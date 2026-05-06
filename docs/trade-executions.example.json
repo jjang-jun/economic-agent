@@ -1,0 +1,16 @@
+[
+  {
+    "date": "2026-05-06",
+    "executedAt": "2026-05-06T07:30:00.000Z",
+    "side": "buy",
+    "ticker": "005930",
+    "symbol": "005930.KS",
+    "name": "삼성전자",
+    "quantity": 3,
+    "price": 266000,
+    "fees": 0,
+    "taxes": 0,
+    "recommendationId": "",
+    "notes": "1차 분할 진입"
+  }
+]

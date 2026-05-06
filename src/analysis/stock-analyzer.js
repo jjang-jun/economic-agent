@@ -70,6 +70,12 @@ Based on the news and indicators above, respond with ONLY this JSON format:
       "conviction": "high or medium or low",
       "reason": "News-based reasoning in Korean (1-2 sentences)",
       "risk": "Main downside risk in Korean (1 sentence)",
+      "invalidation": "What would prove the thesis wrong, in Korean",
+      "upside_probability_pct": 55,
+      "expected_upside_pct": 12,
+      "expected_loss_pct": 6,
+      "stop_loss_pct": 6,
+      "risk_reward": 2.0,
       "related_news": [0, 1]
     }
   ],
@@ -92,6 +98,8 @@ Rules:
 - In a strong but overheated market, prefer trend-following candidates only when they have direct AI/semiconductor/infrastructure linkage, strong relative strength, sufficient liquidity, and foreign/institution support
 - Penalize vague theme stocks, weak relative-strength stocks, large one-day chase entries, and recommendations without an invalidation or stop-loss condition
 - For aggressive candidates, mention split-entry and the condition that would invalidate the setup
+- Every bullish stock must include expected_upside_pct, expected_loss_pct, stop_loss_pct, risk_reward, and invalidation. If the data is insufficient, set signal to neutral or conviction to low
+- Prefer candidates with risk_reward >= 2.0 and expected_loss_pct <= 10. Avoid illiquid stocks or recommendations based only on sector labels
 - This is for informational purposes, not investment advice`;
 
   try {

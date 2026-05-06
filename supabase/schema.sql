@@ -46,6 +46,8 @@ create table if not exists recommendations (
   conviction text,
   reason text,
   risk text,
+  invalidation text,
+  risk_profile jsonb,
   entry jsonb,
   benchmark jsonb,
   status text,
@@ -64,6 +66,25 @@ create table if not exists recommendation_evaluations (
   alpha_pct numeric,
   benchmark jsonb,
   payload jsonb not null default '{}'::jsonb
+);
+
+create table if not exists trade_executions (
+  id text primary key,
+  date date not null,
+  executed_at timestamptz not null,
+  side text not null,
+  ticker text,
+  symbol text,
+  name text,
+  quantity numeric,
+  price numeric,
+  amount numeric,
+  fees numeric,
+  taxes numeric,
+  recommendation_id text references recommendations(id) on delete set null,
+  notes text,
+  payload jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists market_snapshots (
@@ -106,5 +127,6 @@ create table if not exists decision_contexts (
 
 create index if not exists articles_date_idx on articles(date);
 create index if not exists recommendations_date_idx on recommendations(date);
+create index if not exists trade_executions_date_idx on trade_executions(date);
 create index if not exists market_snapshots_captured_at_idx on market_snapshots(captured_at);
 create index if not exists investor_flows_date_idx on investor_flows(date);
