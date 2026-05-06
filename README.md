@@ -143,6 +143,8 @@ Codex에서 작업할 때는 저장소 루트의 `AGENTS.md`를 기준으로 프
 
 대화형 Agent 실행 플랫폼과 Telegram webhook 서버 방향은 `docs/AGENT_PLATFORM.md`에 정리되어 있습니다. 현재 결론은 Telegram을 대화 UI로 유지하고, GitHub Actions는 정기 작업, 별도 Node.js Agent Server는 실시간 대화 처리, Supabase는 기준 저장소로 두는 구조입니다.
 
+Telegram 채팅창에서 명령어를 실제로 쓰기 위한 배포와 webhook 등록 절차는 `docs/TELEGRAM_AGENT_DEPLOY.md`에 정리되어 있습니다.
+
 ## 운영 모드
 
 현재 기본 운영 모드는 `Assist Mode`입니다. 자동 주문은 하지 않습니다.

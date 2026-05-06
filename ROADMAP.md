@@ -242,10 +242,10 @@ Telegram Bot
 - [x] `/portfolio`, `/goal`, `/risk` 조회 명령 구현
 - [x] `/buy`, `/sell`, `/cash`를 pending action + 버튼 승인 방식으로 구현
 - [x] Telegram `chat_id` allowlist와 webhook secret 검증
-- [ ] Cloud Run 또는 Fly.io/Render 배포 문서 추가
+- [x] Cloud Run 또는 Fly.io/Render 배포 문서 추가
 
 ## 현재 가장 중요한 다음 작업
-1. Agent Server 배포 플랫폼을 선택하고 webhook URL/setWebhook 절차를 문서화한다.
+1. Cloud Run/Render/Fly 중 하나로 실제 Agent Server를 배포한다.
 2. FMP profile/financial statement를 보유 미국 종목 분석 리포트에 연결한다.
 3. KRX/공공데이터 일별 종가 백필 provider를 추가한다.
 4. 추천 JSON schema 검증을 추가해 근거, 기준 가격, 손절선, 손익비, 제안 비중이 없는 추천 저장을 차단한다.
