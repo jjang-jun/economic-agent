@@ -1,4 +1,10 @@
 const { chat, extractJSON } = require('../utils/ai-client');
+const {
+  AI_BUDGET,
+  selectDigestArticles,
+  formatDigestArticle,
+  formatMarketSnapshot,
+} = require('../utils/ai-budget');
 
 const DIGEST_NAMES = {
   preopen: '개장 전 브리핑',
@@ -38,18 +44,10 @@ async function generateDigest(articles, indicators, session) {
   if (articles.length === 0) return null;
 
   const sessionName = DIGEST_NAMES[session] || session;
+  const selectedArticles = selectDigestArticles(articles);
 
-  const articleSummaries = articles
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 20)
-    .map((a, i) => {
-      const sentiment = a.sentiment || 'neutral';
-      const sectors = (a.sectors || []).join(', ');
-      const title = a.titleKo || a.title;
-      const source = a.source || '';
-      const score = a.score || '';
-      return `[${i}] (${sentiment}, score ${score}, ${source}) [${sectors}] ${title}`;
-    })
+  const articleSummaries = selectedArticles
+    .map(formatDigestArticle)
     .join('\n');
 
   const indicatorInfo = [];
@@ -59,8 +57,8 @@ async function generateDigest(articles, indicators, session) {
   if (indicators.unemployment) indicatorInfo.push(`US unemployment: ${indicators.unemployment}%`);
   if (indicators.marketSnapshot?.length > 0) {
     indicatorInfo.push('Market snapshot:');
-    for (const item of indicators.marketSnapshot.slice(0, 12)) {
-      indicatorInfo.push(`- ${item.name} (${item.symbol}): ${item.price} ${item.currency}`.trim());
+    for (const line of formatMarketSnapshot(indicators.marketSnapshot, AI_BUDGET.digest.maxSnapshotItems)) {
+      indicatorInfo.push(line);
     }
   }
 
@@ -72,7 +70,7 @@ Summarize the following news articles into a concise briefing.
 ## Economic Indicators
 ${indicatorInfo.length > 0 ? indicatorInfo.join('\n') : '(No data)'}
 
-## Articles (${articles.length} total, top 20 shown)
+## Articles (${articles.length} total, top ${selectedArticles.length} shown)
 ${articleSummaries}
 
 ## Session Focus

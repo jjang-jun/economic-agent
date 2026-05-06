@@ -71,12 +71,10 @@ function formatMessage(article) {
   const originalLine = hasTranslation ? `<i>${escapeHtml(article.title)}</i>` : '';
 
   const lines = [
-    `${s.bar} <b>[${s.label}]</b>  <b>${title}</b>`,
+    `${s.bar} <b>${s.label}</b> | <b>${title}</b>`,
     originalLine,
-    '',
-    reason ? `💬 ${reason}` : '',
-    '',
-    `${source} · ${date}${tags ? ' · ' + tags : ''}`,
+    reason ? `근거: ${reason}` : '',
+    `출처: ${source} · ${date}${tags ? ' · ' + tags : ''}`,
     `<a href="${article.link}">기사 원문 →</a>`,
   ];
 
@@ -177,57 +175,46 @@ function formatStockReport(report) {
 
   const sections = [
     [
-      `━━━━━━━━━━━━━━━━━━`,
-      `📊 <b>장 마감 종목 분석</b>`,
-      `━━━━━━━━━━━━━━━━━━`,
+      `📊 <b>장 마감 의사결정 리포트</b>`,
+      `⏰ ${now}`,
     ].join('\n'),
 
-    escapeHtml(report.market_summary || ''),
+    `한줄 판단: <b>${escapeHtml(report.market_summary || '')}</b>`,
 
     [
-      `── <b>시장 레짐</b> ──`,
-      '',
-      `<b>${escapeHtml(regime)}${regimeScore}</b>`,
+      `<b>1. 시장 레짐</b>`,
+      `${escapeHtml(regime)}${regimeScore}`,
       decisionReasons.join('\n'),
     ].join('\n'),
 
     [
-      `── <b>섹터 동향</b> ──`,
-      '',
+      `<b>2. 섹터 동향</b>`,
       sectorLines.join('\n\n'),
     ].join('\n'),
 
     [
-      `── <b>주목 종목</b> ──`,
-      '',
+      `<b>3. 후보 종목</b>`,
       stockLines.join('\n\n'),
     ].join('\n'),
 
     [
-      `── <b>내일 체크포인트</b> ──`,
-      '',
-      actionLines.join('\n'),
+      `<b>4. 내일 체크포인트</b>`,
+      actionLines.slice(0, 4).join('\n'),
     ].join('\n'),
 
     riskLines.length > 0
       ? [
-          `── <b>리스크 플래그</b> ──`,
-          '',
-          riskLines.join('\n'),
+          `<b>5. 리스크 플래그</b>`,
+          riskLines.slice(0, 4).join('\n'),
         ].join('\n')
       : null,
 
     [
-      `── <b>오늘 행동 가드레일</b> ──`,
-      '',
-      decisionActions.join('\n'),
+      `<b>6. 행동 가드레일</b>`,
+      decisionActions.slice(0, 4).join('\n'),
     ].join('\n'),
 
-    [
-      `━━━━━━━━━━━━━━━━━━`,
-      `⏰ ${now}`,
-      `<i>뉴스 기반 정보 제공이며 투자 권유가 아닙니다</i>`,
-    ].join('\n'),
+    `<i>정보 제공용입니다. 최종 매매는 포트폴리오/리스크 기준으로 판단하세요.</i>`,
   ];
 
   return sections.filter(Boolean).join('\n\n');
@@ -281,27 +268,21 @@ function formatDigest(digest) {
 
   const sections = [
     [
-      `━━━━━━━━━━━━━━━━━━`,
-      `${emoji} <b>${digest.sessionName}</b>  ${moodIcon.bar} ${moodIcon.label}`,
-      `━━━━━━━━━━━━━━━━━━`,
+      `${emoji} <b>${digest.sessionName}</b> | ${moodIcon.bar} ${moodIcon.label}`,
+      `⏰ ${now} · ${digest.articleCount}건 분석`,
     ].join('\n'),
 
-    `💬 <b>${escapeHtml(digest.headline || '')}</b>`,
+    `핵심: <b>${escapeHtml(digest.headline || '')}</b>`,
 
     sectionLines.join('\n\n'),
 
     numberLines.length > 0
-      ? [`<b>📊 주요 수치</b>`, ...numberLines].join('\n')
+      ? [`<b>주요 수치</b>`, ...numberLines.slice(0, 3)].join('\n')
       : null,
 
     watchLines.length > 0
-      ? [`<b>👀 주목 포인트</b>`, ...watchLines].join('\n')
+      ? [`<b>오늘 볼 것</b>`, ...watchLines.slice(0, 3)].join('\n')
       : null,
-
-    [
-      `━━━━━━━━━━━━━━━━━━`,
-      `📰 ${digest.articleCount}건 분석 · ⏰ ${now}`,
-    ].join('\n'),
   ];
 
   return sections.filter(Boolean).join('\n\n');
@@ -345,14 +326,11 @@ function formatPerformanceReport(completed) {
   const avg = completed.reduce((sum, item) => sum + item.evaluation.signalReturnPct, 0) / completed.length;
 
   return [
-    `━━━━━━━━━━━━━━━━━━`,
     `📈 <b>추천 성과 평가</b>`,
-    `━━━━━━━━━━━━━━━━━━`,
+    `⏰ ${now}`,
     `평균 신호기준 수익률: <b>${avg.toFixed(2)}%</b>`,
     '',
     lines.join('\n\n'),
-    '',
-    `⏰ ${now}`,
   ].join('\n');
 }
 

@@ -11,6 +11,13 @@ const { archiveScoredArticles, loadScoredArticles } = require('./utils/article-a
 const { logRecommendations } = require('./utils/recommendation-log');
 const { fetchMarketSnapshot } = require('./utils/market-snapshot');
 const { buildDecisionContext } = require('./utils/decision-engine');
+const {
+  persistArticles,
+  persistDailySummary,
+  persistStockReport,
+  persistMarketSnapshots,
+  persistDecisionContext,
+} = require('./utils/persistence');
 
 function mergeArticles(...groups) {
   const byId = new Map();
@@ -31,6 +38,7 @@ async function main() {
 
   const indicators = await fetchAllIndicators();
   indicators.marketSnapshot = await fetchMarketSnapshot('close');
+  await persistMarketSnapshots(indicators.marketSnapshot, 'close');
 
   const archivedArticles = loadScoredArticles();
   console.log(`[아카이브] 오늘 누적 기사 ${archivedArticles.length}건`);
@@ -53,6 +61,7 @@ async function main() {
 
   const latestScored = await scoreArticles(keywordFiltered);
   const archived = archiveScoredArticles(latestScored);
+  await persistArticles(latestScored);
   console.log(`[스코어링] 최신 ${latestScored.length}건, 아카이브 신규 ${archived}건`);
 
   const scored = mergeArticles(loadScoredArticles(), latestScored);
@@ -70,13 +79,16 @@ async function main() {
     return;
   }
   report.decision = buildDecisionContext({ articles: scored, indicators });
+  await persistStockReport(report);
+  await persistDecisionContext(report.decision);
 
   await sendStockReport(report);
   const logged = await logRecommendations(report, { articles: scored, indicators });
   console.log(`[추천로그] 신규 ${logged.added}건, 중복 ${logged.skipped}건`);
 
   // 일일 요약에 종목 분석 결과 저장
-  saveDailySummary({ articles: scored, indicators, stockReport: report });
+  const summary = saveDailySummary({ articles: scored, indicators, stockReport: report });
+  await persistDailySummary(summary);
 
   console.log(`[${new Date().toISOString()}] 종목 분석 완료`);
 }

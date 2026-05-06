@@ -1,7 +1,7 @@
 # Economic Agent
 
 ## 아키텍처
-RSS/DART 수집 → 키워드 필터 → 로컬 스코어링(FinBERT + 키워드) → 일별 기사 아카이브 → 긴급 알림 또는 다이제스트 버퍼 → AI 다이제스트/종목 리포트 → 추천 성과 평가
+RSS/DART 수집 → 키워드 필터 → 로컬 스코어링(FinBERT + 키워드) → 일별 기사 아카이브/Supabase 저장 → 긴급 알림 또는 다이제스트 버퍼 → AI 다이제스트/종목 리포트 → 추천 성과 평가 → 로컬 JSON/SQLite 미러
 
 ## 데이터 소스
 - **RSS**: 연합뉴스, 매일경제, 한국경제, Bloomberg
@@ -20,6 +20,8 @@ RSS/DART 수집 → 키워드 필터 → 로컬 스코어링(FinBERT + 키워드
    - score 4: `data/article-buffer.json`에 저장해 예약 다이제스트에서 처리
 6. **종목 분석**: 장 마감 리포트는 당일 기사 아카이브 전체를 분석
 7. **추천 검증**: 추천 신호를 저장하고 1일/5일/20일 후 KOSPI 대비 초과수익률 평가
+8. **히스토리 저장**: 기사, 요약, 리포트, 추천, 성과, 시장 스냅샷을 Supabase에 병행 저장
+9. **로컬 미러**: `npm run db:pull`로 Supabase 데이터를 `data/supabase/*.json`, `data/economic-agent.db`에 동기화
 
 ## 다이제스트 스케줄
 | 시간 (KST) | 세션 | 목적 |
@@ -61,12 +63,17 @@ src/
 ├── config/
 │   ├── keywords.js
 │   ├── interests.js
-│   └── watchlist.js
+│   ├── watchlist.js
+│   ├── portfolio.js
+│   └── ai-budget.js
 └── utils/
     ├── ai-client.js
+    ├── ai-budget.js
     ├── article-archive.js
     ├── article-buffer.js
     ├── market-snapshot.js
+    ├── decision-engine.js
+    ├── persistence.js
     ├── recommendation-log.js
     ├── seen-articles.js
     ├── indicators.js
@@ -78,16 +85,20 @@ src/
 - AI: `AI_PROVIDER`, `AI_MODEL`, `AI_API_KEY`, `AI_BASE_URL`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GROQ_API_KEY`
 - Telegram: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`
 - 데이터: `BOK_API_KEY`, `FRED_API_KEY`, `DART_API_KEY`
+- 저장소: `SUPABASE_PROJECT_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_DB_PASSWORD`, `SUPABASE_DB_URL`
 
 ## 명령어
 - `npm start`: 뉴스/공시 수집
 - `npm run digest -- preopen`: 특정 세션 다이제스트
 - `npm run report`: 장 마감 종목 분석
 - `npm run evaluate`: 추천 성과 평가
+- `npm run db:push`: Supabase 스키마 적용
+- `npm run db:pull`: Supabase 데이터를 로컬 JSON/SQLite로 동기화
 - `npm test`: 테스트
 
 ## 작업 규칙
 - 작업 완료 시 `memory/changelog.md`에 날짜/내용/변경 파일 기록
+- 개발 진행 상태와 운영 체크리스트 변경 시 `docs/PROGRESS.md` 업데이트
 - README에 사용자-facing 변경사항 반영
 - 구조 변경 시 `memory/architecture.md`, `memory/MEMORY.md`, `AGENTS.md`도 업데이트
 - 원격 push는 사용자 요청 또는 운영상 필요한 경우에만 수행

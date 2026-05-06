@@ -8,6 +8,8 @@
     "digest": "node --env-file=.env src/digest.js",
     "report": "node --env-file=.env src/stock-report.js",
     "evaluate": "node --env-file=.env src/evaluate-recommendations.js",
+    "db:push": "node --env-file=.env scripts/push-supabase.js",
+    "db:pull": "node --env-file=.env scripts/pull-supabase.js",
     "test": "node --test"
   },
   "keywords": [

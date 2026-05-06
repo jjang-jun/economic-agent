@@ -61,6 +61,7 @@ function saveDailySummary({ articles, indicators, stockReport }) {
 
   fs.writeFileSync(filePath, JSON.stringify(summary, null, 2));
   console.log(`[요약] 일일 요약 저장: ${filePath}`);
+  return summary;
 }
 
 module.exports = { saveDailySummary };

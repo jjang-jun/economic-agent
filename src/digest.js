@@ -5,6 +5,7 @@ const { sendDigest } = require('./notify/telegram');
 const { saveDailySummary } = require('./utils/daily-summary');
 const { archiveScoredArticles } = require('./utils/article-archive');
 const { fetchMarketSnapshot } = require('./utils/market-snapshot');
+const { persistArticles, persistDailySummary, persistMarketSnapshots } = require('./utils/persistence');
 
 // 세션 자동 판별 (KST 기준)
 function detectSession() {
@@ -38,6 +39,8 @@ async function main() {
   const indicators = await fetchAllIndicators();
   indicators.marketSnapshot = await fetchMarketSnapshot(session);
   archiveScoredArticles(articles);
+  await persistArticles(articles);
+  await persistMarketSnapshots(indicators.marketSnapshot, session);
 
   // AI로 다이제스트 생성
   const digest = await generateDigest(articles, indicators, session);
@@ -54,7 +57,8 @@ async function main() {
   }
 
   // 일일 요약 저장
-  saveDailySummary({ articles, indicators });
+  const summary = saveDailySummary({ articles, indicators });
+  await persistDailySummary(summary);
   clearBuffer();
 
   console.log(`[${new Date().toISOString()}] 완료`);

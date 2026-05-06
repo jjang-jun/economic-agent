@@ -1,20 +1,18 @@
 const { chat, extractJSON } = require('../utils/ai-client');
 const MY_INTERESTS = require('../config/interests');
+const {
+  AI_BUDGET,
+  selectStockReportArticles,
+  formatStockReportArticle,
+  formatMarketSnapshot,
+} = require('../utils/ai-budget');
 
 async function analyzeStocks(articles, indicators) {
   if (articles.length === 0) return null;
 
-  const articleSummaries = articles
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 40)
-    .map((a, i) => {
-      const sentiment = a.sentiment || 'neutral';
-      const title = a.titleKo || a.title;
-      const reason = a.reason || '';
-      const sectors = (a.sectors || []).join(', ');
-      const source = a.source || '';
-      return `[${i}] (${sentiment}, score ${a.score}, ${sectors}, ${source}) ${title} — ${reason}`;
-    })
+  const selectedArticles = selectStockReportArticles(articles);
+  const articleSummaries = selectedArticles
+    .map(formatStockReportArticle)
     .join('\n');
 
   const indicatorInfo = [];
@@ -24,9 +22,8 @@ async function analyzeStocks(articles, indicators) {
   if (indicators.unemployment) indicatorInfo.push(`US unemployment: ${indicators.unemployment}%`);
   if (indicators.marketSnapshot?.length > 0) {
     indicatorInfo.push('Market snapshot:');
-    for (const item of indicators.marketSnapshot.slice(0, 12)) {
-      const change = typeof item.changePercent === 'number' ? ` (${item.changePercent}%)` : '';
-      indicatorInfo.push(`- ${item.name} (${item.symbol}): ${item.price}${change} ${item.currency}`.trim());
+    for (const line of formatMarketSnapshot(indicators.marketSnapshot, AI_BUDGET.stockReport.maxSnapshotItems)) {
+      indicatorInfo.push(line);
     }
   }
 
@@ -41,7 +38,7 @@ Analyze today's economic news and indicators, then provide sector/stock investme
 ## Economic Indicators
 ${indicatorInfo.length > 0 ? indicatorInfo.join('\n') : '(No data)'}
 
-## Today's Key News (${articles.length} articles, top 40 shown)
+## Today's Key News (${articles.length} articles, top ${selectedArticles.length} shown)
 ${articleSummaries}
 
 ## User's Areas of Interest

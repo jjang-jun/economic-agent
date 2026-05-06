@@ -6,6 +6,7 @@ const { notifyArticles } = require('./notify/telegram');
 const { loadSeenArticles, saveSeenArticles } = require('./utils/seen-articles');
 const { addToBuffer } = require('./utils/article-buffer');
 const { archiveScoredArticles } = require('./utils/article-archive');
+const { persistArticles } = require('./utils/persistence');
 
 const { scoreArticles } = require('./filters/local-scorer');
 
@@ -46,6 +47,7 @@ async function main() {
   console.log(`[스코어링] ${scored.length}건 통과`);
   const archived = archiveScoredArticles(scored);
   console.log(`[아카이브] 점수화 기사 ${archived}건 신규 저장`);
+  await persistArticles(scored);
 
   // 4. 긴급(5점)은 개인 관련성 필터 후 즉시 알림, 나머지는 버퍼에 저장
   const urgent = filterByRelevance(scored.filter(a => a.score >= 5));

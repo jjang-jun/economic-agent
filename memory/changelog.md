@@ -1,5 +1,43 @@
 # 작업 기록 (Changelog)
 
+## 2026-05-06: Supabase 히스토리 저장과 AI 토큰 예산 추가
+- Supabase/Postgres 스키마와 CLI 기반 `db:push` 스크립트 추가
+- direct DB 연결이 IPv6에서 막힐 때를 대비해 `SUPABASE_DB_URL` pooler 연결 문자열을 지원
+- 로컬 검증에서 direct DB 연결은 IPv6/DNS 문제로 실패했고, REST pull은 테이블 미생성 상태를 확인
+- 기사, 일일 요약, 종목 리포트, 추천, 추천 성과, 시장 스냅샷, 의사결정 컨텍스트를 Supabase에 병행 저장하도록 연결
+- `db:pull`로 Supabase 데이터를 `data/supabase/*.json`과 `data/economic-agent.db`에 내려받는 로컬 미러 추가
+- AI 프롬프트 입력을 중요도 상위 기사와 핵심 시장 스냅샷으로 제한해 API 토큰 사용량을 줄이는 예산 모듈 추가
+- Telegram 문구를 의사결정 중심으로 간결하게 재정렬
+- 개발 진행 컨텍스트를 사람이 읽기 쉬운 `docs/PROGRESS.md`로 분리
+- GitHub Actions에 Supabase 런타임 Secret 연결
+- 변경 파일:
+  - `supabase/schema.sql`
+  - `supabase/migrations/20260506120000_init_history.sql`
+  - `scripts/push-supabase.js`
+  - `scripts/pull-supabase.js`
+  - `src/utils/persistence.js`
+  - `src/config/ai-budget.js`
+  - `src/utils/ai-budget.js`
+  - `src/check-news.js`
+  - `src/digest.js`
+  - `src/stock-report.js`
+  - `src/evaluate-recommendations.js`
+  - `src/utils/daily-summary.js`
+  - `src/utils/recommendation-log.js`
+  - `src/analysis/digest.js`
+  - `src/analysis/stock-analyzer.js`
+  - `src/notify/telegram.js`
+  - `docs/PROGRESS.md`
+  - `.github/workflows/*.yml`
+  - `.env.example`
+  - `README.md`
+  - `AGENTS.md`
+  - `CLAUDE.md`
+  - `ROADMAP.md`
+  - `memory/MEMORY.md`
+  - `memory/architecture.md`
+  - `memory/changelog.md`
+
 ## 2026-05-06: 투자 의사결정 엔진과 로드맵 추가
 - 장기 방향을 `ROADMAP.md`에 정리
 - 포트폴리오/리스크 제약 설정 파일 추가

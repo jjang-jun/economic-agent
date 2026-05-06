@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { getKSTDate } = require('./article-archive');
 const { fetchQuote, fetchBenchmarkQuote, normalizeYahooSymbol } = require('../sources/yahoo-finance');
+const { persistRecommendations, persistRecommendationEvaluations } = require('./persistence');
 
 const DATA_DIR = path.join(__dirname, '..', '..', 'data', 'recommendations');
 const LOG_FILE = path.join(DATA_DIR, 'recommendations.json');
@@ -99,6 +100,7 @@ async function logRecommendations(report, context = {}) {
   }
 
   saveRecommendations([...byId.values()]);
+  await persistRecommendations([...byId.values()]);
   return { added, skipped };
 }
 
@@ -176,6 +178,8 @@ async function evaluateRecommendations() {
   }
 
   saveRecommendations(recommendations);
+  await persistRecommendations(recommendations);
+  await persistRecommendationEvaluations(completed);
   return { completed, total: recommendations.length };
 }
 
