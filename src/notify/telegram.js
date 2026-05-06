@@ -37,7 +37,7 @@ function getSentimentDisplay(article) {
 }
 
 function escapeHtml(str) {
-  return str
+  return String(str ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
@@ -158,7 +158,9 @@ function formatStockReport(report) {
   const stockLines = (report.stocks || []).map(s => {
     const icon = SENTIMENT[s.signal] || SENTIMENT.neutral;
     const ticker = s.ticker ? `  ${s.ticker}` : '';
-    return `${icon.bar} <b>${escapeHtml(s.name)}</b>${ticker}  [${icon.label}]\n└ ${escapeHtml(s.reason)}`;
+    const conviction = s.conviction ? ` · 확신도 ${escapeHtml(s.conviction)}` : '';
+    const risk = s.risk ? `\n⚠ ${escapeHtml(s.risk)}` : '';
+    return `${icon.bar} <b>${escapeHtml(s.name)}</b>${ticker}  [${icon.label}${conviction}]\n└ ${escapeHtml(s.reason)}${risk}`;
   });
 
   const actionLines = (report.action_items || []).map(item =>
@@ -207,8 +209,10 @@ async function sendStockReport(report) {
   try {
     await sendTelegramMessage(message);
     console.log('[종목분석] 리포트 전송 완료');
+    return true;
   } catch (err) {
     console.error(`[종목분석] 전송 실패: ${err.message}`);
+    return false;
   }
 }
 
@@ -279,8 +283,10 @@ async function sendDigest(digest) {
   try {
     await sendTelegramMessage(message);
     console.log(`[다이제스트] ${digest.sessionName} 전송 완료`);
+    return true;
   } catch (err) {
     console.error(`[다이제스트] 전송 실패: ${err.message}`);
+    return false;
   }
 }
 

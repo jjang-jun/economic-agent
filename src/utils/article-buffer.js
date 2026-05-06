@@ -33,4 +33,8 @@ function flushBuffer() {
   return buffer;
 }
 
-module.exports = { loadBuffer, saveBuffer, addToBuffer, flushBuffer };
+function clearBuffer() {
+  saveBuffer([]);
+}
+
+module.exports = { loadBuffer, saveBuffer, addToBuffer, flushBuffer, clearBuffer };

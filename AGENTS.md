@@ -1,0 +1,73 @@
+# Economic Agent - Codex Guide
+
+## Project Summary
+- Personal economic news agent written in Node.js CommonJS.
+- Collector runs every 5 minutes, scores economic news locally, sends urgent items to Telegram, and stores non-urgent score 4 items for scheduled digests.
+- Scheduled digests and stock reports use the provider-agnostic AI client in `src/utils/ai-client.js`.
+- Runtime target: Node.js 20+.
+
+## Core Flow
+```
+RSS feeds
+  -> seen-articles duplicate filter
+  -> keyword filter
+  -> local scorer (keyword weights + FinBERT for English sentiment)
+  -> daily scored article archive
+  -> score 5 urgent articles: relevance filter + Telegram immediate alert
+  -> score 4 articles: article buffer
+  -> scheduled AI digest/report + Telegram
+```
+
+## Important Commands
+- Install dependencies: `npm install` or `npm ci`
+- Collect news once: `npm start`
+- Send digest: `npm run digest`
+- Send digest for a session: `npm run digest -- morning`
+- Send stock report: `npm run report`
+- Test: `npm test`
+
+`npm start`, `npm run digest`, and `npm run report` read `.env` through Node's `--env-file=.env` flag. They may call RSS/API/Telegram/AI services. Use them intentionally.
+
+## Environment
+- Required for Telegram delivery: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`
+- AI digest/report provider: `AI_PROVIDER`, optional `AI_MODEL`, `AI_BASE_URL`, and provider key such as `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GROQ_API_KEY`, or generic `AI_API_KEY`
+- Optional indicators: `BOK_API_KEY`, `FRED_API_KEY`
+- `.env` is private and must not be committed.
+
+## File Map
+- `src/check-news.js`: news collection, filtering, urgent alert, buffer write
+- `src/digest.js`: buffer read, AI digest generation, Telegram delivery, buffer clear after success
+- `src/stock-report.js`: market close stock/sector analysis from the daily scored article archive
+- `src/sources/`: RSS, BOK, FRED integrations
+- `src/filters/keyword-filter.js`: first-pass keyword gate
+- `src/filters/local-scorer.js`: local scoring, sentiment, sector tagging
+- `src/filters/finbert.js`: English FinBERT sentiment model, cached under `.cache/`
+- `src/filters/relevance-matcher.js`: personal relevance matching
+- `src/analysis/`: AI prompt builders for digest/report
+- `src/notify/telegram.js`: Telegram formatting and sending
+- `src/utils/`: config, AI client, buffers, seen-article cache, indicators, daily summaries
+- `src/utils/article-archive.js`: daily scored article archive used by stock reports and later performance review
+- `src/config/keywords.js`: keyword weights, sentiment dictionary, sectors
+- `src/config/interests.js`: user interests
+- `.github/workflows/`: collector, five digest schedules, stock report schedule
+- `memory/`: project memory, architecture notes, changelog
+
+## Data And Generated Files
+- `data/` stores runtime state such as seen articles, article buffer, and daily summaries. It is ignored by Git.
+- `data/daily-articles/YYYY-MM-DD.json` stores scored articles for the day. Use this for daily stock reports instead of relying only on currently new RSS items.
+- `data/article-buffer.json` must only be cleared after digest generation and Telegram delivery both succeed.
+- `.cache/` stores downloaded FinBERT model files. It is ignored by Git.
+- Do not commit `node_modules/`, `.env`, `data/`, or `.cache/`.
+
+## Working Rules
+- Prefer existing CommonJS style: `require`, `module.exports`, async functions, and small utility modules.
+- Keep changes focused. Avoid broad refactors unless the task needs them.
+- When changing behavior, update `README.md` if user-facing usage, architecture, schedules, or environment variables change.
+- Record completed work in `memory/changelog.md` with date, summary, and changed files.
+- If architecture or operating assumptions change, update `memory/architecture.md` and `memory/MEMORY.md`.
+- Do not push to remote unless the user explicitly asks for it.
+
+## Verification Notes
+- Use `npm test` for the baseline check. The current project may have no test files, so also consider syntax/loading checks for changed modules when practical.
+- Avoid running networked commands unless needed for the task. FinBERT may download a model on first execution.
+- For GitHub Actions changes, check each workflow's schedule in UTC against KST.

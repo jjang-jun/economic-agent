@@ -6,11 +6,14 @@ async function analyzeStocks(articles, indicators) {
 
   const articleSummaries = articles
     .sort((a, b) => b.score - a.score)
+    .slice(0, 40)
     .map((a, i) => {
       const sentiment = a.sentiment || 'neutral';
       const title = a.titleKo || a.title;
       const reason = a.reason || '';
-      return `[${i}] (${sentiment}) ${title} — ${reason}`;
+      const sectors = (a.sectors || []).join(', ');
+      const source = a.source || '';
+      return `[${i}] (${sentiment}, score ${a.score}, ${sectors}, ${source}) ${title} — ${reason}`;
     })
     .join('\n');
 
@@ -31,7 +34,7 @@ Analyze today's economic news and indicators, then provide sector/stock investme
 ## Economic Indicators
 ${indicatorInfo.length > 0 ? indicatorInfo.join('\n') : '(No data)'}
 
-## Today's Key News (${articles.length} articles)
+## Today's Key News (${articles.length} articles, top 40 shown)
 ${articleSummaries}
 
 ## User's Areas of Interest
@@ -54,7 +57,9 @@ Based on the news and indicators above, respond with ONLY this JSON format:
       "name": "Stock name (Korean-listed)",
       "ticker": "Ticker code if known, empty string otherwise",
       "signal": "bullish or bearish or neutral",
+      "conviction": "high or medium or low",
       "reason": "News-based reasoning in Korean (1-2 sentences)",
+      "risk": "Main downside risk in Korean (1 sentence)",
       "related_news": [0, 1]
     }
   ],
@@ -68,6 +73,8 @@ Rules:
 - sectors: 2-4, stocks: 3-6, action_items: 2-4
 - Only recommend stocks directly mentioned or affected by the news
 - Focus on KOSPI/KOSDAQ listed stocks
+- Use low conviction if the evidence is only indirect or macro-level
+- Do not invent ticker codes
 - This is for informational purposes, not investment advice`;
 
   try {

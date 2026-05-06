@@ -4,33 +4,50 @@ const { filterByKeywords } = require('./filters/keyword-filter');
 const { scoreArticles } = require('./filters/local-scorer');
 const { analyzeStocks } = require('./analysis/stock-analyzer');
 const { sendStockReport } = require('./notify/telegram');
-const { loadSeenArticles } = require('./utils/seen-articles');
 const { fetchAllIndicators } = require('./utils/indicators');
 const { saveDailySummary } = require('./utils/daily-summary');
+const { archiveScoredArticles, loadScoredArticles } = require('./utils/article-archive');
+
+function mergeArticles(...groups) {
+  const byId = new Map();
+  for (const group of groups) {
+    for (const article of group) {
+      if (article && article.id) byId.set(article.id, article);
+    }
+  }
+  return [...byId.values()]
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return new Date(b.pubDate || 0) - new Date(a.pubDate || 0);
+    });
+}
 
 async function main() {
   console.log(`[${new Date().toISOString()}] 장 마감 종목 분석 시작`);
 
   const indicators = await fetchAllIndicators();
 
-  // RSS 수집 + 필터링
+  const archivedArticles = loadScoredArticles();
+  console.log(`[아카이브] 오늘 누적 기사 ${archivedArticles.length}건`);
+
+  // RSS 수집 + 필터링. 아카이브 누락분 보강용이며 seen-articles에 의존하지 않는다.
   const allArticles = await fetchRSSFeeds();
   console.log(`[수집] RSS에서 ${allArticles.length}건 수집`);
 
-  const seen = loadSeenArticles();
-  const newArticles = allArticles.filter(a => !seen.has(a.id));
-  console.log(`[필터] 신규 기사 ${newArticles.length}건`);
-
-  const keywordFiltered = filterByKeywords(newArticles.length > 0 ? newArticles : allArticles);
+  const keywordFiltered = filterByKeywords(allArticles);
   console.log(`[키워드] ${keywordFiltered.length}건 통과`);
 
-  if (keywordFiltered.length === 0) {
+  if (keywordFiltered.length === 0 && archivedArticles.length === 0) {
     console.log('[완료] 분석할 기사가 없습니다.');
     return;
   }
 
-  const scored = await scoreArticles(keywordFiltered);
-  console.log(`[스코어링] ${scored.length}건 중요도 4점 이상`);
+  const latestScored = await scoreArticles(keywordFiltered);
+  const archived = archiveScoredArticles(latestScored);
+  console.log(`[스코어링] 최신 ${latestScored.length}건, 아카이브 신규 ${archived}건`);
+
+  const scored = mergeArticles(loadScoredArticles(), latestScored);
+  console.log(`[분석대상] 오늘 누적 중요 기사 ${scored.length}건`);
 
   if (scored.length === 0) {
     console.log('[완료] 중요 기사가 없어 리포트를 생략합니다.');

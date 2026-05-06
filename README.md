@@ -23,16 +23,16 @@
       ↓
   2단계: 스코어링 (키워드 가중치 + FinBERT 감성 + 섹터 분류)
       ↓
-  3단계: 개인 관련성 매칭
+  일별 기사 아카이브 저장
       ↓
   score 5 → 개인 관련성 매칭 → 즉시 알림
   score 4 → 다이제스트 버퍼에 저장
 
 하루 5회 ─ AI 다이제스트 (AI 5회/일)
-  버퍼 기사 수집 → AI 요약 → Telegram 발송
+  버퍼 기사 수집 → AI 요약 → Telegram 발송 성공 후 버퍼 비움
 
 하루 1회 ─ 종목 분석 (AI 1회/일)
-  당일 뉴스 종합 → AI 섹터/종목 분석 → Telegram 발송
+  일별 기사 아카이브 기반 당일 뉴스 종합 → AI 섹터/종목 분석 → Telegram 발송
 ```
 
 ## 다이제스트 스케줄
@@ -60,7 +60,6 @@ src/
 │   ├── keyword-filter.js      # 1단계: 키워드 필터
 │   ├── local-scorer.js        # 2단계: 로컬 스코어링 (FinBERT + 키워드)
 │   ├── finbert.js             # FinBERT 금융 감성 분석 (영문)
-│   ├── ai-scorer.js           # 2단계: AI 스코어링 (선택)
 │   └── relevance-matcher.js   # 3단계: 개인 관련성 매칭
 ├── analysis/
 │   ├── digest.js              # AI 다이제스트 프롬프트
@@ -72,12 +71,25 @@ src/
 │   └── interests.js           # 개인 관심사
 └── utils/
     ├── ai-client.js           # AI 제공자 추상화 (멀티 프로바이더)
+    ├── article-archive.js     # 점수화 기사 일별 아카이브
     ├── article-buffer.js      # 기사 버퍼 관리
     ├── config.js              # 공통 설정
     ├── seen-articles.js       # 중복 기사 관리
     ├── indicators.js          # 경제지표 수집
     └── daily-summary.js       # 일일 요약 저장
 ```
+
+## Codex 작업 지침
+
+Codex에서 작업할 때는 저장소 루트의 `AGENTS.md`를 기준으로 프로젝트 구조, 실행 명령, 환경 변수, 변경 기록 규칙을 따릅니다.
+
+## 데이터 보존
+
+- `data/article-buffer.json`: 다음 다이제스트에서 처리할 score 4 기사
+- `data/daily-articles/YYYY-MM-DD.json`: 수집 중 점수화된 당일 기사 누적 아카이브
+- `data/daily-summary/YYYY-MM-DD.json`: 다이제스트/종목 리포트 요약
+
+다이제스트는 AI 생성과 Telegram 전송이 모두 성공한 뒤에만 버퍼를 비웁니다. 장 마감 종목 분석은 `daily-articles` 아카이브를 우선 사용하므로, 5분 수집기가 이미 seen 처리한 기사도 하루 단위 분석에 포함됩니다.
 
 ## 설치 및 실행
 
