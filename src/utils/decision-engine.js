@@ -1,4 +1,4 @@
-const { loadPortfolio } = require('./portfolio');
+const { loadPortfolio, enrichPortfolio } = require('./portfolio');
 
 function countBySentiment(articles) {
   return articles.reduce((acc, article) => {
@@ -311,8 +311,37 @@ function buildDecisionContext({ articles, indicators }) {
   };
 }
 
+async function buildDecisionContextWithQuotes({ articles, indicators }) {
+  const market = scoreMarketRegime({ articles, indicators });
+  const portfolio = await enrichPortfolio(loadPortfolio());
+  const portfolioSummary = summarizePortfolio(portfolio);
+  return {
+    market,
+    portfolio: {
+      cashRatio: portfolio.cashRatio,
+      cashAmount: portfolio.cashAmount,
+      investedAmount: portfolio.investedAmount,
+      totalAssetValue: portfolio.totalAssetValue,
+      costBasis: portfolio.costBasis,
+      unrealizedPnl: portfolio.unrealizedPnl,
+      unrealizedPnlPct: portfolio.unrealizedPnlPct,
+      capturedAt: portfolio.capturedAt,
+      maxNewBuyRatio: portfolio.maxNewBuyRatio,
+      maxPositionRatio: portfolio.maxPositionRatio,
+      maxSectorRatio: portfolio.maxSectorRatio,
+      stopLossPct: portfolio.stopLossPct,
+      trimProfitPct: portfolio.trimProfitPct,
+      positions: portfolio.positions,
+      summary: portfolioSummary,
+      riskBudget: buildRiskBudget(portfolioSummary, portfolio),
+    },
+    actions: buildActions(market, portfolio),
+  };
+}
+
 module.exports = {
   buildDecisionContext,
+  buildDecisionContextWithQuotes,
   scoreMarketRegime,
   summarizePortfolio,
   formatKRW,

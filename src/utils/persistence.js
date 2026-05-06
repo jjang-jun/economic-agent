@@ -218,6 +218,24 @@ async function persistTradeExecutions(trades) {
   return upsert('trade_executions', rows, 'id');
 }
 
+async function persistPortfolioSnapshot(snapshot) {
+  if (!snapshot?.capturedAt) return { saved: 0 };
+  const date = new Date(snapshot.capturedAt).toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+  return upsert('portfolio_snapshots', [{
+    id: `${date}:portfolio`,
+    date,
+    captured_at: snapshot.capturedAt,
+    total_asset_value: snapshot.totalAssetValue ?? null,
+    cash_amount: snapshot.cashAmount ?? null,
+    invested_amount: snapshot.investedAmount ?? null,
+    cost_basis: snapshot.costBasis ?? null,
+    unrealized_pnl: snapshot.unrealizedPnl ?? null,
+    unrealized_pnl_pct: snapshot.unrealizedPnlPct ?? null,
+    payload: snapshot,
+    updated_at: new Date().toISOString(),
+  }], 'id');
+}
+
 async function persistMarketSnapshots(snapshots, session = '', capturedAt = new Date().toISOString()) {
   const rows = (snapshots || [])
     .filter(item => item && item.symbol)
@@ -278,6 +296,7 @@ module.exports = {
   loadPersistedRecommendations,
   persistRecommendationEvaluations,
   persistTradeExecutions,
+  persistPortfolioSnapshot,
   persistMarketSnapshots,
   persistInvestorFlow,
   persistDecisionContext,

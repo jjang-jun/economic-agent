@@ -192,10 +192,21 @@ function formatStockReport(report) {
   const portfolioLines = [
     portfolioSummary.totalAssetValue ? `총자산: ${formatKRW(portfolioSummary.totalAssetValue)}` : '',
     portfolioSummary.cashAmount ? `현금: ${formatKRW(portfolioSummary.cashAmount)} (${portfolioSummary.cashPct}%)` : `현금 비중: ${portfolioSummary.cashPct ?? 0}%`,
+    typeof portfolio.unrealizedPnl === 'number' ? `평가손익: ${formatKRW(portfolio.unrealizedPnl)} (${portfolio.unrealizedPnlPct ?? 0}%)` : '',
     portfolioSummary.maxNewBuyAmount ? `1회 신규 매수 상한: ${formatKRW(portfolioSummary.maxNewBuyAmount)}` : '',
     riskBudget.maxRisk1Pct ? `거래 1회 손실 허용: ${formatKRW(riskBudget.maxRisk1Pct)}~${formatKRW(riskBudget.maxRisk2Pct)}` : '',
     `보유 종목: ${portfolioSummary.positionCount ?? 0}개`,
   ].filter(Boolean).map(item => `▸ ${escapeHtml(item)}`);
+  const positionLines = (portfolio.positions || [])
+    .filter(position => position.marketValue || position.currentPrice)
+    .slice(0, 5)
+    .map(position => {
+      const pnl = typeof position.unrealizedPnl === 'number'
+        ? ` · 손익 ${formatKRW(position.unrealizedPnl)} (${position.unrealizedPnlPct}%)`
+        : '';
+      const weight = typeof position.weight === 'number' ? ` · 비중 ${Math.round(position.weight * 100)}%` : '';
+      return `▸ ${escapeHtml(position.name || position.ticker)} ${position.currentPrice?.toLocaleString('ko-KR') || ''}${pnl}${weight}`;
+    });
 
   const sections = [
     [
@@ -216,6 +227,7 @@ function formatStockReport(report) {
     [
       `<b>2. 내 포트폴리오 기준</b>`,
       portfolioLines.join('\n'),
+      positionLines.length > 0 ? `<b>보유 평가</b>\n${positionLines.join('\n')}` : '',
     ].join('\n'),
 
     [

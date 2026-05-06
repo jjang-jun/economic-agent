@@ -10,14 +10,16 @@ const { saveDailySummary } = require('./utils/daily-summary');
 const { archiveScoredArticles, loadScoredArticles } = require('./utils/article-archive');
 const { logRecommendations } = require('./utils/recommendation-log');
 const { fetchMarketSnapshot } = require('./utils/market-snapshot');
-const { buildDecisionContext } = require('./utils/decision-engine');
+const { buildDecisionContextWithQuotes } = require('./utils/decision-engine');
 const { applyRecommendationRisk } = require('./utils/recommendation-risk');
+const { savePortfolioSnapshot } = require('./utils/portfolio');
 const {
   persistArticles,
   persistDailySummary,
   persistStockReport,
   persistMarketSnapshots,
   persistInvestorFlow,
+  persistPortfolioSnapshot,
   persistDecisionContext,
 } = require('./utils/persistence');
 
@@ -81,7 +83,11 @@ async function main() {
     console.error('[완료] 종목 분석 실패');
     return;
   }
-  report.decision = buildDecisionContext({ articles: scored, indicators });
+  report.decision = await buildDecisionContextWithQuotes({ articles: scored, indicators });
+  if (report.decision.portfolio) {
+    savePortfolioSnapshot(report.decision.portfolio);
+    await persistPortfolioSnapshot(report.decision.portfolio);
+  }
   applyRecommendationRisk(report, report.decision);
   await persistStockReport(report);
   await persistDecisionContext(report.decision);
