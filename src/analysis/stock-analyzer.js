@@ -22,6 +22,13 @@ async function analyzeStocks(articles, indicators) {
   if (indicators.fedRate) indicatorInfo.push(`US Fed rate: ${indicators.fedRate}%`);
   if (indicators.cpi) indicatorInfo.push(`US CPI: ${indicators.cpi}`);
   if (indicators.unemployment) indicatorInfo.push(`US unemployment: ${indicators.unemployment}%`);
+  if (indicators.marketSnapshot?.length > 0) {
+    indicatorInfo.push('Market snapshot:');
+    for (const item of indicators.marketSnapshot.slice(0, 12)) {
+      const change = typeof item.changePercent === 'number' ? ` (${item.changePercent}%)` : '';
+      indicatorInfo.push(`- ${item.name} (${item.symbol}): ${item.price}${change} ${item.currency}`.trim());
+    }
+  }
 
   // interests.js에서 포트폴리오 관심사 동적 로드
   const interestList = Object.entries(MY_INTERESTS)
@@ -65,16 +72,20 @@ Based on the news and indicators above, respond with ONLY this JSON format:
   ],
   "action_items": [
     "Tomorrow's market watchpoint in Korean (1 sentence each)"
+  ],
+  "risk_flags": [
+    "Risk factor that can invalidate the recommendation in Korean"
   ]
 }
 
 Rules:
 - Respond with ONLY valid JSON
-- sectors: 2-4, stocks: 3-6, action_items: 2-4
+- sectors: 2-4, stocks: 3-6, action_items: 2-4, risk_flags: 2-4
 - Only recommend stocks directly mentioned or affected by the news
 - Focus on KOSPI/KOSDAQ listed stocks
 - Use low conviction if the evidence is only indirect or macro-level
 - Do not invent ticker codes
+- Avoid unconditional buy/sell wording; frame outputs as candidates gated by market regime and risk
 - This is for informational purposes, not investment advice`;
 
   try {

@@ -1,5 +1,54 @@
 # 작업 기록 (Changelog)
 
+## 2026-05-06: 투자 의사결정 엔진과 로드맵 추가
+- 장기 방향을 `ROADMAP.md`에 정리
+- 포트폴리오/리스크 제약 설정 파일 추가
+- 시장 레짐(`RISK_ON`, `NEUTRAL`, `RISK_OFF`)과 행동 가드레일을 만드는 의사결정 엔진 추가
+- 장 마감 종목 리포트에 시장 레짐, 리스크 플래그, 오늘 행동 가드레일 표시
+- AI 종목 분석 프롬프트에 리스크 플래그와 조건부 추천 원칙 추가
+- 변경 파일:
+  - `ROADMAP.md`
+  - `src/config/portfolio.js`
+  - `src/utils/decision-engine.js`
+  - `src/stock-report.js`
+  - `src/analysis/stock-analyzer.js`
+  - `src/notify/telegram.js`
+  - `README.md`
+  - `AGENTS.md`
+  - `CLAUDE.md`
+  - `memory/MEMORY.md`
+  - `memory/architecture.md`
+  - `memory/changelog.md`
+
+## 2026-05-06: 다이제스트 시간/내용 최적화
+- KRX 정규장(09:00~15:30), 미국 정규장(09:30~16:00 ET), 주요 미국 지표 발표(대개 08:30/10:00 ET), 유럽장 초반을 기준으로 하루 5회 브리핑 시간을 재조정
+- 브리핑 세션 변경:
+  - 07:30 아침 → 08:20 개장 전 (`preopen`)
+  - 12:00 점심 → 11:50 오전장 점검 (`midday`)
+  - 15:40 장 마감 → 15:45 장 마감 (`close`)
+  - 19:00 저녁 → 17:10 유럽장 체크 (`europe`)
+  - 23:30 마감 → 22:40 미국장 오픈 (`usopen`)
+- 세션별 AI 프롬프트 초점을 분리해 개장 전/오전장/마감/유럽장/미국장 브리핑 내용이 서로 다르게 나오도록 개선
+- 개장 전/미국장 오픈 브리핑에 관심 지수·종목·원자재 가격 스냅샷을 포함하도록 추가
+- 다이제스트 입력 기사에 score/source를 포함하고, 프롬프트에 숫자/지수 임의 생성 금지 규칙 추가
+- 변경 파일:
+  - `src/config/watchlist.js`
+  - `src/utils/market-snapshot.js`
+  - `.github/workflows/digest-morning.yml`
+  - `.github/workflows/digest-lunch.yml`
+  - `.github/workflows/digest-close.yml`
+  - `.github/workflows/digest-evening.yml`
+  - `.github/workflows/digest-night.yml`
+  - `src/analysis/digest.js`
+  - `src/digest.js`
+  - `src/notify/telegram.js`
+  - `README.md`
+  - `AGENTS.md`
+  - `CLAUDE.md`
+  - `memory/MEMORY.md`
+  - `memory/architecture.md`
+  - `memory/changelog.md`
+
 ## 2026-05-06: DART 공시와 벤치마크 성과 평가 추가
 - OpenDART 공시 수집 소스 추가 (`DART_API_KEY` 선택)
 - 뉴스 수집과 장 마감 리포트 보강 수집에 DART 공시를 RSS와 함께 통합

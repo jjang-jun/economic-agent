@@ -1,7 +1,7 @@
 function normalizeYahooSymbol(ticker) {
   if (!ticker) return '';
 
-  const cleaned = String(ticker).trim().replace(/[^0-9A-Za-z.^]/g, '');
+  const cleaned = String(ticker).trim().replace(/[^0-9A-Za-z.^=-]/g, '');
   if (!cleaned) return '';
   if (cleaned.includes('.')) return cleaned.toUpperCase();
   if (/^\d{6}$/.test(cleaned)) return `${cleaned}.KS`;
@@ -28,10 +28,18 @@ async function fetchQuote(ticker) {
     const closes = (quote.close || []).filter(v => typeof v === 'number');
     const price = meta.regularMarketPrice || closes[closes.length - 1];
     if (typeof price !== 'number') throw new Error('no price');
+    const previousClose = meta.previousClose || closes[closes.length - 2] || null;
+    const changePercent = typeof meta.regularMarketChangePercent === 'number'
+      ? Number(meta.regularMarketChangePercent.toFixed(2))
+      : previousClose
+        ? Number((((price - previousClose) / previousClose) * 100).toFixed(2))
+        : null;
 
     return {
       symbol,
       price,
+      previousClose,
+      changePercent,
       currency: meta.currency || '',
       marketTime: meta.regularMarketTime
         ? new Date(meta.regularMarketTime * 1000).toISOString()

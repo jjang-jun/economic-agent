@@ -1,8 +1,8 @@
-name: Digest 점심 브리핑 (12:00 KST)
+name: Digest 오전장 점검 (11:50 KST)
 
 on:
   schedule:
-    - cron: '0 3 * * 1-5'
+    - cron: '50 2 * * 1-5'
   workflow_dispatch:
 
 jobs:
@@ -19,7 +19,7 @@ jobs:
           key: data-${{ github.run_id }}
           restore-keys: data-
       - run: npm ci
-      - run: node src/digest.js lunch
+      - run: node src/digest.js midday
         env:
           AI_PROVIDER: ${{ secrets.AI_PROVIDER }}
           AI_API_KEY: ${{ secrets.AI_API_KEY }}

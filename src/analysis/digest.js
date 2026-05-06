@@ -1,11 +1,37 @@
 const { chat, extractJSON } = require('../utils/ai-client');
 
 const DIGEST_NAMES = {
-  morning: '아침 브리핑',
-  lunch: '점심 브리핑',
+  preopen: '개장 전 브리핑',
+  midday: '오전장 점검',
   close: '장 마감 브리핑',
-  evening: '저녁 브리핑',
-  night: '마감 브리핑',
+  europe: '유럽장 체크',
+  usopen: '미국장 오픈 브리핑',
+};
+
+const SESSION_FOCUS = {
+  preopen: [
+    'Focus on overnight US/Europe market implications for the Korean open.',
+    'Use marketSnapshot as the pre-market board for KOSPI/KOSDAQ, USD/KRW, Korean large caps, and global risk assets.',
+    'Highlight DART disclosures and company events that can affect KRX at 09:00.',
+    'End with concrete opening-session watchpoints.',
+  ],
+  midday: [
+    'Focus on Korean morning-session flow, sectors, disclosures, and macro changes.',
+    'Separate what already moved from what can still matter in the afternoon.',
+  ],
+  close: [
+    'Focus on the Korean close, after-hours implications, and candidates for stock-report follow-up.',
+    'Prioritize market-moving disclosures, sector rotations, and risks for tomorrow.',
+  ],
+  europe: [
+    'Focus on early European session, FX/rates/oil, Korean after-hours context, and US premarket setup.',
+    'Connect global moves to Korean sectors for the next trading session.',
+  ],
+  usopen: [
+    'Focus on US premarket/market open, macro releases, semiconductors/big tech, rates, oil, and next-day Korea implications.',
+    'Use marketSnapshot to discuss US premarket/open signals for indexes, semiconductors, and mega-cap tech.',
+    'If the news is before/after US open due to DST, frame it as US trading setup rather than daily close.',
+  ],
 };
 
 async function generateDigest(articles, indicators, session) {
@@ -20,7 +46,9 @@ async function generateDigest(articles, indicators, session) {
       const sentiment = a.sentiment || 'neutral';
       const sectors = (a.sectors || []).join(', ');
       const title = a.titleKo || a.title;
-      return `[${i}] (${sentiment}) [${sectors}] ${title}`;
+      const source = a.source || '';
+      const score = a.score || '';
+      return `[${i}] (${sentiment}, score ${score}, ${source}) [${sectors}] ${title}`;
     })
     .join('\n');
 
@@ -29,6 +57,14 @@ async function generateDigest(articles, indicators, session) {
   if (indicators.fedRate) indicatorInfo.push(`US Fed rate: ${indicators.fedRate}%`);
   if (indicators.cpi) indicatorInfo.push(`US CPI: ${indicators.cpi}`);
   if (indicators.unemployment) indicatorInfo.push(`US unemployment: ${indicators.unemployment}%`);
+  if (indicators.marketSnapshot?.length > 0) {
+    indicatorInfo.push('Market snapshot:');
+    for (const item of indicators.marketSnapshot.slice(0, 12)) {
+      indicatorInfo.push(`- ${item.name} (${item.symbol}): ${item.price} ${item.currency}`.trim());
+    }
+  }
+
+  const sessionFocus = SESSION_FOCUS[session] || [];
 
   const prompt = `You are a financial news editor creating a "${sessionName}" digest for a Korean investor.
 Summarize the following news articles into a concise briefing.
@@ -38,6 +74,9 @@ ${indicatorInfo.length > 0 ? indicatorInfo.join('\n') : '(No data)'}
 
 ## Articles (${articles.length} total, top 20 shown)
 ${articleSummaries}
+
+## Session Focus
+${sessionFocus.map(item => `- ${item}`).join('\n') || '- Provide a balanced investor briefing.'}
 
 ## Instructions
 Create a digest in this JSON format:
@@ -66,6 +105,8 @@ Rules:
 - key_numbers: 1-3개
 - watch_list: 2-3개
 - All text in Korean
+- Do not invent numbers, prices, or index levels not present in the articles or indicators
+- Prefer source-grounded statements over generic market commentary
 - Be concise and actionable`;
 
   try {

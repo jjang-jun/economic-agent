@@ -4,6 +4,7 @@ const { generateDigest } = require('./analysis/digest');
 const { sendDigest } = require('./notify/telegram');
 const { saveDailySummary } = require('./utils/daily-summary');
 const { archiveScoredArticles } = require('./utils/article-archive');
+const { fetchMarketSnapshot } = require('./utils/market-snapshot');
 
 // 세션 자동 판별 (KST 기준)
 function detectSession() {
@@ -13,11 +14,11 @@ function detectSession() {
     hour12: false,
   }));
 
-  if (hour < 9) return 'morning';
-  if (hour < 13) return 'lunch';
+  if (hour < 9) return 'preopen';
+  if (hour < 13) return 'midday';
   if (hour < 16) return 'close';
-  if (hour < 20) return 'evening';
-  return 'night';
+  if (hour < 20) return 'europe';
+  return 'usopen';
 }
 
 async function main() {
@@ -35,6 +36,7 @@ async function main() {
 
   // 경제 지표
   const indicators = await fetchAllIndicators();
+  indicators.marketSnapshot = await fetchMarketSnapshot(session);
   archiveScoredArticles(articles);
 
   // AI로 다이제스트 생성

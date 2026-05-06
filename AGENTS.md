@@ -23,7 +23,7 @@ RSS feeds
 - Install dependencies: `npm install` or `npm ci`
 - Collect news once: `npm start`
 - Send digest: `npm run digest`
-- Send digest for a session: `npm run digest -- morning`
+- Send digest for a session: `npm run digest -- preopen`
 - Send stock report: `npm run report`
 - Evaluate recommendation performance: `npm run evaluate`
 - Test: `npm test`
@@ -53,10 +53,15 @@ RSS feeds
 - `src/utils/`: config, AI client, buffers, seen-article cache, indicators, daily summaries
 - `src/utils/article-archive.js`: daily scored article archive used by stock reports and later performance review
 - `src/utils/recommendation-log.js`: stores stock signals and evaluates returns against KOSPI benchmark when available
+- `src/utils/decision-engine.js`: rule-based market regime and action guardrails
 - `src/config/keywords.js`: keyword weights, sentiment dictionary, sectors
 - `src/config/interests.js`: user interests
+- `src/config/watchlist.js`: symbols used for pre-market and global market snapshots
+- `src/config/portfolio.js`: local portfolio/risk constraints used by the decision engine
 - `.github/workflows/`: collector, five digest schedules, stock report schedule
 - `memory/`: project memory, architecture notes, changelog
+- `CLAUDE.md`: legacy Claude-facing project guide, keep aligned with this file when architecture or schedules change
+- `ROADMAP.md`: long-term product and investing-system roadmap
 
 ## Data And Generated Files
 - `data/` stores runtime state such as seen articles, article buffer, and daily summaries. It is ignored by Git.

@@ -166,6 +166,14 @@ function formatStockReport(report) {
   const actionLines = (report.action_items || []).map(item =>
     `▸ ${escapeHtml(item)}`
   );
+  const riskLines = (report.risk_flags || []).map(item =>
+    `▸ ${escapeHtml(item)}`
+  );
+  const decision = report.decision || {};
+  const regime = decision.market?.regime || 'UNKNOWN';
+  const regimeScore = typeof decision.market?.score === 'number' ? ` (${decision.market.score})` : '';
+  const decisionReasons = (decision.market?.reasons || []).map(item => `└ ${escapeHtml(item)}`);
+  const decisionActions = (decision.actions || []).map(item => `▸ ${escapeHtml(item)}`);
 
   const sections = [
     [
@@ -175,6 +183,13 @@ function formatStockReport(report) {
     ].join('\n'),
 
     escapeHtml(report.market_summary || ''),
+
+    [
+      `── <b>시장 레짐</b> ──`,
+      '',
+      `<b>${escapeHtml(regime)}${regimeScore}</b>`,
+      decisionReasons.join('\n'),
+    ].join('\n'),
 
     [
       `── <b>섹터 동향</b> ──`,
@@ -194,6 +209,20 @@ function formatStockReport(report) {
       actionLines.join('\n'),
     ].join('\n'),
 
+    riskLines.length > 0
+      ? [
+          `── <b>리스크 플래그</b> ──`,
+          '',
+          riskLines.join('\n'),
+        ].join('\n')
+      : null,
+
+    [
+      `── <b>오늘 행동 가드레일</b> ──`,
+      '',
+      decisionActions.join('\n'),
+    ].join('\n'),
+
     [
       `━━━━━━━━━━━━━━━━━━`,
       `⏰ ${now}`,
@@ -201,7 +230,7 @@ function formatStockReport(report) {
     ].join('\n'),
   ];
 
-  return sections.join('\n\n');
+  return sections.filter(Boolean).join('\n\n');
 }
 
 async function sendStockReport(report) {
@@ -217,11 +246,11 @@ async function sendStockReport(report) {
 }
 
 const SESSION_EMOJI = {
-  morning: '🌅',
-  lunch: '☀️',
+  preopen: '🌅',
+  midday: '☀️',
   close: '🔔',
-  evening: '🌆',
-  night: '🌙',
+  europe: '🌆',
+  usopen: '🇺🇸',
 };
 
 function formatDigest(digest) {

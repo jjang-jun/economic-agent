@@ -1,8 +1,8 @@
-name: Digest 마감 브리핑 (23:30 KST)
+name: Digest 미국장 오픈 브리핑 (22:40 KST)
 
 on:
   schedule:
-    - cron: '30 14 * * 1-5'
+    - cron: '40 13 * * 1-5'
   workflow_dispatch:
 
 jobs:
@@ -19,7 +19,7 @@ jobs:
           key: data-${{ github.run_id }}
           restore-keys: data-
       - run: npm ci
-      - run: node src/digest.js night
+      - run: node src/digest.js usopen
         env:
           AI_PROVIDER: ${{ secrets.AI_PROVIDER }}
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
