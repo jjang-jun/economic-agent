@@ -71,7 +71,7 @@ TELEGRAM_PRIVATE_CHAT_ID
   - 대화형 Agent 승인 플로우
 ```
 
-`TELEGRAM_PRIVATE_CHAT_ID`가 없으면 기존 `TELEGRAM_CHAT_ID`로 fallback한다.
+`TELEGRAM_SECRET_CHAT_ID`도 같은 비공개방 alias로 지원한다. `TELEGRAM_PRIVATE_CHAT_ID`와 `TELEGRAM_SECRET_CHAT_ID`가 모두 없으면 기존 `TELEGRAM_CHAT_ID`로 fallback한다.
 
 지원할 대화:
 
