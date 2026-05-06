@@ -1,5 +1,8 @@
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+const TELEGRAM_PRIVATE_CHAT_ID = process.env.TELEGRAM_PRIVATE_CHAT_ID
+  || process.env.TELEGRAM_AGENT_CHAT_ID
+  || process.env.TELEGRAM_PORTFOLIO_CHAT_ID;
 
 const TAG_MAP = {
   portfolio: '포트폴리오',
@@ -86,8 +89,14 @@ function formatMessage(article) {
   return lines.filter(l => l !== '').join('\n');
 }
 
-async function sendTelegramMessage(text) {
-  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+function getTelegramChatId(channel = 'public') {
+  if (channel === 'private') return TELEGRAM_PRIVATE_CHAT_ID || TELEGRAM_CHAT_ID;
+  return TELEGRAM_CHAT_ID;
+}
+
+async function sendTelegramMessage(text, options = {}) {
+  const chatId = options.chatId || getTelegramChatId(options.channel || 'public');
+  if (!TELEGRAM_BOT_TOKEN || !chatId) {
     console.warn('[Telegram] 봇 토큰 또는 채팅 ID가 설정되지 않았습니다.');
     console.log('[알림 미리보기]\n' + text);
     return;
@@ -99,7 +108,7 @@ async function sendTelegramMessage(text) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      chat_id: TELEGRAM_CHAT_ID,
+      chat_id: chatId,
       text,
       parse_mode: 'HTML',
       disable_web_page_preview: true,
@@ -275,7 +284,7 @@ function formatStockReport(report) {
 async function sendStockReport(report) {
   const message = formatStockReport(report);
   try {
-    await sendTelegramMessage(message);
+    await sendTelegramMessage(message, { channel: 'private' });
     console.log('[종목분석] 리포트 전송 완료');
     return true;
   } catch (err) {
@@ -349,7 +358,7 @@ function formatActionReport(report) {
 async function sendActionReport(report) {
   const message = formatActionReport(report);
   try {
-    await sendTelegramMessage(message);
+    await sendTelegramMessage(message, { channel: 'private' });
     console.log('[행동리포트] 전송 완료');
     return true;
   } catch (err) {
@@ -463,7 +472,7 @@ function formatPerformanceReport(completed) {
 async function sendPerformanceReport(completed) {
   const message = formatPerformanceReport(completed);
   try {
-    await sendTelegramMessage(message);
+    await sendTelegramMessage(message, { channel: 'private' });
     console.log('[성과평가] 리포트 전송 완료');
     return true;
   } catch (err) {
@@ -504,7 +513,7 @@ function formatTradePerformanceReport(report) {
 async function sendTradePerformanceReport(report) {
   const message = formatTradePerformanceReport(report);
   try {
-    await sendTelegramMessage(message);
+    await sendTelegramMessage(message, { channel: 'private' });
     console.log('[거래성과] 리포트 전송 완료');
     return true;
   } catch (err) {
@@ -533,7 +542,7 @@ function formatPerformanceReview(review) {
 async function sendPerformanceReview(review) {
   const message = formatPerformanceReview(review);
   try {
-    await sendTelegramMessage(message);
+    await sendTelegramMessage(message, { channel: 'private' });
     console.log('[성과리뷰] 리포트 전송 완료');
     return true;
   } catch (err) {
@@ -543,6 +552,6 @@ async function sendPerformanceReview(review) {
 }
 
 module.exports = {
-  notifyArticles, sendStockReport, sendDigest, sendPerformanceReport, sendTradePerformanceReport, sendPerformanceReview, sendActionReport,
+  notifyArticles, sendStockReport, sendDigest, sendPerformanceReport, sendTradePerformanceReport, sendPerformanceReview, sendActionReport, sendTelegramMessage, getTelegramChatId,
   formatMessage, formatStockReport, formatDigest, formatPerformanceReport, formatTradePerformanceReport, formatPerformanceReview, formatActionReport,
 };

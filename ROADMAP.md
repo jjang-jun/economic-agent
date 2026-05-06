@@ -210,6 +210,7 @@ Telegram Bot
 ## Phase 8: 대화형 Agent 플랫폼
 - [x] Telegram을 대화 UI로 유지하고 Agent Server를 별도 런타임으로 분리하는 방향 결정
 - [x] `docs/AGENT_PLATFORM.md` 작성
+- [x] 공유방/비공개방 Telegram 라우팅 분리: `TELEGRAM_CHAT_ID`, `TELEGRAM_PRIVATE_CHAT_ID`
 - [ ] Supabase 원본 포트폴리오 테이블 추가: `portfolio_accounts`, `positions`, `risk_policy`
 - [ ] 대화/승인 테이블 추가: `conversation_messages`, `pending_actions`
 - [ ] `src/server/telegram-webhook.js` 추가
