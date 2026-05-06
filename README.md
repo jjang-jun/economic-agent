@@ -157,10 +157,13 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 
 ```bash
 npm run trade:record -- --side buy --ticker 005930 --name 삼성전자 --quantity 3 --price 266000 --notes "1차 분할 진입"
+npm run recommendations:list
 npm run trade:performance
 npm run review:weekly
 npm run review:monthly
 ```
+
+`trade:record`는 기본적으로 `data/portfolio.json`의 현금, 보유수량, 평균단가를 함께 갱신합니다. 거래만 기록하고 포트폴리오를 건드리지 않으려면 `--noPortfolio`를 붙입니다.
 
 종목 추천은 단순 `매수/관찰` 문구가 아니라 기대 손익 구조를 포함해야 합니다. 장 마감 리포트는 가능한 경우 `손익비`, `손절폭`, `무효화 조건`, `제안 매수금액`, `계좌 비중`, `20일 상대강도`, `20일 평균 대비 거래량`, `20일 고점 근접/돌파 여부`를 함께 표시합니다. 2,000만원 계좌 기준 기본 1회 신규 매수 상한은 100만원이고, 거래 1회 손실 허용액은 20만~40만원입니다.
 
@@ -345,7 +348,13 @@ cp docs/portfolio.example.json data/portfolio.json
 GitHub Actions에서도 실제 포트폴리오를 평가하려면 같은 JSON을 secret으로 넣습니다. 권장 방식은 base64입니다.
 
 ```bash
-base64 -i data/portfolio.json | gh secret set PORTFOLIO_JSON_BASE64 --body-file -
+base64 < data/portfolio.json | gh secret set PORTFOLIO_JSON_BASE64
+```
+
+로컬 포트폴리오가 바뀐 뒤 Actions secret까지 갱신하려면:
+
+```bash
+npm run portfolio:sync-secret
 ```
 
 `cashAmount`와 `totalAssetValue`를 넣으면 현금 비중이 자동 계산됩니다. 종목별 `weight`를 넣으면 장 마감 리포트의 행동 가드레일에서 종목/섹터 쏠림을 점검합니다.

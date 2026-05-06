@@ -26,11 +26,13 @@ RSS feeds
 - Send digest for a session: `npm run digest -- preopen`
 - Send stock report: `npm run report`
 - Evaluate recommendation performance: `npm run evaluate`
+- List recent recommendations and IDs: `npm run recommendations:list`
 - Record an actual manual trade execution: `npm run trade:record -- --side buy --ticker 005930 --quantity 3 --price 266000`
 - Review actual trade performance: `npm run trade:performance`
 - Build weekly/monthly performance reviews: `npm run review:weekly`, `npm run review:monthly`
 - Build local HTML dashboard from pulled Supabase mirrors: `npm run dashboard`
 - Create a current portfolio valuation snapshot: `npm run portfolio:snapshot`
+- Sync ignored local portfolio to GitHub Actions secret: `npm run portfolio:sync-secret`
 - Push Supabase schema: `npm run db:push`
 - Import existing local `data/*.json` history into Supabase: `npm run db:import-local`
 - Pull Supabase history to local JSON/SQLite: `npm run db:pull`

@@ -77,6 +77,12 @@ function loadPortfolio() {
   return normalizePortfolio(local);
 }
 
+function savePortfolioFile(portfolio, filePath = process.env.PORTFOLIO_FILE || DEFAULT_PORTFOLIO_FILE) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, JSON.stringify(portfolio, null, 2));
+  return filePath;
+}
+
 function round(value, digits = 2) {
   if (typeof value !== 'number' || !Number.isFinite(value)) return null;
   const factor = 10 ** digits;
@@ -159,9 +165,77 @@ function savePortfolioSnapshot(snapshot, date = getKSTDate()) {
   return file;
 }
 
+function applyTradeToPortfolio(rawPortfolio, trade) {
+  const portfolio = normalizePortfolio(rawPortfolio);
+  const amount = typeof trade.amount === 'number'
+    ? trade.amount
+    : trade.quantity * trade.price;
+  const positions = [...portfolio.positions];
+  const symbol = trade.symbol || normalizeYahooSymbol(trade.ticker || '');
+  const index = positions.findIndex(position => (
+    (symbol && position.symbol === symbol)
+    || (trade.ticker && position.ticker === trade.ticker)
+  ));
+
+  if (trade.side === 'buy') {
+    const existing = index >= 0 ? positions[index] : null;
+    if (existing) {
+      const oldQty = Number(existing.quantity || 0);
+      const oldAvg = Number(existing.avgPrice || 0);
+      const newQty = oldQty + trade.quantity;
+      const newAvg = newQty > 0
+        ? ((oldQty * oldAvg) + (trade.quantity * trade.price)) / newQty
+        : trade.price;
+      positions[index] = {
+        ...existing,
+        name: existing.name || trade.name || '',
+        ticker: existing.ticker || trade.ticker || '',
+        symbol: existing.symbol || symbol,
+        quantity: newQty,
+        avgPrice: Math.round(newAvg * 100) / 100,
+      };
+    } else {
+      positions.push(normalizePosition({
+        name: trade.name || '',
+        ticker: trade.ticker || '',
+        symbol,
+        quantity: trade.quantity,
+        avgPrice: trade.price,
+      }));
+    }
+    portfolio.cashAmount = typeof portfolio.cashAmount === 'number'
+      ? portfolio.cashAmount - amount
+      : portfolio.cashAmount;
+  } else if (trade.side === 'sell') {
+    if (index < 0) throw new Error(`position not found for ${trade.ticker || trade.symbol}`);
+    const existing = positions[index];
+    const remaining = Number(existing.quantity || 0) - trade.quantity;
+    if (remaining < -1e-9) throw new Error(`sell quantity exceeds position for ${trade.ticker || trade.symbol}`);
+    if (remaining <= 1e-9) {
+      positions.splice(index, 1);
+    } else {
+      positions[index] = { ...existing, quantity: remaining };
+    }
+    portfolio.cashAmount = typeof portfolio.cashAmount === 'number'
+      ? portfolio.cashAmount + amount
+      : portfolio.cashAmount;
+  }
+
+  portfolio.positions = positions;
+  portfolio.totalAssetValue = typeof portfolio.totalAssetValue === 'number'
+    ? portfolio.totalAssetValue
+    : portfolio.cashAmount;
+  portfolio.cashRatio = portfolio.totalAssetValue && typeof portfolio.cashAmount === 'number'
+    ? portfolio.cashAmount / portfolio.totalAssetValue
+    : portfolio.cashRatio;
+  return portfolio;
+}
+
 module.exports = {
   loadPortfolio,
   normalizePortfolio,
+  savePortfolioFile,
+  applyTradeToPortfolio,
   enrichPortfolio,
   savePortfolioSnapshot,
   DEFAULT_PORTFOLIO_FILE,

@@ -3,6 +3,7 @@ const path = require('path');
 const { getKSTDate } = require('./article-archive');
 const { normalizeYahooSymbol } = require('../sources/yahoo-finance');
 const { persistTradeExecutions, loadPersistedTradeExecutions } = require('./persistence');
+const { loadPortfolio, savePortfolioFile, applyTradeToPortfolio } = require('./portfolio');
 
 const DATA_DIR = path.join(__dirname, '..', '..', 'data', 'trades');
 const LOG_FILE = path.join(DATA_DIR, 'trade-executions.json');
@@ -88,6 +89,10 @@ async function recordTradeExecution(input) {
   const trades = [...byId.values()].sort((a, b) => new Date(a.executedAt) - new Date(b.executedAt));
   saveTradeExecutions(trades);
   await persistTradeExecutions(trades);
+  if (input.updatePortfolio !== false) {
+    const updatedPortfolio = applyTradeToPortfolio(loadPortfolio(), trade);
+    savePortfolioFile(updatedPortfolio);
+  }
   return trade;
 }
 

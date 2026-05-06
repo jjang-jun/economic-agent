@@ -37,9 +37,13 @@ async function main() {
     notes: args.notes,
     date: args.date,
     executedAt: args.executedAt,
+    updatePortfolio: !args.noPortfolio,
   });
 
   console.log(`[거래기록] ${trade.side} ${trade.name || trade.ticker || trade.symbol} ${trade.quantity}주 @ ${trade.price.toLocaleString('ko-KR')}`);
+  if (!args.noPortfolio) {
+    console.log('[거래기록] portfolio.json 갱신 완료');
+  }
   console.log(`[거래기록] id=${trade.id}`);
 }
 
