@@ -136,6 +136,9 @@ npm run db:push
 # Supabase 데이터를 로컬 파일시스템으로 내려받기
 npm run db:pull
 
+# 기존 data/*.json 히스토리를 Supabase로 업로드
+npm run db:import-local
+
 # SQLite 질의 예시
 sqlite3 data/economic-agent.db "select count(*) from articles;"
 ```
@@ -212,6 +215,7 @@ npm run evaluate
 
 # Supabase 스키마 적용 / 로컬 미러 동기화
 npm run db:push
+npm run db:import-local
 npm run db:pull
 ```
 

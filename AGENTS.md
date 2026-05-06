@@ -27,10 +27,11 @@ RSS feeds
 - Send stock report: `npm run report`
 - Evaluate recommendation performance: `npm run evaluate`
 - Push Supabase schema: `npm run db:push`
+- Import existing local `data/*.json` history into Supabase: `npm run db:import-local`
 - Pull Supabase history to local JSON/SQLite: `npm run db:pull`
 - Test: `npm test`
 
-`npm start`, `npm run digest`, `npm run report`, `npm run evaluate`, `npm run db:push`, and `npm run db:pull` read `.env` through Node's `--env-file=.env` flag. They may call RSS/API/Telegram/AI/Supabase services. Use them intentionally.
+`npm start`, `npm run digest`, `npm run report`, `npm run evaluate`, `npm run db:push`, `npm run db:import-local`, and `npm run db:pull` read `.env` through Node's `--env-file=.env` flag. They may call RSS/API/Telegram/AI/Supabase services. Use them intentionally.
 
 ## Environment
 - Required for Telegram delivery: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`
@@ -66,6 +67,7 @@ RSS feeds
 - `src/config/ai-budget.js`: max article/snapshot counts and clipping lengths for AI prompts
 - `supabase/migrations/`: Postgres schema migrations for long-term history
 - `scripts/push-supabase.js`, `scripts/pull-supabase.js`: Supabase CLI push and local history mirror scripts
+- `scripts/import-local-history.js`: uploads existing ignored `data/*.json` history into Supabase after schema creation
 - `.github/workflows/`: collector, five digest schedules, stock report schedule
 - `memory/`: project memory, architecture notes, changelog
 - `docs/PROGRESS.md`: human-readable development progress and current operating context

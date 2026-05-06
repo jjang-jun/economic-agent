@@ -6,6 +6,7 @@
 - 로컬 검증에서 direct DB 연결은 IPv6/DNS 문제로 실패했고, REST pull은 테이블 미생성 상태를 확인
 - 기사, 일일 요약, 종목 리포트, 추천, 추천 성과, 시장 스냅샷, 의사결정 컨텍스트를 Supabase에 병행 저장하도록 연결
 - `db:pull`로 Supabase 데이터를 `data/supabase/*.json`과 `data/economic-agent.db`에 내려받는 로컬 미러 추가
+- 기존 로컬 JSON 히스토리를 Supabase로 업로드하는 `db:import-local` 추가
 - AI 프롬프트 입력을 중요도 상위 기사와 핵심 시장 스냅샷으로 제한해 API 토큰 사용량을 줄이는 예산 모듈 추가
 - Telegram 문구를 의사결정 중심으로 간결하게 재정렬
 - 개발 진행 컨텍스트를 사람이 읽기 쉬운 `docs/PROGRESS.md`로 분리
@@ -15,6 +16,7 @@
   - `supabase/migrations/20260506120000_init_history.sql`
   - `scripts/push-supabase.js`
   - `scripts/pull-supabase.js`
+  - `scripts/import-local-history.js`
   - `src/utils/persistence.js`
   - `src/config/ai-budget.js`
   - `src/utils/ai-budget.js`

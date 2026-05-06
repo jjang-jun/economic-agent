@@ -93,6 +93,7 @@ src/
 - `npm run report`: 장 마감 종목 분석
 - `npm run evaluate`: 추천 성과 평가
 - `npm run db:push`: Supabase 스키마 적용
+- `npm run db:import-local`: 기존 로컬 JSON 히스토리를 Supabase로 업로드
 - `npm run db:pull`: Supabase 데이터를 로컬 JSON/SQLite로 동기화
 - `npm test`: 테스트
 

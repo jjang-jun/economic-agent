@@ -72,6 +72,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 로컬 `.env`에 `SUPABASE_DB_PASSWORD` 유지
 - direct DB가 IPv6 문제로 실패하면 `SUPABASE_DNS_RESOLVER=https`를 유지하고, 그래도 실패하면 Supabase pooler 연결 문자열을 `SUPABASE_DB_URL`로 추가
 - `npm run db:push`로 Supabase 스키마 적용
+- 기존 로컬 히스토리는 `npm run db:import-local`로 Supabase에 업로드
 - GitHub Actions 실행 후 Supabase 테이블에 row가 쌓이는지 확인
 - `npm run db:pull`로 로컬 JSON/SQLite 미러 생성 확인
 
@@ -80,6 +81,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 2026-05-06 로컬에서 `npm run db:push`를 시도했지만 Supabase direct DB 호스트가 IPv6 라우팅/DNS 문제로 연결되지 않았다.
 - `npm run db:pull`은 Supabase REST API까지 도달했으나 아직 `public.articles` 테이블이 없어 실패했다.
 - 해결: Supabase Dashboard > Project Settings > Database > Connection string에서 pooler URI를 복사해 `.env`에 `SUPABASE_DB_URL`로 추가한 뒤 `npm run db:push`를 다시 실행한다.
+- 이후 순서: `npm run db:push` -> `npm run db:import-local` -> `npm run db:pull`
 
 ## 다음 작업
 
