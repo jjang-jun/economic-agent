@@ -4,7 +4,7 @@
 - Personal economic news agent written in Node.js CommonJS.
 - Collector runs every 5 minutes, scores economic news locally, sends urgent items to Telegram, and stores non-urgent score 4 items for scheduled digests.
 - Scheduled digests and stock reports use the provider-agnostic AI client in `src/utils/ai-client.js`.
-- Runtime target: Node.js 20+.
+- Runtime target: Node.js 22+.
 
 ## Core Flow
 ```

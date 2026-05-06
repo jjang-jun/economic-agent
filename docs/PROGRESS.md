@@ -40,6 +40,7 @@
 - Supabase 히스토리 저장소와 로컬 SQLite 미러 추가
 - Telegram 문구를 의사결정 중심 템플릿으로 재정렬
 - 현재 운영/AI 참조 기준에서 제외된 `memory/`, `CLAUDE.md`, `.claude/` 정리
+- GitHub Actions 경고 대응: Node.js 22 기준으로 런타임과 워크플로우 업데이트
 
 ## 데이터 저장 전략
 
@@ -83,10 +84,11 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - `npm run db:import-local` 성공: articles 8건, daily summaries 2건 업로드
 - `npm run db:pull` 성공: `data/supabase/*.json`, `data/economic-agent.db` 생성
 - SQLite 확인: `articles=8`, `daily_summaries=2`, `stock_reports=2`, `recommendations=0`
+- GitHub Actions `news-alert.yml` 수동 실행 성공. 신규 score 4+ 기사가 없어 Supabase row 수 증가는 없었지만, Secrets 주입과 수집 파이프라인은 정상 확인.
 
 ## 다음 작업
 
-1. GitHub Actions 수동 실행으로 원격 자동 적재 검증
+1. Node.js 22 워크플로우 변경 후 `news-alert.yml` 재검증
 2. 추천/성과 평가의 기준 저장소를 JSON에서 DB로 전환
 3. 실제 보유 종목/현금 비중을 포트폴리오 설정에 반영
 4. 시장 레짐 점수에 수급, 추세, 변동성 지표 추가

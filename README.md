@@ -149,7 +149,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 
 ### 요구 사항
 
-- Node.js 20+
+- Node.js 22+
 - Telegram Bot Token ([BotFather](https://t.me/BotFather)에서 발급)
 - AI API Key (다이제스트/종목분석용, 아래 지원 목록 참조)
 
