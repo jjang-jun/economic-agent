@@ -24,9 +24,10 @@ RSS feeds
 - Send digest: `npm run digest`
 - Send digest for a session: `npm run digest -- morning`
 - Send stock report: `npm run report`
+- Evaluate recommendation performance: `npm run evaluate`
 - Test: `npm test`
 
-`npm start`, `npm run digest`, and `npm run report` read `.env` through Node's `--env-file=.env` flag. They may call RSS/API/Telegram/AI services. Use them intentionally.
+`npm start`, `npm run digest`, `npm run report`, and `npm run evaluate` read `.env` through Node's `--env-file=.env` flag. They may call RSS/API/Telegram/AI services. Use them intentionally.
 
 ## Environment
 - Required for Telegram delivery: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`
@@ -38,7 +39,9 @@ RSS feeds
 - `src/check-news.js`: news collection, filtering, urgent alert, buffer write
 - `src/digest.js`: buffer read, AI digest generation, Telegram delivery, buffer clear after success
 - `src/stock-report.js`: market close stock/sector analysis from the daily scored article archive
+- `src/evaluate-recommendations.js`: evaluates logged stock signals after 1/5/20 days
 - `src/sources/`: RSS, BOK, FRED integrations
+- `src/sources/yahoo-finance.js`: Yahoo chart quote fetcher for recommendation performance tracking
 - `src/filters/keyword-filter.js`: first-pass keyword gate
 - `src/filters/local-scorer.js`: local scoring, sentiment, sector tagging
 - `src/filters/finbert.js`: English FinBERT sentiment model, cached under `.cache/`
@@ -47,6 +50,7 @@ RSS feeds
 - `src/notify/telegram.js`: Telegram formatting and sending
 - `src/utils/`: config, AI client, buffers, seen-article cache, indicators, daily summaries
 - `src/utils/article-archive.js`: daily scored article archive used by stock reports and later performance review
+- `src/utils/recommendation-log.js`: stores stock signals and evaluates returns
 - `src/config/keywords.js`: keyword weights, sentiment dictionary, sectors
 - `src/config/interests.js`: user interests
 - `.github/workflows/`: collector, five digest schedules, stock report schedule
@@ -56,6 +60,7 @@ RSS feeds
 - `data/` stores runtime state such as seen articles, article buffer, and daily summaries. It is ignored by Git.
 - `data/daily-articles/YYYY-MM-DD.json` stores scored articles for the day. Use this for daily stock reports instead of relying only on currently new RSS items.
 - `data/article-buffer.json` must only be cleared after digest generation and Telegram delivery both succeed.
+- `data/recommendations/recommendations.json` stores stock signals, entry prices, and 1/5/20 day evaluations.
 - `.cache/` stores downloaded FinBERT model files. It is ignored by Git.
 - Do not commit `node_modules/`, `.env`, `data/`, or `.cache/`.
 

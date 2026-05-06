@@ -290,7 +290,53 @@ async function sendDigest(digest) {
   }
 }
 
+function formatPerformanceReport(completed) {
+  const now = new Date().toLocaleString('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    month: '2-digit',
+    day: '2-digit',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: false,
+  });
+
+  const lines = completed.map(({ recommendation, day, evaluation }) => {
+    const icon = evaluation.signalReturnPct >= 0 ? '🔴' : '🔵';
+    const ticker = recommendation.ticker ? ` ${escapeHtml(recommendation.ticker)}` : '';
+    return [
+      `${icon} <b>${escapeHtml(recommendation.name)}</b>${ticker} · ${day}일`,
+      `└ 실제 ${evaluation.returnPct}% · 신호기준 ${evaluation.signalReturnPct}%`,
+      `└ ${escapeHtml(recommendation.signal)} / ${escapeHtml(recommendation.conviction)}`,
+    ].join('\n');
+  });
+
+  const avg = completed.reduce((sum, item) => sum + item.evaluation.signalReturnPct, 0) / completed.length;
+
+  return [
+    `━━━━━━━━━━━━━━━━━━`,
+    `📈 <b>추천 성과 평가</b>`,
+    `━━━━━━━━━━━━━━━━━━`,
+    `평균 신호기준 수익률: <b>${avg.toFixed(2)}%</b>`,
+    '',
+    lines.join('\n\n'),
+    '',
+    `⏰ ${now}`,
+  ].join('\n');
+}
+
+async function sendPerformanceReport(completed) {
+  const message = formatPerformanceReport(completed);
+  try {
+    await sendTelegramMessage(message);
+    console.log('[성과평가] 리포트 전송 완료');
+    return true;
+  } catch (err) {
+    console.error(`[성과평가] 전송 실패: ${err.message}`);
+    return false;
+  }
+}
+
 module.exports = {
-  notifyArticles, sendStockReport, sendDigest,
-  formatMessage, formatStockReport, formatDigest,
+  notifyArticles, sendStockReport, sendDigest, sendPerformanceReport,
+  formatMessage, formatStockReport, formatDigest, formatPerformanceReport,
 };

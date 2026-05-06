@@ -20,6 +20,13 @@ RSS 수집 → 중복 제거(seen-articles.json) → 키워드 필터 → 로컬
 ## 종목 분석 데이터
 - 장 마감 종목 분석은 5분 수집기가 누적한 `data/daily-articles/YYYY-MM-DD.json`을 우선 사용한다.
 - 실행 시점의 RSS도 다시 점수화해 아카이브 누락분을 보강한 뒤, 당일 누적 중요 기사 전체를 AI 분석에 전달한다.
+- 종목 리포트의 `stocks` 항목은 `data/recommendations/recommendations.json`에 저장한다.
+
+## 추천 성과 평가
+- 추천 저장 시 Yahoo Finance chart 엔드포인트로 진입 가격을 조회한다.
+- 평가 작업은 1일/5일/20일이 지난 추천 중 아직 평가되지 않은 항목을 찾아 현재 가격과 진입 가격을 비교한다.
+- bullish는 가격 상승률을 그대로, bearish는 하락 방향을 맞춘 경우 양수로 계산한 `signalReturnPct`를 기록한다.
+- 신규 평가 결과가 있으면 Telegram으로 성과 리포트를 보낸다.
 
 ## 예약 작업
 - `news-alert.yml`: 평일 KST 07:00~23:00, 5분 간격 뉴스 수집
@@ -29,6 +36,7 @@ RSS 수집 → 중복 제거(seen-articles.json) → 키워드 필터 → 로컬
 - `digest-evening.yml`: KST 19:00 저녁 브리핑
 - `digest-night.yml`: KST 23:30 마감 브리핑
 - `stock-report.yml`: KST 16:00 장 마감 종목 분석
+- `evaluate-recommendations.yml`: KST 17:30 추천 성과 평가
 
 ## AI 사용 지점
 - 뉴스 수집 스코어링은 기본적으로 AI API를 쓰지 않는다.

@@ -11,6 +11,7 @@
 - **7개 섹터 자동 분류** — 반도체, 에너지·원자재, 금융·통화, 부동산, 거시경제, 테크, 무역·지정학
 - **하루 5회 AI 다이제스트** — 시장 이벤트 시간대에 맞춘 뉴스 요약 브리핑
 - **장 마감 종목 분석** — AI 기반 섹터/종목 인사이트 리포트
+- **추천 성과 추적** — 종목 신호를 저장하고 1일/5일/20일 후 수익률 평가
 - **일일 요약 아카이빙** — 매일 시장 데이터를 JSON으로 저장
 
 ## 아키텍처
@@ -33,6 +34,8 @@
 
 하루 1회 ─ 종목 분석 (AI 1회/일)
   일별 기사 아카이브 기반 당일 뉴스 종합 → AI 섹터/종목 분석 → Telegram 발송
+      ↓
+  추천 로그 저장 → 1일/5일/20일 성과 평가
 ```
 
 ## 다이제스트 스케줄
@@ -52,10 +55,12 @@ src/
 ├── check-news.js              # 뉴스 수집 + 스코어링 → 버퍼 저장 (5분 간격)
 ├── digest.js                  # AI 다이제스트 생성 + 발송 (하루 5회)
 ├── stock-report.js            # 장 마감 종목 분석 (하루 1회)
+├── evaluate-recommendations.js # 추천 성과 평가
 ├── sources/
 │   ├── rss-fetcher.js         # RSS 수집 (4개 소스)
 │   ├── bok-api.js             # 한국은행 기준금리 API
-│   └── fred-api.js            # FRED 미국 경제지표 API
+│   ├── fred-api.js            # FRED 미국 경제지표 API
+│   └── yahoo-finance.js       # 추천 성과 평가용 가격 조회
 ├── filters/
 │   ├── keyword-filter.js      # 1단계: 키워드 필터
 │   ├── local-scorer.js        # 2단계: 로컬 스코어링 (FinBERT + 키워드)
@@ -74,6 +79,7 @@ src/
     ├── article-archive.js     # 점수화 기사 일별 아카이브
     ├── article-buffer.js      # 기사 버퍼 관리
     ├── config.js              # 공통 설정
+    ├── recommendation-log.js  # 추천 저장 및 성과 평가
     ├── seen-articles.js       # 중복 기사 관리
     ├── indicators.js          # 경제지표 수집
     └── daily-summary.js       # 일일 요약 저장
@@ -88,6 +94,7 @@ Codex에서 작업할 때는 저장소 루트의 `AGENTS.md`를 기준으로 프
 - `data/article-buffer.json`: 다음 다이제스트에서 처리할 score 4 기사
 - `data/daily-articles/YYYY-MM-DD.json`: 수집 중 점수화된 당일 기사 누적 아카이브
 - `data/daily-summary/YYYY-MM-DD.json`: 다이제스트/종목 리포트 요약
+- `data/recommendations/recommendations.json`: 종목 리포트 추천과 1일/5일/20일 성과 평가
 
 다이제스트는 AI 생성과 Telegram 전송이 모두 성공한 뒤에만 버퍼를 비웁니다. 장 마감 종목 분석은 `daily-articles` 아카이브를 우선 사용하므로, 5분 수집기가 이미 seen 처리한 기사도 하루 단위 분석에 포함됩니다.
 
@@ -147,6 +154,9 @@ npm run digest -- morning
 
 # 장 마감 종목 분석
 npm run report
+
+# 추천 성과 평가
+npm run evaluate
 ```
 
 ## AI 제공자 지원
@@ -188,6 +198,7 @@ npm run report
 | `digest-evening.yml` | 평일 19:00 KST | 저녁 브리핑 |
 | `digest-night.yml` | 평일 23:30 KST | 마감 브리핑 |
 | `stock-report.yml` | 평일 16:00 KST | 장 마감 종목 분석 |
+| `evaluate-recommendations.yml` | 평일 17:30 KST | 추천 성과 평가 |
 
 GitHub 저장소의 **Settings > Secrets and variables > Actions**에 환경 변수를 등록하세요.
 

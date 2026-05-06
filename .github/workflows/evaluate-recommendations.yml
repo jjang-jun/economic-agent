@@ -1,0 +1,28 @@
+name: Evaluate Recommendations (추천 성과 평가)
+
+on:
+  schedule:
+    # KST 17:30 = UTC 08:30 (월~금)
+    - cron: '30 8 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: actions/cache@v4
+        with:
+          path: data/
+          key: data-${{ github.run_id }}
+          restore-keys: data-
+
+      - run: npm ci
+      - run: node src/evaluate-recommendations.js
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

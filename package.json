@@ -7,6 +7,7 @@
     "start": "node --env-file=.env src/check-news.js",
     "digest": "node --env-file=.env src/digest.js",
     "report": "node --env-file=.env src/stock-report.js",
+    "evaluate": "node --env-file=.env src/evaluate-recommendations.js",
     "test": "node --test"
   },
   "keywords": [

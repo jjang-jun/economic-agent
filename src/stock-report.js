@@ -7,6 +7,7 @@ const { sendStockReport } = require('./notify/telegram');
 const { fetchAllIndicators } = require('./utils/indicators');
 const { saveDailySummary } = require('./utils/daily-summary');
 const { archiveScoredArticles, loadScoredArticles } = require('./utils/article-archive');
+const { logRecommendations } = require('./utils/recommendation-log');
 
 function mergeArticles(...groups) {
   const byId = new Map();
@@ -62,6 +63,8 @@ async function main() {
   }
 
   await sendStockReport(report);
+  const logged = await logRecommendations(report, { articles: scored, indicators });
+  console.log(`[추천로그] 신규 ${logged.added}건, 중복 ${logged.skipped}건`);
 
   // 일일 요약에 종목 분석 결과 저장
   saveDailySummary({ articles: scored, indicators, stockReport: report });

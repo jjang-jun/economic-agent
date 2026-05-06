@@ -1,5 +1,26 @@
 # 작업 기록 (Changelog)
 
+## 2026-05-06: 추천 성과 평가 루프 추가
+- 종목 리포트의 추천 신호를 `data/recommendations/recommendations.json`에 저장하도록 추가
+- Yahoo Finance chart 엔드포인트 기반 가격 조회 소스 추가
+- 추천 저장 시 진입 가격을 기록하고, 1일/5일/20일 후 수익률을 평가하는 스크립트 추가
+- 평가 결과를 Telegram으로 전송하는 성과 리포트 포맷 추가
+- 평일 KST 17:30에 추천 성과를 평가하는 GitHub Actions 워크플로우 추가
+- `npm run evaluate` 스크립트 추가
+- 변경 파일:
+  - `src/sources/yahoo-finance.js`
+  - `src/utils/recommendation-log.js`
+  - `src/evaluate-recommendations.js`
+  - `src/stock-report.js`
+  - `src/notify/telegram.js`
+  - `.github/workflows/evaluate-recommendations.yml`
+  - `package.json`
+  - `README.md`
+  - `AGENTS.md`
+  - `memory/MEMORY.md`
+  - `memory/architecture.md`
+  - `memory/changelog.md`
+
 ## 2026-05-06: 투자 판단용 데이터 흐름 보강
 - score 4 이상 점수화 기사를 `data/daily-articles/YYYY-MM-DD.json`에 누적 저장하는 `article-archive` 유틸 추가
 - 뉴스 수집 시 점수화 기사를 일별 아카이브에 저장하도록 변경
