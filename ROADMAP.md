@@ -162,7 +162,7 @@ Telegram Bot
 - [x] FMP provider 골격 추가: 미국 기업 profile/fundamental 확장 준비
 - [x] 사용 가격의 source/as_of/price_type 저장
 - [ ] KIS 계정 키 설정 후 국내 현재가 실호출 검증
-- [ ] FMP API key 설정 후 보유 미국 주식 재무/실적 profile 수집
+- [x] FMP API key 설정 후 보유 미국 주식 quote/profile 실호출 검증
 - [x] Alpaca API key 설정 후 미국 보유 종목 현재가 검증
 - [ ] KIS 일봉 데이터를 추천 성과 평가에 연결
 - [ ] KRX Open API 또는 공공데이터포털로 공식 일별 종가 백필
@@ -240,13 +240,13 @@ Telegram Bot
 - [x] `src/server/telegram-webhook.js` 추가
 - [x] `src/agent/agent-router.js`와 기본 명령어 라우팅 추가
 - [x] `/portfolio`, `/goal`, `/risk` 조회 명령 구현
-- [ ] `/buy`, `/sell`, `/cash`를 pending action + 버튼 승인 방식으로 구현
+- [x] `/buy`, `/sell`, `/cash`를 pending action + 버튼 승인 방식으로 구현
 - [x] Telegram `chat_id` allowlist와 webhook secret 검증
 - [ ] Cloud Run 또는 Fly.io/Render 배포 문서 추가
 
 ## 현재 가장 중요한 다음 작업
-1. `/buy`, `/sell`, `/cash`를 pending action과 Telegram 승인 버튼으로 구현한다.
-2. FMP 계정 키를 설정하고 미국 기업 재무/실적 provider 실호출을 검증한다.
+1. Agent Server 배포 플랫폼을 선택하고 webhook URL/setWebhook 절차를 문서화한다.
+2. FMP profile/financial statement를 보유 미국 종목 분석 리포트에 연결한다.
 3. KRX/공공데이터 일별 종가 백필 provider를 추가한다.
 4. 추천 JSON schema 검증을 추가해 근거, 기준 가격, 손절선, 손익비, 제안 비중이 없는 추천 저장을 차단한다.
 5. `performance-lab.js`와 `behavior-reviewer.js`로 추천/실거래/행동 패턴을 분리 분석한다.

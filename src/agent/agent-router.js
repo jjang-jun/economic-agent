@@ -9,6 +9,7 @@ const {
   formatRiskStatus,
   formatHelp,
 } = require('./response-composer');
+const { createPendingAction, handlePendingActionCallback } = require('./pending-actions');
 
 function getAllowedChatIds() {
   return [
@@ -29,6 +30,10 @@ function normalizeCommand(text = '') {
   const cleaned = String(text || '').trim();
   const command = cleaned.split(/\s+/)[0].toLowerCase();
   return command.replace(/@[\w_]+$/, '');
+}
+
+function isPendingActionCommand(command) {
+  return ['/buy', '/sell', '/cash'].includes(command);
 }
 
 async function getEnrichedPortfolio() {
@@ -75,10 +80,10 @@ async function buildResponse(text) {
     };
   }
 
-  if (['/buy', '/sell', '/cash'].includes(command)) {
+  if (isPendingActionCommand(command)) {
     return {
-      intent: 'pending_action_not_implemented',
-      response: '거래/현금 변경은 아직 바로 기록하지 않습니다. 다음 단계에서 승인 버튼 기반 pending action으로 추가합니다.',
+      intent: 'pending_action_requires_chat',
+      response: '거래/현금 변경은 Telegram 승인 버튼이 필요합니다. Telegram 대화에서 실행해주세요.',
     };
   }
 
@@ -108,7 +113,26 @@ async function routeTelegramMessage(message = {}) {
     return { allowed: false, response: '허용되지 않은 Telegram chat_id입니다.' };
   }
 
-  const result = await buildResponse(text);
+  const command = normalizeCommand(text);
+  let result;
+  if (isPendingActionCommand(command)) {
+    try {
+      const draft = await createPendingAction({ chatId, text });
+      result = {
+        intent: `draft_${command.slice(1)}`,
+        response: draft.response,
+        replyMarkup: draft.replyMarkup,
+        pendingActionId: draft.action.id,
+      };
+    } catch (err) {
+      result = {
+        intent: 'pending_action_invalid',
+        response: err.message,
+      };
+    }
+  } else {
+    result = await buildResponse(text);
+  }
   await persistConversationMessage({
     id,
     chatId: String(chatId),
@@ -118,11 +142,47 @@ async function routeTelegramMessage(message = {}) {
     text,
     response: result.response,
     dataCutoff: result.dataCutoff || {},
+    pendingActionId: result.pendingActionId || null,
     status: 'answered',
     payload: { message },
   });
 
   return { allowed: true, ...result };
+}
+
+async function routeTelegramCallback(callbackQuery = {}) {
+  const chatId = callbackQuery.message?.chat?.id;
+  const data = callbackQuery.data || '';
+  const id = crypto.randomUUID();
+
+  if (!isAllowedChat(chatId)) {
+    await persistConversationMessage({
+      id,
+      chatId: String(chatId || ''),
+      messageId: callbackQuery.message?.message_id ? String(callbackQuery.message.message_id) : '',
+      direction: 'callback',
+      intent: 'unauthorized',
+      text: data,
+      status: 'blocked',
+      payload: { callbackQuery },
+    });
+    return { allowed: false, response: '허용되지 않은 Telegram chat_id입니다.' };
+  }
+
+  const result = await handlePendingActionCallback(data);
+  await persistConversationMessage({
+    id,
+    chatId: String(chatId),
+    messageId: callbackQuery.message?.message_id ? String(callbackQuery.message.message_id) : '',
+    direction: 'callback',
+    intent: `pending_action_${result.verb}`,
+    text: data,
+    response: result.response,
+    pendingActionId: result.actionId,
+    status: 'answered',
+    payload: { callbackQuery },
+  });
+  return { allowed: true, intent: `pending_action_${result.verb}`, response: result.response };
 }
 
 module.exports = {
@@ -131,4 +191,5 @@ module.exports = {
   normalizeCommand,
   buildResponse,
   routeTelegramMessage,
+  routeTelegramCallback,
 };

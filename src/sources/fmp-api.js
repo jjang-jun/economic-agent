@@ -20,12 +20,17 @@ function parseNumber(value) {
   return Number.isFinite(num) ? num : null;
 }
 
+function buildFmpUrl(endpoint) {
+  const base = FMP_BASE_URL.endsWith('/') ? FMP_BASE_URL : `${FMP_BASE_URL}/`;
+  return new URL(String(endpoint || '').replace(/^\//, ''), base);
+}
+
 async function fetchFmpQuote(symbol) {
   const ticker = normalizeFmpSymbol(symbol);
   if (!ticker || !isFmpConfigured()) return null;
 
   try {
-    const url = new URL('/quote', FMP_BASE_URL);
+    const url = buildFmpUrl('quote');
     url.searchParams.set('symbol', ticker);
     url.searchParams.set('apikey', FMP_API_KEY);
 
@@ -74,7 +79,7 @@ async function fetchFmpProfile(symbol) {
   if (!ticker || !isFmpConfigured()) return null;
 
   try {
-    const url = new URL('/profile', FMP_BASE_URL);
+    const url = buildFmpUrl('profile');
     url.searchParams.set('symbol', ticker);
     url.searchParams.set('apikey', FMP_API_KEY);
 

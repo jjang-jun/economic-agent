@@ -105,20 +105,41 @@ async function sendTelegramMessage(text, options = {}) {
 
   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
 
+  const payload = {
+    chat_id: chatId,
+    text,
+    parse_mode: 'HTML',
+    disable_web_page_preview: true,
+  };
+  if (options.replyMarkup) payload.reply_markup = options.replyMarkup;
+
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      parse_mode: 'HTML',
-      disable_web_page_preview: true,
-    }),
+    body: JSON.stringify(payload),
   });
 
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`Telegram 전송 실패: ${res.status} ${body}`);
+  }
+}
+
+async function answerTelegramCallbackQuery(callbackQueryId, text = '') {
+  if (!TELEGRAM_BOT_TOKEN || !callbackQueryId) return;
+  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      callback_query_id: callbackQueryId,
+      text,
+      show_alert: false,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Telegram callback 응답 실패: ${res.status} ${body}`);
   }
 }
 
@@ -553,6 +574,6 @@ async function sendPerformanceReview(review) {
 }
 
 module.exports = {
-  notifyArticles, sendStockReport, sendDigest, sendPerformanceReport, sendTradePerformanceReport, sendPerformanceReview, sendActionReport, sendTelegramMessage, getTelegramChatId,
+  notifyArticles, sendStockReport, sendDigest, sendPerformanceReport, sendTradePerformanceReport, sendPerformanceReview, sendActionReport, sendTelegramMessage, answerTelegramCallbackQuery, getTelegramChatId,
   formatMessage, formatStockReport, formatDigest, formatPerformanceReport, formatTradePerformanceReport, formatPerformanceReview, formatActionReport,
 };

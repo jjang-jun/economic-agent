@@ -286,10 +286,15 @@ POST /telegram/webhook
 /portfolio
 /goal
 /risk
+/buy TICKER 수량 가격 [이름]
+/sell TICKER 수량 가격 [이름]
+/cash 현금잔액
 /help
 ```
 
 포트폴리오와 경제적 자유 상태를 다루므로 Telegram `chat_id` allowlist를 통과한 채팅만 응답합니다. allowlist는 `TELEGRAM_SECRET_CHAT_ID`, `TELEGRAM_PRIVATE_CHAT_ID`, `TELEGRAM_AGENT_CHAT_ID`, `TELEGRAM_PORTFOLIO_CHAT_ID`, `TELEGRAM_CHAT_ID` 순서로 구성됩니다.
+
+`/buy`, `/sell`, `/cash`는 즉시 반영하지 않고 Supabase `pending_actions`에 초안을 만든 뒤 Telegram inline button의 `기록하기`/`취소` 승인으로 처리합니다.
 
 Telegram webhook secret token을 쓰려면 아래 값을 설정하고, Bot API `setWebhook`에도 같은 secret token을 넣습니다.
 

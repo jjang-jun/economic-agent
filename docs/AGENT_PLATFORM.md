@@ -209,11 +209,11 @@ pending_actions
 - `GET /health`
 - `POST /telegram/webhook`
 - `/portfolio`, `/goal`, `/risk`, `/help`
+- `/buy`, `/sell`, `/cash` pending action
 - Telegram chat_id allowlist
 - `TELEGRAM_WEBHOOK_SECRET` 검증
 - `conversation_messages` 저장
+- Telegram inline keyboard 승인/취소
 
 아직 미구현:
-- `/buy`, `/sell`, `/cash` pending action
-- Telegram inline keyboard 승인 버튼
 - Cloud Run/Fly/Render 배포 설정

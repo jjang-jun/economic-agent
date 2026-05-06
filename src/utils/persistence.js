@@ -396,6 +396,34 @@ async function persistConversationMessage(message) {
   }], 'id');
 }
 
+async function persistPendingAction(action) {
+  if (!action?.id || !action?.type) return { saved: 0 };
+  return upsert('pending_actions', [{
+    id: action.id,
+    chat_id: action.chatId || '',
+    type: action.type,
+    status: action.status || 'pending',
+    requested_payload: action.requestedPayload || {},
+    risk_review: action.riskReview || {},
+    confirmation_token: action.confirmationToken || '',
+    expires_at: action.expiresAt || null,
+    confirmed_at: action.confirmedAt || null,
+    cancelled_at: action.cancelledAt || null,
+    payload: action.payload || {},
+    updated_at: new Date().toISOString(),
+  }], 'id');
+}
+
+async function loadPendingAction(id) {
+  if (!id) return null;
+  const result = await selectRows('pending_actions', {
+    select: '*',
+    id: `eq.${id}`,
+    limit: '1',
+  });
+  return result.rows?.[0] || null;
+}
+
 module.exports = {
   isPersistenceEnabled,
   selectRows,
@@ -415,4 +443,6 @@ module.exports = {
   persistPerformanceReview,
   persistFinancialFreedomGoal,
   persistConversationMessage,
+  persistPendingAction,
+  loadPendingAction,
 };
