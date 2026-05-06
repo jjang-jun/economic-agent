@@ -75,6 +75,8 @@ create table if not exists market_snapshots (
   price numeric,
   previous_close numeric,
   change_percent numeric,
+  return_5d_pct numeric,
+  return_20d_pct numeric,
   currency text,
   market_time timestamptz,
   payload jsonb not null default '{}'::jsonb

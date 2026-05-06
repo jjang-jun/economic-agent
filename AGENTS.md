@@ -48,7 +48,7 @@ RSS feeds
 - `src/evaluate-recommendations.js`: evaluates logged stock signals after 1/5/20 days
 - `src/sources/`: RSS, DART, BOK, FRED integrations
 - `src/sources/dart-api.js`: OpenDART disclosure fetcher, optional `DART_API_KEY`
-- `src/sources/yahoo-finance.js`: Yahoo chart quote fetcher for recommendation performance tracking
+- `src/sources/yahoo-finance.js`: Yahoo chart quote fetcher for recommendation performance tracking and 5/20 day trend fields
 - `src/filters/keyword-filter.js`: first-pass keyword gate
 - `src/filters/local-scorer.js`: local scoring, sentiment, sector tagging
 - `src/filters/finbert.js`: English FinBERT sentiment model, cached under `.cache/`
@@ -59,7 +59,7 @@ RSS feeds
 - `src/utils/ai-budget.js`: trims AI prompt inputs to control token use
 - `src/utils/article-archive.js`: daily scored article archive used by stock reports and later performance review
 - `src/utils/recommendation-log.js`: stores stock signals and evaluates returns against KOSPI benchmark when available
-- `src/utils/decision-engine.js`: rule-based market regime and action guardrails
+- `src/utils/decision-engine.js`: rule-based market regime, index trend scoring, and action guardrails
 - `src/utils/portfolio.js`: loads ignored local portfolio data and derives cash/position risk inputs
 - `src/utils/persistence.js`: optional Supabase REST persistence for articles, summaries, reports, recommendations, snapshots, decisions
 - `src/config/keywords.js`: keyword weights, sentiment dictionary, sectors

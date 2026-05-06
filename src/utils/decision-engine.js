@@ -12,6 +12,32 @@ function findSnapshot(snapshot, symbol) {
   return (snapshot || []).find(item => item.symbol === symbol);
 }
 
+function getTrendSignal(snapshot, symbols) {
+  const items = symbols
+    .map(symbol => findSnapshot(snapshot, symbol))
+    .filter(Boolean);
+  let weak = 0;
+  let strong = 0;
+  const details = [];
+
+  for (const item of items) {
+    const daily = item.changePercent;
+    const week = item.return5dPct;
+    const month = item.return20dPct;
+    if (typeof month === 'number' && month <= -5) weak++;
+    if (typeof week === 'number' && week <= -3) weak++;
+    if (typeof daily === 'number' && daily <= -1.5) weak++;
+    if (typeof month === 'number' && month >= 5) strong++;
+    if (typeof week === 'number' && week >= 3) strong++;
+    if (typeof daily === 'number' && daily >= 1.5) strong++;
+    if (typeof month === 'number') {
+      details.push(`${item.name} 20일 ${month}%`);
+    }
+  }
+
+  return { weak, strong, details };
+}
+
 function scoreMarketRegime({ articles, indicators }) {
   const sentiment = countBySentiment(articles);
   const snapshot = indicators.marketSnapshot || [];
@@ -42,6 +68,30 @@ function scoreMarketRegime({ articles, indicators }) {
   if (dollar?.price >= 106) {
     score -= 1;
     reasons.push(`달러지수 ${dollar.price}로 위험자산 부담`);
+  }
+
+  const usdkrw = findSnapshot(snapshot, 'KRW=X');
+  if (usdkrw?.changePercent >= 0.8) {
+    score -= 1;
+    reasons.push(`USD/KRW ${usdkrw.changePercent}% 상승으로 원화 약세 부담`);
+  }
+
+  const domesticTrend = getTrendSignal(snapshot, ['^KS11', '^KQ11']);
+  if (domesticTrend.weak >= 2) {
+    score -= 2;
+    reasons.push(`국내 지수 약세: ${domesticTrend.details.join(', ')}`);
+  } else if (domesticTrend.strong >= 2) {
+    score += 1;
+    reasons.push(`국내 지수 개선: ${domesticTrend.details.join(', ')}`);
+  }
+
+  const globalTrend = getTrendSignal(snapshot, ['SPY', 'QQQ', 'SOXX']);
+  if (globalTrend.weak >= 3) {
+    score -= 2;
+    reasons.push(`미국/반도체 추세 약세: ${globalTrend.details.join(', ')}`);
+  } else if (globalTrend.strong >= 3) {
+    score += 1;
+    reasons.push(`미국/반도체 추세 개선: ${globalTrend.details.join(', ')}`);
   }
 
   if (indicators.fedRate && Number(indicators.fedRate) >= 4.5) {
@@ -145,4 +195,10 @@ function buildDecisionContext({ articles, indicators }) {
   };
 }
 
-module.exports = { buildDecisionContext, scoreMarketRegime, summarizePortfolio, formatKRW };
+module.exports = {
+  buildDecisionContext,
+  scoreMarketRegime,
+  summarizePortfolio,
+  formatKRW,
+  getTrendSignal,
+};

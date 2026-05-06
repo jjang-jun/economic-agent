@@ -25,9 +25,13 @@ module.exports = {
     { symbol: '000660.KS', name: 'SK하이닉스' },
   ],
   global: [
+    { symbol: 'SPY', name: 'S&P 500 ETF' },
+    { symbol: 'QQQ', name: 'Nasdaq 100 ETF' },
+    { symbol: 'SOXX', name: 'Semiconductor ETF' },
     { symbol: 'CL=F', name: 'WTI Oil' },
     { symbol: 'GC=F', name: 'Gold' },
     { symbol: '^VIX', name: 'VIX' },
     { symbol: 'DX-Y.NYB', name: 'Dollar Index' },
+    { symbol: 'KRW=X', name: 'USD/KRW' },
   ],
 };

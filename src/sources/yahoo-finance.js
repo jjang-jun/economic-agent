@@ -13,7 +13,7 @@ async function fetchQuote(ticker) {
   if (!symbol) return null;
 
   try {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=5d&interval=1d`;
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=3mo&interval=1d`;
     const res = await fetch(url, {
       headers: { 'User-Agent': 'economic-agent/2.0' },
     });
@@ -34,12 +34,16 @@ async function fetchQuote(ticker) {
       : previousClose
         ? Number((((price - previousClose) / previousClose) * 100).toFixed(2))
         : null;
+    const return5dPct = calculatePeriodReturn(price, closes, 5);
+    const return20dPct = calculatePeriodReturn(price, closes, 20);
 
     return {
       symbol,
       price,
       previousClose,
       changePercent,
+      return5dPct,
+      return20dPct,
       currency: meta.currency || '',
       marketTime: meta.regularMarketTime
         ? new Date(meta.regularMarketTime * 1000).toISOString()
@@ -51,8 +55,15 @@ async function fetchQuote(ticker) {
   }
 }
 
+function calculatePeriodReturn(price, closes, days) {
+  if (typeof price !== 'number' || closes.length <= days) return null;
+  const base = closes[closes.length - 1 - days];
+  if (typeof base !== 'number' || base === 0) return null;
+  return Number((((price - base) / base) * 100).toFixed(2));
+}
+
 async function fetchBenchmarkQuote() {
   return fetchQuote('^KS11');
 }
 
-module.exports = { fetchQuote, fetchBenchmarkQuote, normalizeYahooSymbol };
+module.exports = { fetchQuote, fetchBenchmarkQuote, normalizeYahooSymbol, calculatePeriodReturn };

@@ -3,7 +3,11 @@ const { fetchQuote } = require('../sources/yahoo-finance');
 
 function getSymbolsForSession(session) {
   const primary = WATCHLIST[session] || [];
-  return [...primary, ...WATCHLIST.global];
+  const bySymbol = new Map();
+  for (const item of [...primary, ...WATCHLIST.global]) {
+    if (!bySymbol.has(item.symbol)) bySymbol.set(item.symbol, item);
+  }
+  return [...bySymbol.values()];
 }
 
 async function fetchMarketSnapshot(session) {
@@ -20,6 +24,8 @@ async function fetchMarketSnapshot(session) {
         price: quote.price,
         previousClose: quote.previousClose,
         changePercent: quote.changePercent,
+        return5dPct: quote.return5dPct,
+        return20dPct: quote.return20dPct,
         currency: quote.currency,
         marketTime: quote.marketTime,
       };

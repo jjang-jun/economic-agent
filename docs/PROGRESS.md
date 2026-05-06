@@ -44,6 +44,7 @@
 - 추천/성과 평가 로딩을 Supabase 기준으로 전환하고, 로컬 JSON은 미러/장애 fallback으로 사용
 - 실제 보유 종목 입력용 `data/portfolio.json` 로딩 구조와 `docs/portfolio.example.json` 템플릿 추가
 - 초기 포트폴리오를 현금 2,000만원, 보유 종목 0개로 설정. 장 마감 리포트에 총자산/현금/1회 신규 매수 상한 100만원 표시.
+- 시장 레짐 점수에 KOSPI/KOSDAQ/S&P/Nasdaq/반도체 5일·20일 추세와 USD/KRW 변화를 추가.
 
 ## 데이터 저장 전략
 
@@ -90,11 +91,12 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - GitHub Actions `news-alert.yml` 수동 실행 성공. 신규 score 4+ 기사가 없어 Supabase row 수 증가는 없었지만, Secrets 주입과 수집 파이프라인은 정상 확인.
 - Node.js 22와 `actions/checkout@v6`, `actions/setup-node@v6`, `actions/cache@v5` 조합으로 `news-alert.yml` 재검증 성공. Node 20 actions deprecation 경고 제거.
 - `evaluate-recommendations.yml` 수동 실행 성공. Actions 캐시에 있던 추천 4건이 Supabase `recommendations` 테이블로 동기화됨.
+- Yahoo Finance 실제 스냅샷에서 5일/20일 수익률 필드 확인. Supabase `market_snapshots` 추세 컬럼 migration 적용 완료.
 
 ## 다음 작업
 
 1. 실제 `data/portfolio.json` 값 입력
-2. 시장 레짐 점수에 수급, 추세, 변동성 지표 추가
+2. 시장 레짐 점수에 외국인/기관 수급 데이터 추가
 3. 추천과 실제 매매 실행 기록을 분리 저장
 4. 추천 DB 이력을 기준으로 승률/초과수익률 리포트 고도화
 5. 주간/월간 성과 리뷰 리포트 추가

@@ -45,7 +45,8 @@ function formatStockReportArticle(article, index) {
 function formatMarketSnapshot(snapshot, maxItems) {
   return (snapshot || []).slice(0, maxItems).map(item => {
     const change = typeof item.changePercent === 'number' ? ` (${item.changePercent}%)` : '';
-    return `- ${item.name} (${item.symbol}): ${item.price}${change} ${item.currency}`.trim();
+    const trend = typeof item.return20dPct === 'number' ? `, 20d ${item.return20dPct}%` : '';
+    return `- ${item.name} (${item.symbol}): ${item.price}${change}${trend} ${item.currency}`.trim();
   });
 }
 

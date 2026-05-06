@@ -195,6 +195,8 @@ async function persistMarketSnapshots(snapshots, session = '', capturedAt = new 
       price: item.price || null,
       previous_close: item.previousClose || null,
       change_percent: item.changePercent ?? null,
+      return_5d_pct: item.return5dPct ?? null,
+      return_20d_pct: item.return20dPct ?? null,
       currency: item.currency || '',
       market_time: item.marketTime || null,
       payload: item,
