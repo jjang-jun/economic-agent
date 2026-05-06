@@ -74,6 +74,7 @@ async function buildRecommendation(stock, articles, indicators, date) {
     invalidation: stock.invalidation || stock.risk_profile?.invalidation || '',
     riskProfile: stock.risk_profile || null,
     marketProfile: stock.market_profile || null,
+    riskReview: stock.risk_review || null,
     relatedNews: getRelatedArticleIds(stock, articles),
     indicators,
     entry: quote

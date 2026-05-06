@@ -68,12 +68,14 @@ RSS feeds
 - `src/utils/article-archive.js`: daily scored article archive used by stock reports and later performance review
 - `src/utils/article-identity.js`: normalized article identity keys for duplicate suppression across RSS/DART, URLs, and titles
 - `src/utils/recommendation-log.js`: stores stock signals and evaluates returns against KOSPI benchmark when available
+- `src/utils/risk-reviewer.js`: rule-based risk manager for recommendation factor pass/fail and blockers
 - `src/utils/trade-log.js`: stores actual manual trade executions in ignored local data and Supabase
 - `src/utils/decision-engine.js`: rule-based market regime, index trend scoring, and action guardrails
 - Market regime can include tags such as `OVERHEATED`, `CONCENTRATED_LEADERSHIP`, `SEMICONDUCTOR_LEADERSHIP`, and `MOMENTUM_ALLOWED`. Treat these as risk controls, not pure buy signals.
 - Stock recommendations should be framed as expected-value trades. Prefer risk/reward, stop-loss width, invalidation, suggested amount, and account weight over plain buy/sell wording.
 - Recommended stocks can include `market_profile` with relative strength, volume ratio, and average turnover. Liquidity and relative strength filters should reduce tradeability, not just decorate the report.
 - `market_profile` also tracks 20d/60d highs and distance from the 20d high. For momentum candidates, being far below the 20d high should reduce tradeability.
+- Recommendations should include `risk_review` before persistence. Treat blockers as a reason to mark a stock watch-only even when AI text sounds bullish.
 - `src/utils/portfolio.js`: loads ignored local portfolio data and derives cash/position risk inputs
 - Portfolio valuation snapshots are saved under ignored `data/portfolio-snapshots/` and persisted to Supabase `portfolio_snapshots` when configured.
 - `src/utils/persistence.js`: optional Supabase REST persistence for articles, summaries, reports, recommendations, snapshots, investor flows, decisions

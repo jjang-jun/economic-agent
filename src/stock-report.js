@@ -13,6 +13,7 @@ const { fetchMarketSnapshot } = require('./utils/market-snapshot');
 const { buildDecisionContextWithQuotes } = require('./utils/decision-engine');
 const { applyRecommendationRisk } = require('./utils/recommendation-risk');
 const { applyRecommendationMarketData } = require('./utils/recommendation-market');
+const { applyRiskReview } = require('./utils/risk-reviewer');
 const { savePortfolioSnapshot } = require('./utils/portfolio');
 const {
   persistArticles,
@@ -91,6 +92,7 @@ async function main() {
   }
   await applyRecommendationMarketData(report);
   applyRecommendationRisk(report, report.decision);
+  applyRiskReview(report, report.decision);
   await persistStockReport(report);
   await persistDecisionContext(report.decision);
 
