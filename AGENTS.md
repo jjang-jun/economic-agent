@@ -67,6 +67,7 @@ RSS feeds
 - `src/utils/decision-engine.js`: rule-based market regime, index trend scoring, and action guardrails
 - Market regime can include tags such as `OVERHEATED`, `CONCENTRATED_LEADERSHIP`, `SEMICONDUCTOR_LEADERSHIP`, and `MOMENTUM_ALLOWED`. Treat these as risk controls, not pure buy signals.
 - Stock recommendations should be framed as expected-value trades. Prefer risk/reward, stop-loss width, invalidation, suggested amount, and account weight over plain buy/sell wording.
+- Recommended stocks can include `market_profile` with relative strength, volume ratio, and average turnover. Liquidity and relative strength filters should reduce tradeability, not just decorate the report.
 - `src/utils/portfolio.js`: loads ignored local portfolio data and derives cash/position risk inputs
 - Portfolio valuation snapshots are saved under ignored `data/portfolio-snapshots/` and persisted to Supabase `portfolio_snapshots` when configured.
 - `src/utils/persistence.js`: optional Supabase REST persistence for articles, summaries, reports, recommendations, snapshots, investor flows, decisions

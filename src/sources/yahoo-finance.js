@@ -26,6 +26,7 @@ async function fetchQuote(ticker) {
     const meta = result.meta || {};
     const quote = result.indicators?.quote?.[0] || {};
     const closes = (quote.close || []).filter(v => typeof v === 'number');
+    const volumes = (quote.volume || []).filter(v => typeof v === 'number');
     const price = meta.regularMarketPrice || closes[closes.length - 1];
     if (typeof price !== 'number') throw new Error('no price');
     const previousClose = meta.previousClose || closes[closes.length - 2] || null;
@@ -36,6 +37,14 @@ async function fetchQuote(ticker) {
         : null;
     const return5dPct = calculatePeriodReturn(price, closes, 5);
     const return20dPct = calculatePeriodReturn(price, closes, 20);
+    const volume = meta.regularMarketVolume || volumes[volumes.length - 1] || null;
+    const avgVolume20d = calculateAverage(volumes, 20);
+    const volumeRatio20d = volume && avgVolume20d
+      ? Number((volume / avgVolume20d).toFixed(2))
+      : null;
+    const averageTurnover20d = avgVolume20d && price
+      ? Math.round(avgVolume20d * price)
+      : null;
 
     return {
       symbol,
@@ -44,6 +53,10 @@ async function fetchQuote(ticker) {
       changePercent,
       return5dPct,
       return20dPct,
+      volume,
+      avgVolume20d,
+      volumeRatio20d,
+      averageTurnover20d,
       currency: meta.currency || '',
       marketTime: meta.regularMarketTime
         ? new Date(meta.regularMarketTime * 1000).toISOString()
@@ -53,6 +66,12 @@ async function fetchQuote(ticker) {
     console.warn(`[Yahoo] ${symbol} 가격 조회 실패: ${err.message}`);
     return null;
   }
+}
+
+function calculateAverage(values, days) {
+  const recent = values.slice(-days).filter(v => typeof v === 'number');
+  if (recent.length === 0) return null;
+  return Math.round(recent.reduce((sum, value) => sum + value, 0) / recent.length);
 }
 
 function calculatePeriodReturn(price, closes, days) {
@@ -66,4 +85,4 @@ async function fetchBenchmarkQuote() {
   return fetchQuote('^KS11');
 }
 
-module.exports = { fetchQuote, fetchBenchmarkQuote, normalizeYahooSymbol, calculatePeriodReturn };
+module.exports = { fetchQuote, fetchBenchmarkQuote, normalizeYahooSymbol, calculatePeriodReturn, calculateAverage };

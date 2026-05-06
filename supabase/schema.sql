@@ -48,6 +48,7 @@ create table if not exists recommendations (
   risk text,
   invalidation text,
   risk_profile jsonb,
+  market_profile jsonb,
   entry jsonb,
   benchmark jsonb,
   status text,

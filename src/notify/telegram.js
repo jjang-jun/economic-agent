@@ -164,12 +164,15 @@ function formatStockReport(report) {
     const conviction = s.conviction ? ` · 확신도 ${escapeHtml(s.conviction)}` : '';
     const risk = s.risk ? `\n⚠ ${escapeHtml(s.risk)}` : '';
     const profile = s.risk_profile || {};
+    const market = s.market_profile || {};
     const rr = profile.riskReward ? `손익비 ${profile.riskReward}:1` : '';
     const stop = profile.expectedLossPct ? `손절폭 ${profile.expectedLossPct}%` : '';
     const size = profile.suggestedAmount ? `제안 ${formatKRW(profile.suggestedAmount)} (${profile.suggestedWeightPct}%)` : '';
+    const rs = typeof market.relativeStrength20d === 'number' ? `RS20 ${market.relativeStrength20d}%p` : '';
+    const volume = typeof market.volumeRatio20d === 'number' ? `거래량 ${market.volumeRatio20d}x` : '';
     const tradeable = profile.tradeable === false ? '거래불가/관찰' : '';
     const invalidation = profile.invalidation ? `\n무효화: ${escapeHtml(profile.invalidation)}` : '';
-    const riskProfile = [rr, stop, size, tradeable].filter(Boolean).join(' · ');
+    const riskProfile = [rr, stop, size, rs, volume, tradeable].filter(Boolean).join(' · ');
     return `${icon.bar} <b>${escapeHtml(s.name)}</b>${ticker}  [${icon.label}${conviction}]\n└ ${escapeHtml(s.reason)}${riskProfile ? `\n└ ${escapeHtml(riskProfile)}` : ''}${invalidation}${risk}`;
   });
 

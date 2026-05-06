@@ -133,6 +133,7 @@ function recommendationRow(recommendation) {
     risk: recommendation.risk || '',
     invalidation: recommendation.invalidation || '',
     risk_profile: recommendation.riskProfile || recommendation.risk_profile || null,
+    market_profile: recommendation.marketProfile || recommendation.market_profile || null,
     entry: recommendation.entry || null,
     benchmark: recommendation.benchmark || null,
     status: recommendation.status || '',

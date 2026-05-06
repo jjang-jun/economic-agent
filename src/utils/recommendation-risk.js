@@ -62,12 +62,19 @@ function normalizeRecommendationRisk(stock, decision) {
   const maxWeightPct = typeof portfolio.maxPositionRatio === 'number'
     ? round(portfolio.maxPositionRatio * 100)
     : null;
+  const marketProfile = stock.market_profile || stock.marketProfile || {};
+  const relativeStrengthPass = typeof marketProfile.relativeStrength20d === 'number'
+    ? marketProfile.relativeStrength20d >= 0
+    : null;
+  const liquidityPass = typeof marketProfile.liquid === 'boolean' ? marketProfile.liquid : null;
   const tradeable = Boolean(
     riskReward !== null
     && riskReward >= 2
     && expectedLossPct > 0
     && expectedLossPct <= 10
     && finalSuggestedAmount
+    && liquidityPass !== false
+    && relativeStrengthPass !== false
   );
 
   return {
@@ -79,6 +86,8 @@ function normalizeRecommendationRisk(stock, decision) {
     suggestedWeightPct,
     maxWeightPct,
     invalidation: stock.invalidation || stock.invalidation_condition || stock.stop_condition || stock.risk || '',
+    relativeStrengthPass,
+    liquidityPass,
     tradeable,
     sizingFormula: maxRiskAmount && expectedLossPct
       ? `risk ${Math.round(maxRiskAmount).toLocaleString('ko-KR')} / stop ${expectedLossPct}%`
