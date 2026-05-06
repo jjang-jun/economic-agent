@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { getArticleKeys } = require('./article-identity');
 
 const DATA_DIR = path.join(__dirname, '..', '..', 'data');
 const BUFFER_FILE = path.join(DATA_DIR, 'article-buffer.json');
@@ -20,8 +21,13 @@ function saveBuffer(articles) {
 
 function addToBuffer(newArticles) {
   const buffer = loadBuffer();
-  const existingIds = new Set(buffer.map(a => a.id));
-  const toAdd = newArticles.filter(a => !existingIds.has(a.id));
+  const existingKeys = new Set(buffer.flatMap(getArticleKeys));
+  const toAdd = newArticles.filter(article => {
+    const keys = getArticleKeys(article);
+    if (keys.some(key => existingKeys.has(key))) return false;
+    for (const key of keys) existingKeys.add(key);
+    return true;
+  });
   buffer.push(...toAdd);
   saveBuffer(buffer);
   return toAdd.length;

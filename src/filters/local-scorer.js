@@ -1,6 +1,7 @@
 const KEYWORDS = require('../config/keywords');
 const { MIN_SCORE } = require('../utils/config');
 const { analyzeArticlesSentiment, isEnglish } = require('./finbert');
+const { analyzeDictionarySentiment } = require('./sentiment-dictionary');
 
 /**
  * 로컬 스코어링 (AI API 비용 0원)
@@ -55,25 +56,12 @@ async function scoreArticles(articles) {
     // 2. 감성 분석 (FinBERT 결과가 없으면 키워드 사전 사용)
     let sentiment = article.sentiment;
     let finbertConfidence = article.finbertConfidence || null;
+    let sentimentReason = article.sentimentReason || '';
     if (!sentiment) {
-      let bullishCount = 0;
-      let bearishCount = 0;
-      for (const kw of KEYWORDS.sentiment.bullish) {
-        if (text.includes(kw.toLowerCase())) bullishCount++;
-      }
-      for (const kw of KEYWORDS.sentiment.bearish) {
-        if (text.includes(kw.toLowerCase())) bearishCount++;
-      }
-      sentiment = 'neutral';
-      if (bullishCount > bearishCount) sentiment = 'bullish';
-      else if (bearishCount > bullishCount) sentiment = 'bearish';
-
-      // 키워드 매칭 수로 의사 confidence 생성 (강도 표시용)
-      const total = bullishCount + bearishCount;
-      if (total > 0) {
-        const dominant = Math.max(bullishCount, bearishCount);
-        finbertConfidence = Math.min(0.5 + (dominant / total) * 0.3 + Math.min(total, 5) * 0.05, 0.95);
-      }
+      const dictionarySentiment = analyzeDictionarySentiment(text);
+      sentiment = dictionarySentiment.sentiment;
+      finbertConfidence = dictionarySentiment.confidence;
+      sentimentReason = dictionarySentiment.reason;
     }
 
     // 3. 섹터 분류
@@ -95,7 +83,8 @@ async function scoreArticles(articles) {
       sentiment,
       finbertConfidence,
       sectors: matchedSectors,
-      reason: '',
+      sentimentReason,
+      reason: sentimentReason,
       titleKo: '',
     };
   });

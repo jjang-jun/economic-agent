@@ -1,0 +1,53 @@
+module.exports = {
+  must_include: [
+    '금리', '기준금리', '통화정책', 'FOMC', '금통위',
+    'CPI', 'PCE', '물가', '인플레이션', '디스인플레이션',
+    '환율', '달러', '원화', '엔화', '달러지수',
+    '코스피', '코스닥', 'S&P', '나스닥', '다우', 'VIX',
+    '고용', '실업률', 'GDP', 'PMI', '소매판매', '소비심리',
+    '유가', '원유', 'WTI', '브렌트', '배럴', '석유', 'OPEC',
+    '채권', '국채', '수익률', '장단기금리', '유동성',
+    '관세', '제재', '전쟁', '무역분쟁', '공급망',
+    'Fed', 'rate cut', 'rate hike', 'inflation', 'treasury', 'bond',
+    'recession', 'oil', 'crude', 'tariff', 'sanction', 'trade war',
+  ],
+  high_priority: [
+    '긴급', '속보', '폭락', '폭등', '서킷브레이커',
+    '금리 인하', '금리 인상', '기준금리 변경',
+    '전쟁', '침공', '디폴트', '파산', '유동성 위기',
+  ],
+  weight: {
+    5: ['속보', '긴급', '폭락', '폭등', '서킷브레이커', '전쟁', '디폴트', '파산'],
+    4: ['금리 인하', '금리 인상', '기준금리', 'FOMC', '금통위', 'CPI', 'PCE', '제재', '관세',
+        'rate cut', 'rate hike', 'executive order', 'sanction', 'tariff',
+        '유가 급등', '유가 급락', '원유 급등', '유동성 위기'],
+    3: ['금리', '통화정책', '인플레이션', '환율', 'GDP', '실업률', '고용',
+        '코스피', '코스닥', 'S&P', '나스닥', 'VIX',
+        'Fed', 'inflation', 'recession', 'treasury', 'Trump',
+        '유가', '원유', 'WTI', 'OPEC', 'oil', 'crude', '배럴'],
+    2: ['물가', '달러', '원화', 'PMI', 'trade war', 'bond', 'Bloomberg'],
+  },
+  sentiment: {
+    bullish: [
+      '상승', '급등', '폭등', '개선', '회복', '강세', '반등', '돌파', '확대',
+      '금리 인하', '유동성 공급', '부양', '완화', '감세', '연착륙',
+      'surge', 'rally', 'gain', 'rise', 'bullish', 'recovery', 'optimism', 'rate cut',
+    ],
+    bearish: [
+      '하락', '급락', '폭락', '악화', '위기', '침체', '약세', '붕괴', '축소',
+      '리스크', '긴축', '금리 인상', '유동성 축소', '물가 상승', '고유가', '공급 차질',
+      'fall', 'drop', 'plunge', 'crash', 'decline', 'bearish', 'recession',
+      'sell-off', 'fear', 'risk', 'slump', 'weak', 'supply disruption',
+    ],
+  },
+  sectors: {
+    '금융·통화': ['금리', '기준금리', 'FOMC', '금통위', '은행', '보험', '증권', '채권',
+                  'Fed', 'rate', 'treasury', 'bond', 'banking'],
+    '거시경제': ['CPI', 'PCE', '물가', '인플레이션', '환율', 'GDP', 'PMI', '실업률', '고용',
+                'inflation', 'recession', 'unemployment'],
+    '에너지·원자재': ['유가', '원유', 'WTI', '브렌트', 'OPEC', '석유', '배럴', '가스', 'LNG',
+                     'oil', 'crude', 'energy', 'petroleum'],
+    '무역·지정학': ['관세', '제재', '전쟁', 'Trump', 'tariff', 'sanction', 'trade war',
+                    'executive order', 'ban', '봉쇄', '공급망'],
+  },
+};

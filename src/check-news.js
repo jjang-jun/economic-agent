@@ -7,6 +7,7 @@ const { loadSeenArticles, saveSeenArticles } = require('./utils/seen-articles');
 const { addToBuffer } = require('./utils/article-buffer');
 const { archiveScoredArticles } = require('./utils/article-archive');
 const { persistArticles } = require('./utils/persistence');
+const { dedupeArticles, isSeenArticle, markSeenArticle } = require('./utils/article-identity');
 
 const { scoreArticles } = require('./filters/local-scorer');
 
@@ -18,12 +19,12 @@ async function main() {
     fetchRSSFeeds(),
     fetchDartDisclosures(),
   ]);
-  const allArticles = [...rssArticles, ...dartArticles];
+  const allArticles = dedupeArticles([...rssArticles, ...dartArticles]);
   console.log(`[수집] RSS ${rssArticles.length}건, DART ${dartArticles.length}건`);
 
   // 중복 제거
   const seen = loadSeenArticles();
-  const newArticles = allArticles.filter(a => !seen.has(a.id));
+  const newArticles = allArticles.filter(a => !isSeenArticle(a, seen));
   console.log(`[중복제거] 신규 기사 ${newArticles.length}건`);
 
   if (newArticles.length === 0) {
@@ -36,7 +37,7 @@ async function main() {
   console.log(`[키워드] ${keywordFiltered.length}건 통과`);
 
   if (keywordFiltered.length === 0) {
-    for (const a of newArticles) seen.add(a.id);
+    for (const a of newArticles) markSeenArticle(a, seen);
     saveSeenArticles(seen);
     console.log('[완료] 키워드 매칭 기사가 없습니다.');
     return;
@@ -64,7 +65,7 @@ async function main() {
   console.log(`[버퍼] ${added}건 추가 (다이제스트 대기)`);
 
   // 6. seen 업데이트
-  for (const a of newArticles) seen.add(a.id);
+  for (const a of newArticles) markSeenArticle(a, seen);
   saveSeenArticles(seen);
 
   console.log(`[${new Date().toISOString()}] 수집 완료`);

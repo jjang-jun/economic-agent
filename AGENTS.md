@@ -59,12 +59,14 @@ RSS feeds
 - `src/filters/keyword-filter.js`: first-pass keyword gate
 - `src/filters/local-scorer.js`: local scoring, sentiment, sector tagging
 - `src/filters/finbert.js`: English FinBERT sentiment model, cached under `.cache/`
+- `src/filters/sentiment-dictionary.js`: weighted Korean/disclosure sentiment dictionary
 - `src/filters/relevance-matcher.js`: personal relevance matching
 - `src/analysis/`: AI prompt builders for digest/report
 - `src/notify/telegram.js`: Telegram formatting and sending
 - `src/utils/`: config, AI client, buffers, seen-article cache, indicators, daily summaries
 - `src/utils/ai-budget.js`: trims AI prompt inputs to control token use
 - `src/utils/article-archive.js`: daily scored article archive used by stock reports and later performance review
+- `src/utils/article-identity.js`: normalized article identity keys for duplicate suppression across RSS/DART, URLs, and titles
 - `src/utils/recommendation-log.js`: stores stock signals and evaluates returns against KOSPI benchmark when available
 - `src/utils/trade-log.js`: stores actual manual trade executions in ignored local data and Supabase
 - `src/utils/decision-engine.js`: rule-based market regime, index trend scoring, and action guardrails
@@ -75,7 +77,10 @@ RSS feeds
 - `src/utils/portfolio.js`: loads ignored local portfolio data and derives cash/position risk inputs
 - Portfolio valuation snapshots are saved under ignored `data/portfolio-snapshots/` and persisted to Supabase `portfolio_snapshots` when configured.
 - `src/utils/persistence.js`: optional Supabase REST persistence for articles, summaries, reports, recommendations, snapshots, investor flows, decisions
-- `src/config/keywords.js`: keyword weights, sentiment dictionary, sectors
+- `src/config/keywords.js`: compatibility facade merging purpose-specific keyword configs
+- `src/config/market-keywords.js`: macro/market-regime keywords
+- `src/config/stock-keywords.js`: stock/sector keywords
+- `src/config/disclosure-keywords.js`: DART/disclosure event keywords
 - `src/config/interests.js`: user interests
 - `src/config/watchlist.js`: symbols used for pre-market and global market snapshots
 - `src/config/portfolio.js`: local portfolio/risk constraints used by the decision engine

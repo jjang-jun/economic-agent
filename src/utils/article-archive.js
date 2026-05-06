@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { getArticleKeys } = require('./article-identity');
 
 const ARCHIVE_DIR = path.join(__dirname, '..', '..', 'data', 'daily-articles');
 const MAX_DAILY_ARTICLES = 1000;
@@ -53,11 +54,15 @@ function archiveScoredArticles(newArticles, date = getKSTDate()) {
 
   const existing = loadScoredArticles(date);
   const byId = new Map(existing.filter(a => a.id).map(a => [a.id, a]));
+  const seenKeys = new Set(existing.flatMap(getArticleKeys));
   let added = 0;
 
   for (const article of newArticles) {
     if (!article || !article.id) continue;
-    if (!byId.has(article.id)) added++;
+    const keys = getArticleKeys(article);
+    const duplicate = keys.some(key => seenKeys.has(key));
+    if (!duplicate) added++;
+    for (const key of keys) seenKeys.add(key);
     byId.set(article.id, normalizeArticle(article));
   }
 
