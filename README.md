@@ -8,7 +8,8 @@
 - **3단계 필터링** — 키워드 → 중요도 스코어링 → 즉시 알림(5점)은 관련성 매칭, 나머지는 다이제스트 버퍼
 - **FinBERT 감성 분석** — 영문 기사는 금융 특화 ML 모델로 호재/악재 판단 (로컬, 무료)
 - **감성 강도 표시** — 강한 호재/호재/약한 호재/중립/약한 악재/악재/강한 악재 7단계
-- **7개 섹터 자동 분류** — 반도체, 에너지·원자재, 금융·통화, 부동산, 거시경제, 테크, 무역·지정학
+- **섹터 자동 분류** — 반도체, 에너지·원자재, 금융·통화, 부동산, 거시경제, 테크, 무역·지정학, 공시·기업이벤트
+- **DART 공시 수집** — 주요 공시를 뉴스와 함께 스코어링하여 기업 이벤트 반영
 - **하루 5회 AI 다이제스트** — 시장 이벤트 시간대에 맞춘 뉴스 요약 브리핑
 - **장 마감 종목 분석** — AI 기반 섹터/종목 인사이트 리포트
 - **추천 성과 추적** — 종목 신호를 저장하고 1일/5일/20일 후 수익률 평가
@@ -18,7 +19,7 @@
 
 ```
 5분마다 ─ 뉴스 수집 파이프라인 (무료)
-  RSS 피드 (연합뉴스, 매경, 한경, Bloomberg)
+  RSS 피드 (연합뉴스, 매경, 한경, Bloomberg) + DART 공시
       ↓
   1단계: 키워드 필터
       ↓
@@ -35,7 +36,7 @@
 하루 1회 ─ 종목 분석 (AI 1회/일)
   일별 기사 아카이브 기반 당일 뉴스 종합 → AI 섹터/종목 분석 → Telegram 발송
       ↓
-  추천 로그 저장 → 1일/5일/20일 성과 평가
+  추천 로그 저장 → KOSPI 벤치마크 대비 1일/5일/20일 성과 평가
 ```
 
 ## 다이제스트 스케줄
@@ -58,6 +59,7 @@ src/
 ├── evaluate-recommendations.js # 추천 성과 평가
 ├── sources/
 │   ├── rss-fetcher.js         # RSS 수집 (4개 소스)
+│   ├── dart-api.js            # DART 공시 수집
 │   ├── bok-api.js             # 한국은행 기준금리 API
 │   ├── fred-api.js            # FRED 미국 경제지표 API
 │   └── yahoo-finance.js       # 추천 성과 평가용 가격 조회
@@ -96,7 +98,7 @@ Codex에서 작업할 때는 저장소 루트의 `AGENTS.md`를 기준으로 프
 - `data/daily-summary/YYYY-MM-DD.json`: 다이제스트/종목 리포트 요약
 - `data/recommendations/recommendations.json`: 종목 리포트 추천과 1일/5일/20일 성과 평가
 
-다이제스트는 AI 생성과 Telegram 전송이 모두 성공한 뒤에만 버퍼를 비웁니다. 장 마감 종목 분석은 `daily-articles` 아카이브를 우선 사용하므로, 5분 수집기가 이미 seen 처리한 기사도 하루 단위 분석에 포함됩니다.
+다이제스트는 AI 생성과 Telegram 전송이 모두 성공한 뒤에만 버퍼를 비웁니다. 장 마감 종목 분석은 `daily-articles` 아카이브를 우선 사용하므로, 5분 수집기가 이미 seen 처리한 기사와 DART 공시도 하루 단위 분석에 포함됩니다.
 
 ## 설치 및 실행
 
@@ -138,6 +140,7 @@ TELEGRAM_CHAT_ID=-100...
 # 경제지표 (선택)
 BOK_API_KEY=...
 FRED_API_KEY=...
+DART_API_KEY=...
 ```
 
 ### 실행
@@ -200,7 +203,7 @@ npm run evaluate
 | `stock-report.yml` | 평일 16:00 KST | 장 마감 종목 분석 |
 | `evaluate-recommendations.yml` | 평일 17:30 KST | 추천 성과 평가 |
 
-GitHub 저장소의 **Settings > Secrets and variables > Actions**에 환경 변수를 등록하세요.
+GitHub 저장소의 **Settings > Secrets and variables > Actions**에 환경 변수를 등록하세요. DART 공시 수집을 쓰려면 `DART_API_KEY`도 Secret에 추가합니다.
 
 ## 커스터마이징
 
@@ -238,7 +241,7 @@ module.exports = {
 | 다이제스트 + 종목분석 (Groq) | **$0/월** |
 | 다이제스트 + 종목분석 (Claude Haiku) | **~$5.4/월** |
 | GitHub Actions (Public) | 무료 |
-| Telegram / BOK / FRED API | 무료 |
+| Telegram / BOK / FRED / DART API | 무료 |
 
 ## 라이선스
 

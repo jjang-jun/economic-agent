@@ -1,4 +1,5 @@
 const { fetchRSSFeeds } = require('./sources/rss-fetcher');
+const { fetchDartDisclosures } = require('./sources/dart-api');
 const { filterByKeywords } = require('./filters/keyword-filter');
 const { filterByRelevance } = require('./filters/relevance-matcher');
 const { notifyArticles } = require('./notify/telegram');
@@ -11,9 +12,13 @@ const { scoreArticles } = require('./filters/local-scorer');
 async function main() {
   console.log(`[${new Date().toISOString()}] 뉴스 수집 시작`);
 
-  // 1. RSS 수집
-  const allArticles = await fetchRSSFeeds();
-  console.log(`[수집] RSS에서 ${allArticles.length}건 수집`);
+  // 1. RSS + DART 공시 수집
+  const [rssArticles, dartArticles] = await Promise.all([
+    fetchRSSFeeds(),
+    fetchDartDisclosures(),
+  ]);
+  const allArticles = [...rssArticles, ...dartArticles];
+  console.log(`[수집] RSS ${rssArticles.length}건, DART ${dartArticles.length}건`);
 
   // 중복 제거
   const seen = loadSeenArticles();

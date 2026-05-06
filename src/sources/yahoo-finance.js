@@ -1,7 +1,7 @@
 function normalizeYahooSymbol(ticker) {
   if (!ticker) return '';
 
-  const cleaned = String(ticker).trim().replace(/[^0-9A-Za-z.]/g, '');
+  const cleaned = String(ticker).trim().replace(/[^0-9A-Za-z.^]/g, '');
   if (!cleaned) return '';
   if (cleaned.includes('.')) return cleaned.toUpperCase();
   if (/^\d{6}$/.test(cleaned)) return `${cleaned}.KS`;
@@ -43,4 +43,8 @@ async function fetchQuote(ticker) {
   }
 }
 
-module.exports = { fetchQuote, normalizeYahooSymbol };
+async function fetchBenchmarkQuote() {
+  return fetchQuote('^KS11');
+}
+
+module.exports = { fetchQuote, fetchBenchmarkQuote, normalizeYahooSymbol };

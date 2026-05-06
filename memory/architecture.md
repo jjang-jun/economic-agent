@@ -2,14 +2,15 @@
 
 ## 파이프라인 흐름
 ```
-RSS 수집 → 중복 제거(seen-articles.json) → 키워드 필터 → 로컬 스코어링 → 일별 기사 아카이브 → 긴급 알림 또는 다이제스트 버퍼
+RSS/DART 수집 → 중복 제거(seen-articles.json) → 키워드 필터 → 로컬 스코어링 → 일별 기사 아카이브 → 긴급 알림 또는 다이제스트 버퍼
 ```
 
 ## 뉴스 수집 파이프라인
-1. **키워드 필터** (비용 0원): must_include / high_priority 키워드 매칭
-2. **로컬 스코어링** (비용 0원): 키워드 가중치로 1~5점 산정, 영문 기사는 FinBERT 감성 분석, 한국어 기사는 감성 사전 사용
-3. **일별 기사 아카이브**: score 4 이상 기사를 `data/daily-articles/YYYY-MM-DD.json`에 누적 저장
-4. **라우팅**:
+1. **수집**: RSS 뉴스와 DART 공시를 같은 기사 객체로 정규화
+2. **키워드 필터** (비용 0원): must_include / high_priority 키워드 매칭
+3. **로컬 스코어링** (비용 0원): 키워드 가중치로 1~5점 산정, 영문 기사는 FinBERT 감성 분석, 한국어 기사는 감성 사전 사용
+4. **일별 기사 아카이브**: score 4 이상 기사를 `data/daily-articles/YYYY-MM-DD.json`에 누적 저장
+5. **라우팅**:
    - score 5: 개인 관련성 매칭 후 Telegram 즉시 알림
    - score 4: `data/article-buffer.json`에 저장 후 예약 다이제스트에서 처리
 
@@ -23,9 +24,9 @@ RSS 수집 → 중복 제거(seen-articles.json) → 키워드 필터 → 로컬
 - 종목 리포트의 `stocks` 항목은 `data/recommendations/recommendations.json`에 저장한다.
 
 ## 추천 성과 평가
-- 추천 저장 시 Yahoo Finance chart 엔드포인트로 진입 가격을 조회한다.
+- 추천 저장 시 Yahoo Finance chart 엔드포인트로 진입 가격과 KOSPI(`^KS11`) 벤치마크 가격을 조회한다.
 - 평가 작업은 1일/5일/20일이 지난 추천 중 아직 평가되지 않은 항목을 찾아 현재 가격과 진입 가격을 비교한다.
-- bullish는 가격 상승률을 그대로, bearish는 하락 방향을 맞춘 경우 양수로 계산한 `signalReturnPct`를 기록한다.
+- bullish는 가격 상승률을 그대로, bearish는 하락 방향을 맞춘 경우 양수로 계산한 `signalReturnPct`를 기록하고, 벤치마크 대비 `alphaPct`도 저장한다.
 - 신규 평가 결과가 있으면 Telegram으로 성과 리포트를 보낸다.
 
 ## 예약 작업
@@ -52,6 +53,6 @@ RSS 수집 → 중복 제거(seen-articles.json) → 키워드 필터 → 로컬
 ## 환경변수
 - AI_PROVIDER, AI_MODEL, AI_API_KEY, AI_BASE_URL
 - ANTHROPIC_API_KEY, OPENAI_API_KEY, GROQ_API_KEY
-- TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, BOK_API_KEY, FRED_API_KEY
+- TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, BOK_API_KEY, FRED_API_KEY, DART_API_KEY
 - 로컬: .env 파일 (--env-file 플래그)
 - CI: GitHub Secrets

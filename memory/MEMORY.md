@@ -1,7 +1,7 @@
 # Economic Agent - 프로젝트 메모리
 
 ## 프로젝트 개요
-- RSS/API → 키워드 필터 → 로컬 스코어링(FinBERT + 키워드 가중치) → 일별 기사 아카이브 → 긴급 알림 또는 다이제스트 버퍼
+- RSS/DART/API → 키워드 필터 → 로컬 스코어링(FinBERT + 키워드 가중치) → 일별 기사 아카이브 → 긴급 알림 또는 다이제스트 버퍼
 - GitHub Actions로 5분 간격 수집, 하루 5회 AI 다이제스트, 장 마감 종목 리포트, 추천 성과 평가 실행
 - 상세 아키텍처: [architecture.md](./architecture.md)
 
@@ -15,17 +15,18 @@
 - 추천 성과 평가: `src/evaluate-recommendations.js`
 - 설정: `src/config/keywords.js`, `src/config/interests.js`
 - 필터/스코어링: `src/filters/keyword-filter.js` → `local-scorer.js`/`finbert.js` → `relevance-matcher.js`
-- 데이터 소스: `src/sources/rss-fetcher.js`, `bok-api.js`, `fred-api.js`
+- 데이터 소스: `src/sources/rss-fetcher.js`, `dart-api.js`, `bok-api.js`, `fred-api.js`, `yahoo-finance.js`
 - 알림: `src/notify/telegram.js`
 - AI 추상화: `src/utils/ai-client.js`
 - 기사 아카이브: `src/utils/article-archive.js`, `data/daily-articles/YYYY-MM-DD.json`
-- 추천 로그/성과 평가: `src/utils/recommendation-log.js`, `data/recommendations/recommendations.json`
+- 추천 로그/성과 평가: `src/utils/recommendation-log.js`, `data/recommendations/recommendations.json` (KOSPI 벤치마크 대비 평가 포함)
 - 워크플로우: `.github/workflows/news-alert.yml`, `digest-*.yml`, `stock-report.yml`
 
 ## 기술 스택
 - Node.js 20.19.6 (nvm, --env-file 플래그, .nvmrc 설정됨)
 - CommonJS, rss-parser, @huggingface/transformers
 - Yahoo Finance chart endpoint로 추천 종목 가격 조회
+- OpenDART 공시 API 선택 연동 (`DART_API_KEY`)
 - AI 제공자 추상화: Anthropic/OpenAI/Groq/Ollama/Custom 지원
 
 ## 사용자 선호

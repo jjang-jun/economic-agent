@@ -9,6 +9,7 @@
 ## Core Flow
 ```
 RSS feeds
+  + DART disclosures
   -> seen-articles duplicate filter
   -> keyword filter
   -> local scorer (keyword weights + FinBERT for English sentiment)
@@ -32,7 +33,7 @@ RSS feeds
 ## Environment
 - Required for Telegram delivery: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`
 - AI digest/report provider: `AI_PROVIDER`, optional `AI_MODEL`, `AI_BASE_URL`, and provider key such as `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GROQ_API_KEY`, or generic `AI_API_KEY`
-- Optional indicators: `BOK_API_KEY`, `FRED_API_KEY`
+- Optional indicators/data: `BOK_API_KEY`, `FRED_API_KEY`, `DART_API_KEY`
 - `.env` is private and must not be committed.
 
 ## File Map
@@ -40,7 +41,8 @@ RSS feeds
 - `src/digest.js`: buffer read, AI digest generation, Telegram delivery, buffer clear after success
 - `src/stock-report.js`: market close stock/sector analysis from the daily scored article archive
 - `src/evaluate-recommendations.js`: evaluates logged stock signals after 1/5/20 days
-- `src/sources/`: RSS, BOK, FRED integrations
+- `src/sources/`: RSS, DART, BOK, FRED integrations
+- `src/sources/dart-api.js`: OpenDART disclosure fetcher, optional `DART_API_KEY`
 - `src/sources/yahoo-finance.js`: Yahoo chart quote fetcher for recommendation performance tracking
 - `src/filters/keyword-filter.js`: first-pass keyword gate
 - `src/filters/local-scorer.js`: local scoring, sentiment, sector tagging
@@ -50,7 +52,7 @@ RSS feeds
 - `src/notify/telegram.js`: Telegram formatting and sending
 - `src/utils/`: config, AI client, buffers, seen-article cache, indicators, daily summaries
 - `src/utils/article-archive.js`: daily scored article archive used by stock reports and later performance review
-- `src/utils/recommendation-log.js`: stores stock signals and evaluates returns
+- `src/utils/recommendation-log.js`: stores stock signals and evaluates returns against KOSPI benchmark when available
 - `src/config/keywords.js`: keyword weights, sentiment dictionary, sectors
 - `src/config/interests.js`: user interests
 - `.github/workflows/`: collector, five digest schedules, stock report schedule

@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { getKSTDate } = require('./article-archive');
-const { fetchQuote, normalizeYahooSymbol } = require('../sources/yahoo-finance');
+const { fetchQuote, fetchBenchmarkQuote, normalizeYahooSymbol } = require('../sources/yahoo-finance');
 
 const DATA_DIR = path.join(__dirname, '..', '..', 'data', 'recommendations');
 const LOG_FILE = path.join(DATA_DIR, 'recommendations.json');
@@ -34,7 +34,10 @@ function getRelatedArticleIds(stock, articles) {
 
 async function buildRecommendation(stock, articles, indicators, date) {
   const symbol = normalizeYahooSymbol(stock.ticker);
-  const quote = symbol ? await fetchQuote(symbol) : null;
+  const [quote, benchmark] = await Promise.all([
+    symbol ? fetchQuote(symbol) : null,
+    fetchBenchmarkQuote(),
+  ]);
 
   return {
     id: getRecommendationId(date, stock),
@@ -54,6 +57,14 @@ async function buildRecommendation(stock, articles, indicators, date) {
           price: quote.price,
           currency: quote.currency,
           marketTime: quote.marketTime,
+        }
+      : null,
+    benchmark: benchmark
+      ? {
+          symbol: benchmark.symbol,
+          entryPrice: benchmark.price,
+          currency: benchmark.currency,
+          marketTime: benchmark.marketTime,
         }
       : null,
     evaluations: {},
@@ -105,6 +116,11 @@ function calculateReturn(signal, entryPrice, currentPrice) {
   };
 }
 
+function calculateBenchmarkReturn(entryPrice, currentPrice) {
+  if (!entryPrice || !currentPrice) return null;
+  return Number((((currentPrice - entryPrice) / entryPrice) * 100).toFixed(2));
+}
+
 async function evaluateRecommendations() {
   const recommendations = loadRecommendations();
   const completed = [];
@@ -118,7 +134,10 @@ async function evaluateRecommendations() {
     );
     if (dueTargets.length === 0) continue;
 
-    const quote = await fetchQuote(recommendation.symbol);
+    const [quote, benchmarkQuote] = await Promise.all([
+      fetchQuote(recommendation.symbol),
+      recommendation.benchmark?.symbol ? fetchQuote(recommendation.benchmark.symbol) : null,
+    ]);
     if (!quote) continue;
 
     for (const day of dueTargets) {
@@ -135,6 +154,20 @@ async function evaluateRecommendations() {
         marketTime: quote.marketTime,
         ...result,
       };
+      if (recommendation.benchmark?.entryPrice && benchmarkQuote?.price) {
+        const benchmarkReturnPct = calculateBenchmarkReturn(
+          recommendation.benchmark.entryPrice,
+          benchmarkQuote.price
+        );
+        recommendation.evaluations[String(day)].benchmark = {
+          symbol: recommendation.benchmark.symbol,
+          price: benchmarkQuote.price,
+          returnPct: benchmarkReturnPct,
+        };
+        recommendation.evaluations[String(day)].alphaPct = Number(
+          (result.signalReturnPct - benchmarkReturnPct).toFixed(2)
+        );
+      }
       completed.push({ recommendation, day, evaluation: recommendation.evaluations[String(day)] });
     }
 
@@ -153,4 +186,5 @@ module.exports = {
   logRecommendations,
   evaluateRecommendations,
   calculateReturn,
+  calculateBenchmarkReturn,
 };

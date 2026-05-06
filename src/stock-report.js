@@ -1,4 +1,5 @@
 const { fetchRSSFeeds } = require('./sources/rss-fetcher');
+const { fetchDartDisclosures } = require('./sources/dart-api');
 const { filterByKeywords } = require('./filters/keyword-filter');
 // 종목 분석은 로컬 스코어러로 충분 (AI는 analyzeStocks에서만 사용)
 const { scoreArticles } = require('./filters/local-scorer');
@@ -31,9 +32,13 @@ async function main() {
   const archivedArticles = loadScoredArticles();
   console.log(`[아카이브] 오늘 누적 기사 ${archivedArticles.length}건`);
 
-  // RSS 수집 + 필터링. 아카이브 누락분 보강용이며 seen-articles에 의존하지 않는다.
-  const allArticles = await fetchRSSFeeds();
-  console.log(`[수집] RSS에서 ${allArticles.length}건 수집`);
+  // RSS + DART 수집. 아카이브 누락분 보강용이며 seen-articles에 의존하지 않는다.
+  const [rssArticles, dartArticles] = await Promise.all([
+    fetchRSSFeeds(),
+    fetchDartDisclosures({ days: 1 }),
+  ]);
+  const allArticles = [...rssArticles, ...dartArticles];
+  console.log(`[수집] RSS ${rssArticles.length}건, DART ${dartArticles.length}건`);
 
   const keywordFiltered = filterByKeywords(allArticles);
   console.log(`[키워드] ${keywordFiltered.length}건 통과`);

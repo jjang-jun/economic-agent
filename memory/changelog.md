@@ -1,5 +1,28 @@
 # 작업 기록 (Changelog)
 
+## 2026-05-06: DART 공시와 벤치마크 성과 평가 추가
+- OpenDART 공시 수집 소스 추가 (`DART_API_KEY` 선택)
+- 뉴스 수집과 장 마감 리포트 보강 수집에 DART 공시를 RSS와 함께 통합
+- 주요 공시 키워드(잠정실적, 공급계약, 자기주식, 유상증자, 전환사채 등)를 필터/섹터에 추가
+- 추천 저장/평가 시 KOSPI(`^KS11`) 벤치마크 가격을 함께 기록하고 `alphaPct` 계산 추가
+- GitHub Actions에 `DART_API_KEY` Secret 연결
+- 변경 파일:
+  - `src/sources/dart-api.js`
+  - `src/check-news.js`
+  - `src/stock-report.js`
+  - `src/config/keywords.js`
+  - `src/sources/yahoo-finance.js`
+  - `src/utils/recommendation-log.js`
+  - `src/notify/telegram.js`
+  - `.github/workflows/news-alert.yml`
+  - `.github/workflows/stock-report.yml`
+  - `.env.example`
+  - `README.md`
+  - `AGENTS.md`
+  - `memory/MEMORY.md`
+  - `memory/architecture.md`
+  - `memory/changelog.md`
+
 ## 2026-05-06: 추천 성과 평가 루프 추가
 - 종목 리포트의 추천 신호를 `data/recommendations/recommendations.json`에 저장하도록 추가
 - Yahoo Finance chart 엔드포인트 기반 가격 조회 소스 추가

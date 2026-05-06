@@ -303,9 +303,12 @@ function formatPerformanceReport(completed) {
   const lines = completed.map(({ recommendation, day, evaluation }) => {
     const icon = evaluation.signalReturnPct >= 0 ? '🔴' : '🔵';
     const ticker = recommendation.ticker ? ` ${escapeHtml(recommendation.ticker)}` : '';
+    const alpha = typeof evaluation.alphaPct === 'number'
+      ? ` · 초과 ${evaluation.alphaPct}%`
+      : '';
     return [
       `${icon} <b>${escapeHtml(recommendation.name)}</b>${ticker} · ${day}일`,
-      `└ 실제 ${evaluation.returnPct}% · 신호기준 ${evaluation.signalReturnPct}%`,
+      `└ 실제 ${evaluation.returnPct}% · 신호기준 ${evaluation.signalReturnPct}%${alpha}`,
       `└ ${escapeHtml(recommendation.signal)} / ${escapeHtml(recommendation.conviction)}`,
     ].join('\n');
   });
