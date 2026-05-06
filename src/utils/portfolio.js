@@ -38,7 +38,9 @@ function normalizePosition(position) {
     name: position.name || '',
     ticker: position.ticker || '',
     symbol: position.symbol || normalizeYahooSymbol(position.ticker || ''),
+    currency: position.currency || '',
     avgPrice: position.avgPrice ?? null,
+    currentPrice: position.currentPrice ?? null,
     quantity: position.quantity ?? null,
     sector: position.sector || '',
     weight: position.weight ?? position.ratio ?? null,
@@ -89,12 +91,22 @@ function round(value, digits = 2) {
   return Math.round(value * factor) / factor;
 }
 
-function valuePosition(position, quote) {
+function getFxRate(currency, fxRates = {}) {
+  if (!currency || currency === 'KRW') return 1;
+  if (currency === 'USD') return fxRates.USDKRW || 1;
+  return 1;
+}
+
+function valuePosition(position, quote, fxRates = {}) {
   const quantity = typeof position.quantity === 'number' ? position.quantity : null;
   const avgPrice = typeof position.avgPrice === 'number' ? position.avgPrice : null;
-  const currentPrice = quote?.price ?? null;
-  const costBasis = quantity !== null && avgPrice !== null ? quantity * avgPrice : null;
-  const marketValue = quantity !== null && typeof currentPrice === 'number' ? quantity * currentPrice : null;
+  const currentPrice = typeof position.currentPrice === 'number'
+    ? position.currentPrice
+    : (quote?.price ?? null);
+  const currency = position.currency || quote?.currency || '';
+  const fxRate = getFxRate(currency, fxRates);
+  const costBasis = quantity !== null && avgPrice !== null ? quantity * avgPrice * fxRate : null;
+  const marketValue = quantity !== null && typeof currentPrice === 'number' ? quantity * currentPrice * fxRate : null;
   const unrealizedPnl = marketValue !== null && costBasis !== null ? marketValue - costBasis : null;
   const unrealizedPnlPct = unrealizedPnl !== null && costBasis
     ? round((unrealizedPnl / costBasis) * 100)
@@ -103,12 +115,16 @@ function valuePosition(position, quote) {
   return {
     ...position,
     currentPrice,
+    priceCurrency: quote?.currency || currency,
+    priceSource: typeof position.currentPrice === 'number' ? 'manual' : 'quote',
+    quoteSource: typeof position.currentPrice === 'number' ? 'manual' : (quote?.source || ''),
+    fxRate,
     previousClose: quote?.previousClose ?? null,
     changePercent: quote?.changePercent ?? null,
     return5dPct: quote?.return5dPct ?? null,
     return20dPct: quote?.return20dPct ?? null,
-    currency: quote?.currency || '',
-    marketTime: quote?.marketTime || null,
+    currency,
+    marketTime: typeof position.currentPrice === 'number' ? null : (quote?.marketTime || null),
     costBasis,
     marketValue,
     unrealizedPnl,
@@ -117,11 +133,15 @@ function valuePosition(position, quote) {
 }
 
 async function enrichPortfolio(portfolio = loadPortfolio()) {
+  const usdKrw = await fetchQuote('KRW=X');
+  const fxRates = {
+    USDKRW: typeof usdKrw?.price === 'number' ? usdKrw.price : 1,
+  };
   const valuedPositions = await Promise.all((portfolio.positions || []).map(async position => {
     const quote = position.symbol || position.ticker
       ? await fetchQuote(position.symbol || position.ticker)
       : null;
-    return valuePosition(position, quote);
+    return valuePosition(position, quote, fxRates);
   }));
 
   const investedAmount = valuedPositions.reduce((sum, position) => (
@@ -150,6 +170,7 @@ async function enrichPortfolio(portfolio = loadPortfolio()) {
     costBasis,
     unrealizedPnl,
     unrealizedPnlPct: costBasis ? round((unrealizedPnl / costBasis) * 100) : null,
+    fxRates,
     capturedAt: new Date().toISOString(),
   };
 }
@@ -163,6 +184,19 @@ function savePortfolioSnapshot(snapshot, date = getKSTDate()) {
   const file = path.join(SNAPSHOT_DIR, `${date}.json`);
   fs.writeFileSync(file, JSON.stringify(snapshot, null, 2));
   return file;
+}
+
+function loadLatestPortfolioSnapshot() {
+  try {
+    const files = fs.readdirSync(SNAPSHOT_DIR)
+      .filter(file => file.endsWith('.json'))
+      .sort()
+      .reverse();
+    if (files.length === 0) return null;
+    return JSON.parse(fs.readFileSync(path.join(SNAPSHOT_DIR, files[0]), 'utf-8'));
+  } catch {
+    return null;
+  }
 }
 
 function applyTradeToPortfolio(rawPortfolio, trade) {
@@ -238,6 +272,7 @@ module.exports = {
   applyTradeToPortfolio,
   enrichPortfolio,
   savePortfolioSnapshot,
+  loadLatestPortfolioSnapshot,
   DEFAULT_PORTFOLIO_FILE,
   SNAPSHOT_DIR,
 };

@@ -81,7 +81,8 @@ src/
 │   ├── dart-api.js            # DART 공시 수집
 │   ├── bok-api.js             # 한국은행 기준금리 API
 │   ├── fred-api.js            # FRED 미국 경제지표 API
-│   └── yahoo-finance.js       # 추천 성과 평가용 가격 조회
+│   ├── naver-finance.js       # 국내 종목 현재가 조회
+│   └── yahoo-finance.js       # 해외 종목/국내 fallback 가격 조회
 ├── filters/
 │   ├── keyword-filter.js      # 1단계: 키워드 필터
 │   ├── local-scorer.js        # 2단계: 로컬 스코어링 (FinBERT + 키워드)
@@ -159,6 +160,7 @@ Codex에서 작업할 때는 저장소 루트의 `AGENTS.md`를 기준으로 프
 - `data/action-reports/YYYY-MM-DD.json`: 신규 매수/관찰/보유/축소/매도 후보 일일 행동 리포트
 - `data/freedom/freedom-status.json`: 경제적 자유 목표와 현재 달성률
 - Supabase tables: `articles`, `daily_summaries`, `stock_reports`, `recommendations`, `recommendation_evaluations`, `trade_executions`, `portfolio_snapshots`, `market_snapshots`, `investor_flows`, `decision_contexts`
+- Agent/Supabase tables: `financial_freedom_goals`, `portfolio_accounts`, `positions`, `risk_policy`, `conversation_messages`, `pending_actions`
 - `data/supabase/*.json`: Supabase 데이터를 내려받은 로컬 JSON 미러
 - `data/economic-agent.db`: Supabase 데이터를 내려받은 로컬 SQLite 미러
 
@@ -430,6 +432,12 @@ module.exports = {
   career: ['프론트엔드', '금융IT', ...],
 };
 ```
+
+### 가격 데이터
+
+국내 6자리 종목코드는 Naver Finance realtime endpoint를 우선 사용합니다. Yahoo Finance는 해외 종목과 국내 fallback 용도로만 사용합니다. 국내 현재가가 Naver에서 확인된 경우 Yahoo의 국내 history 기반 5일/20일 수익률은 사용하지 않습니다.
+
+포트폴리오에 미국 주식과 한국 주식이 섞여 있으면 USD 종목은 USD/KRW로 KRW 환산해 총자산을 계산합니다.
 
 ### 실제 포트폴리오
 

@@ -1,3 +1,5 @@
+const { fetchNaverQuote, normalizeNaverTicker } = require('./naver-finance');
+
 function normalizeYahooSymbol(ticker) {
   if (!ticker) return '';
 
@@ -9,6 +11,9 @@ function normalizeYahooSymbol(ticker) {
 }
 
 async function fetchQuote(ticker) {
+  const rawTicker = String(ticker || '').trim();
+  const domesticTicker = normalizeNaverTicker(rawTicker);
+  const naverQuote = domesticTicker ? await fetchNaverQuote(domesticTicker) : null;
   const symbol = normalizeYahooSymbol(ticker);
   if (!symbol) return null;
 
@@ -76,7 +81,7 @@ async function fetchQuote(ticker) {
       }))
       .filter(row => typeof row.close === 'number');
 
-    return {
+    const yahooQuote = {
       symbol,
       price,
       previousClose,
@@ -98,10 +103,30 @@ async function fetchQuote(ticker) {
       marketTime: meta.regularMarketTime
         ? new Date(meta.regularMarketTime * 1000).toISOString()
         : new Date().toISOString(),
+      source: 'yahoo-finance',
     };
+    if (naverQuote) {
+      return {
+        ...yahooQuote,
+        ...naverQuote,
+        symbol,
+        return5dPct: null,
+        return20dPct: null,
+        history: [],
+        high20d: null,
+        high60d: null,
+        distanceFrom20dHighPct: null,
+        distanceFrom60dHighPct: null,
+        near20dHigh: null,
+        breakout20d: null,
+        source: 'naver-finance',
+        fallbackSource: 'yahoo-finance',
+      };
+    }
+    return yahooQuote;
   } catch (err) {
     console.warn(`[Yahoo] ${symbol} 가격 조회 실패: ${err.message}`);
-    return null;
+    return naverQuote || null;
   }
 }
 

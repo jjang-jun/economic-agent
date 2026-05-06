@@ -3,8 +3,9 @@ const path = require('path');
 const { loadRecommendations } = require('./recommendation-log');
 const { loadTradeExecutions } = require('./trade-log');
 const { getKSTDate } = require('./article-archive');
-const { loadPortfolio } = require('./portfolio');
+const { loadPortfolio, enrichPortfolio, loadLatestPortfolioSnapshot } = require('./portfolio');
 const { buildFreedomStatus, saveFreedomStatus } = require('./freedom-engine');
+const { persistFinancialFreedomGoal } = require('./persistence');
 
 const REVIEW_DIR = path.join(__dirname, '..', '..', 'data', 'performance-reviews');
 
@@ -94,10 +95,21 @@ async function buildPerformanceReview(period = 'weekly') {
   const periodTrades = filterByWindow(trades, 'date', startDate);
   const recommendationSummary = summarizeRecommendations(periodRecommendations);
   const tradeSummary = summarizeTrades(periodTrades, periodRecommendations);
+  let freedomPortfolio = null;
+  if (period === 'monthly') {
+    const enriched = await enrichPortfolio(loadPortfolio());
+    const missingMarketValues = (enriched.positions || []).some(position => (
+      typeof position.quantity === 'number' && typeof position.marketValue !== 'number'
+    ));
+    freedomPortfolio = missingMarketValues && loadLatestPortfolioSnapshot()?.totalAssetValue
+      ? loadLatestPortfolioSnapshot()
+      : enriched;
+  }
   const freedomStatus = period === 'monthly'
-    ? buildFreedomStatus({ portfolio: loadPortfolio() })
+    ? buildFreedomStatus({ portfolio: freedomPortfolio })
     : null;
   if (freedomStatus) saveFreedomStatus(freedomStatus);
+  if (freedomStatus) await persistFinancialFreedomGoal(freedomStatus);
 
   return {
     id: `${getKSTDate()}:${period}`,

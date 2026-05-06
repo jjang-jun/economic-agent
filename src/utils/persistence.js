@@ -327,6 +327,30 @@ async function persistPerformanceReview(review) {
   }], 'id');
 }
 
+async function persistFinancialFreedomGoal(status) {
+  if (!status?.id || !status?.goal) return { saved: 0 };
+  const goal = status.goal;
+  return upsert('financial_freedom_goals', [{
+    id: status.id,
+    user_key: 'default',
+    date: status.date || getKSTDate(),
+    monthly_living_cost: goal.monthlyLivingCost ?? null,
+    annual_living_cost: goal.annualLivingCost ?? null,
+    target_withdrawal_rate: goal.targetWithdrawalRate ?? null,
+    target_net_worth: goal.targetNetWorth ?? null,
+    current_net_worth: status.currentNetWorth ?? null,
+    monthly_saving_amount: status.monthlySavingAmount ?? null,
+    target_progress_pct: status.targetProgressPct ?? null,
+    target_date: status.targetDate || null,
+    estimated_target_date: status.estimatedTargetDate || null,
+    expected_annual_return_pct: status.expectedAnnualReturnPct ?? null,
+    required_annual_return_pct: status.requiredAnnualReturnPct ?? null,
+    stress: status.stress || {},
+    payload: status,
+    updated_at: new Date().toISOString(),
+  }], 'id');
+}
+
 module.exports = {
   isPersistenceEnabled,
   selectRows,
@@ -343,4 +367,5 @@ module.exports = {
   persistInvestorFlow,
   persistDecisionContext,
   persistPerformanceReview,
+  persistFinancialFreedomGoal,
 };

@@ -1,5 +1,6 @@
-const { loadPortfolio } = require('../src/utils/portfolio');
+const { loadPortfolio, enrichPortfolio, loadLatestPortfolioSnapshot } = require('../src/utils/portfolio');
 const { buildFreedomStatus, saveFreedomStatus } = require('../src/utils/freedom-engine');
+const { persistFinancialFreedomGoal } = require('../src/utils/persistence');
 
 function formatKRW(value) {
   if (typeof value !== 'number') return 'n/a';
@@ -13,10 +14,18 @@ function formatMonths(months) {
   return `${years}년 ${rest}개월`;
 }
 
-function main() {
-  const portfolio = loadPortfolio();
+async function main() {
+  const enriched = await enrichPortfolio(loadPortfolio());
+  const missingMarketValues = (enriched.positions || []).some(position => (
+    typeof position.quantity === 'number' && typeof position.marketValue !== 'number'
+  ));
+  const latestSnapshot = loadLatestPortfolioSnapshot();
+  const portfolio = missingMarketValues && latestSnapshot?.totalAssetValue
+    ? latestSnapshot
+    : enriched;
   const status = buildFreedomStatus({ portfolio });
   const file = saveFreedomStatus(status);
+  await persistFinancialFreedomGoal(status);
 
   console.log(`[Freedom] 저장: ${file}`);
   console.log(`[Freedom] 목표 순자산: ${formatKRW(status.goal.targetNetWorth)}`);
@@ -26,4 +35,7 @@ function main() {
   console.log(`[Freedom] ${status.stress.drawdownPct}% 하락 시 지연: ${formatMonths(status.stress.delayMonths)}`);
 }
 
-main();
+main().catch(err => {
+  console.error('[Freedom] 실패:', err.message);
+  process.exit(1);
+});
