@@ -170,9 +170,12 @@ function formatStockReport(report) {
     const size = profile.suggestedAmount ? `제안 ${formatKRW(profile.suggestedAmount)} (${profile.suggestedWeightPct}%)` : '';
     const rs = typeof market.relativeStrength20d === 'number' ? `RS20 ${market.relativeStrength20d}%p` : '';
     const volume = typeof market.volumeRatio20d === 'number' ? `거래량 ${market.volumeRatio20d}x` : '';
+    const high = market.breakout20d
+      ? '20일 돌파'
+      : (typeof market.distanceFrom20dHighPct === 'number' ? `20일고점 ${market.distanceFrom20dHighPct}%` : '');
     const tradeable = profile.tradeable === false ? '거래불가/관찰' : '';
     const invalidation = profile.invalidation ? `\n무효화: ${escapeHtml(profile.invalidation)}` : '';
-    const riskProfile = [rr, stop, size, rs, volume, tradeable].filter(Boolean).join(' · ');
+    const riskProfile = [rr, stop, size, rs, volume, high, tradeable].filter(Boolean).join(' · ');
     return `${icon.bar} <b>${escapeHtml(s.name)}</b>${ticker}  [${icon.label}${conviction}]\n└ ${escapeHtml(s.reason)}${riskProfile ? `\n└ ${escapeHtml(riskProfile)}` : ''}${invalidation}${risk}`;
   });
 

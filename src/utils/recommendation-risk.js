@@ -67,6 +67,7 @@ function normalizeRecommendationRisk(stock, decision) {
     ? marketProfile.relativeStrength20d >= 0
     : null;
   const liquidityPass = typeof marketProfile.liquid === 'boolean' ? marketProfile.liquid : null;
+  const momentumPass = typeof marketProfile.near20dHigh === 'boolean' ? marketProfile.near20dHigh : null;
   const tradeable = Boolean(
     riskReward !== null
     && riskReward >= 2
@@ -75,6 +76,7 @@ function normalizeRecommendationRisk(stock, decision) {
     && finalSuggestedAmount
     && liquidityPass !== false
     && relativeStrengthPass !== false
+    && momentumPass !== false
   );
 
   return {
@@ -88,6 +90,7 @@ function normalizeRecommendationRisk(stock, decision) {
     invalidation: stock.invalidation || stock.invalidation_condition || stock.stop_condition || stock.risk || '',
     relativeStrengthPass,
     liquidityPass,
+    momentumPass,
     tradeable,
     sizingFormula: maxRiskAmount && expectedLossPct
       ? `risk ${Math.round(maxRiskAmount).toLocaleString('ko-KR')} / stop ${expectedLossPct}%`

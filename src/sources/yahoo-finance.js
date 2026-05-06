@@ -26,6 +26,7 @@ async function fetchQuote(ticker) {
     const meta = result.meta || {};
     const quote = result.indicators?.quote?.[0] || {};
     const closes = (quote.close || []).filter(v => typeof v === 'number');
+    const highs = (quote.high || []).filter(v => typeof v === 'number');
     const volumes = (quote.volume || []).filter(v => typeof v === 'number');
     const price = meta.regularMarketPrice || closes[closes.length - 1];
     if (typeof price !== 'number') throw new Error('no price');
@@ -45,6 +46,21 @@ async function fetchQuote(ticker) {
     const averageTurnover20d = avgVolume20d && price
       ? Math.round(avgVolume20d * price)
       : null;
+    const high20d = calculatePeriodHigh(highs, 20);
+    const high60d = calculatePeriodHigh(highs, 60);
+    const priorHigh20d = calculatePeriodHigh(highs.slice(0, -1), 20);
+    const distanceFrom20dHighPct = high20d
+      ? Number((((price - high20d) / high20d) * 100).toFixed(2))
+      : null;
+    const distanceFrom60dHighPct = high60d
+      ? Number((((price - high60d) / high60d) * 100).toFixed(2))
+      : null;
+    const near20dHigh = typeof distanceFrom20dHighPct === 'number'
+      ? distanceFrom20dHighPct >= -3
+      : null;
+    const breakout20d = priorHigh20d
+      ? price >= priorHigh20d
+      : null;
 
     return {
       symbol,
@@ -57,6 +73,12 @@ async function fetchQuote(ticker) {
       avgVolume20d,
       volumeRatio20d,
       averageTurnover20d,
+      high20d,
+      high60d,
+      distanceFrom20dHighPct,
+      distanceFrom60dHighPct,
+      near20dHigh,
+      breakout20d,
       currency: meta.currency || '',
       marketTime: meta.regularMarketTime
         ? new Date(meta.regularMarketTime * 1000).toISOString()
@@ -74,6 +96,12 @@ function calculateAverage(values, days) {
   return Math.round(recent.reduce((sum, value) => sum + value, 0) / recent.length);
 }
 
+function calculatePeriodHigh(values, days) {
+  const recent = values.slice(-days).filter(v => typeof v === 'number');
+  if (recent.length === 0) return null;
+  return Math.max(...recent);
+}
+
 function calculatePeriodReturn(price, closes, days) {
   if (typeof price !== 'number' || closes.length <= days) return null;
   const base = closes[closes.length - 1 - days];
@@ -85,4 +113,11 @@ async function fetchBenchmarkQuote() {
   return fetchQuote('^KS11');
 }
 
-module.exports = { fetchQuote, fetchBenchmarkQuote, normalizeYahooSymbol, calculatePeriodReturn, calculateAverage };
+module.exports = {
+  fetchQuote,
+  fetchBenchmarkQuote,
+  normalizeYahooSymbol,
+  calculatePeriodReturn,
+  calculateAverage,
+  calculatePeriodHigh,
+};

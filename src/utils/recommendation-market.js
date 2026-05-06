@@ -35,6 +35,12 @@ function buildMarketProfile(quote, benchmark) {
     avgVolume20d: quote.avgVolume20d,
     volumeRatio20d: quote.volumeRatio20d,
     averageTurnover20d: quote.averageTurnover20d,
+    high20d: quote.high20d,
+    high60d: quote.high60d,
+    distanceFrom20dHighPct: quote.distanceFrom20dHighPct,
+    distanceFrom60dHighPct: quote.distanceFrom60dHighPct,
+    near20dHigh: quote.near20dHigh,
+    breakout20d: quote.breakout20d,
     liquid,
     liquidityThreshold: MIN_AVG_TURNOVER_KRW,
   };
