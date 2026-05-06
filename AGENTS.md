@@ -27,6 +27,7 @@ RSS feeds
 - Send stock report: `npm run report`
 - Evaluate recommendation performance: `npm run evaluate`
 - Record an actual manual trade execution: `npm run trade:record -- --side buy --ticker 005930 --quantity 3 --price 266000`
+- Review actual trade performance: `npm run trade:performance`
 - Create a current portfolio valuation snapshot: `npm run portfolio:snapshot`
 - Push Supabase schema: `npm run db:push`
 - Import existing local `data/*.json` history into Supabase: `npm run db:import-local`
@@ -50,6 +51,7 @@ RSS feeds
 - `src/stock-report.js`: market close stock/sector analysis from the daily scored article archive
 - `src/evaluate-recommendations.js`: evaluates logged stock signals after 1/5/20 days
 - `scripts/record-trade.js`: records a manual buy/sell execution separately from AI recommendations
+- `scripts/trade-performance.js`: evaluates actual trade executions with current quotes and sends a Telegram report when trades exist
 - `src/sources/`: RSS, DART, BOK, FRED integrations
 - `src/sources/dart-api.js`: OpenDART disclosure fetcher, optional `DART_API_KEY`
 - `src/sources/yahoo-finance.js`: Yahoo chart quote fetcher for recommendation performance tracking and 5/20 day trend fields
@@ -81,7 +83,7 @@ RSS feeds
 - `supabase/migrations/`: Postgres schema migrations for long-term history
 - `scripts/push-supabase.js`, `scripts/pull-supabase.js`: Supabase CLI push and local history mirror scripts
 - `scripts/import-local-history.js`: uploads existing ignored `data/*.json` history into Supabase after schema creation
-- `.github/workflows/`: collector, five digest schedules, stock report, portfolio snapshot, and evaluation schedules
+- `.github/workflows/`: collector, five digest schedules, stock report, portfolio snapshot, recommendation evaluation, and trade performance schedules
 - `docs/README.md`: docs index and folder roles
 - `docs/PROGRESS.md`: human-readable development progress and current operating context
 - `docs/portfolio.example.json`: private `data/portfolio.json` template

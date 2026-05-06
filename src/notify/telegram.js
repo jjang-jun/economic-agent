@@ -395,7 +395,48 @@ async function sendPerformanceReport(completed) {
   }
 }
 
+function formatTradePerformanceReport(report) {
+  const now = new Date().toLocaleString('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    month: '2-digit',
+    day: '2-digit',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: false,
+  });
+  const topLines = (report.positions || [])
+    .filter(item => item.trade.side === 'buy')
+    .slice(0, 5)
+    .map(item => {
+      const trade = item.trade;
+      const pnl = typeof item.pnl === 'number' ? ` · 손익 ${formatKRW(item.pnl)} (${item.returnPct}%)` : '';
+      const link = trade.recommendationId ? ' · 추천연결' : '';
+      return `▸ ${escapeHtml(trade.name || trade.ticker || trade.symbol)} ${formatKRW(item.entryAmount)}${pnl}${link}`;
+    });
+
+  return [
+    `📒 <b>실제 거래 성과</b>`,
+    `⏰ ${now}`,
+    `거래: ${report.totalTrades}건 · 매수 ${report.buyTrades}건 · 매도 ${report.sellTrades}건`,
+    `추천 연결: ${report.linkedRecommendations}건`,
+    `평가손익: <b>${formatKRW(report.totalPnl)}</b> (${report.totalReturnPct ?? 0}%)`,
+    topLines.length > 0 ? topLines.join('\n') : '아직 평가 가능한 실제 거래가 없습니다.',
+  ].join('\n');
+}
+
+async function sendTradePerformanceReport(report) {
+  const message = formatTradePerformanceReport(report);
+  try {
+    await sendTelegramMessage(message);
+    console.log('[거래성과] 리포트 전송 완료');
+    return true;
+  } catch (err) {
+    console.error(`[거래성과] 전송 실패: ${err.message}`);
+    return false;
+  }
+}
+
 module.exports = {
-  notifyArticles, sendStockReport, sendDigest, sendPerformanceReport,
-  formatMessage, formatStockReport, formatDigest, formatPerformanceReport,
+  notifyArticles, sendStockReport, sendDigest, sendPerformanceReport, sendTradePerformanceReport,
+  formatMessage, formatStockReport, formatDigest, formatPerformanceReport, formatTradePerformanceReport,
 };

@@ -219,6 +219,19 @@ async function persistTradeExecutions(trades) {
   return upsert('trade_executions', rows, 'id');
 }
 
+async function loadPersistedTradeExecutions() {
+  const result = await selectRows('trade_executions', {
+    select: 'payload',
+    order: 'date.desc,executed_at.desc',
+  });
+  if (!result.rows) return result;
+
+  const trades = result.rows
+    .map(row => row.payload)
+    .filter(Boolean);
+  return { rows: trades };
+}
+
 async function persistPortfolioSnapshot(snapshot) {
   if (!snapshot?.capturedAt) return { saved: 0 };
   const date = new Date(snapshot.capturedAt).toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
@@ -297,6 +310,7 @@ module.exports = {
   loadPersistedRecommendations,
   persistRecommendationEvaluations,
   persistTradeExecutions,
+  loadPersistedTradeExecutions,
   persistPortfolioSnapshot,
   persistMarketSnapshots,
   persistInvestorFlow,

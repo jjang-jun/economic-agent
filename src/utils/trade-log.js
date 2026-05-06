@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { getKSTDate } = require('./article-archive');
 const { normalizeYahooSymbol } = require('../sources/yahoo-finance');
-const { persistTradeExecutions } = require('./persistence');
+const { persistTradeExecutions, loadPersistedTradeExecutions } = require('./persistence');
 
 const DATA_DIR = path.join(__dirname, '..', '..', 'data', 'trades');
 const LOG_FILE = path.join(DATA_DIR, 'trade-executions.json');
@@ -18,6 +18,22 @@ function loadLocalTradeExecutions() {
 function saveTradeExecutions(trades) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   fs.writeFileSync(LOG_FILE, JSON.stringify(trades, null, 2));
+}
+
+async function loadTradeExecutions() {
+  const local = loadLocalTradeExecutions();
+  const persisted = await loadPersistedTradeExecutions();
+  if (persisted.error || persisted.disabled || !persisted.rows) {
+    return local;
+  }
+
+  const byId = new Map(local.filter(trade => trade.id).map(trade => [trade.id, trade]));
+  for (const trade of persisted.rows) {
+    if (trade?.id) byId.set(trade.id, trade);
+  }
+  const merged = [...byId.values()].sort((a, b) => new Date(a.executedAt) - new Date(b.executedAt));
+  saveTradeExecutions(merged);
+  return merged;
 }
 
 function normalizeSide(side) {
@@ -78,6 +94,7 @@ async function recordTradeExecution(input) {
 module.exports = {
   LOG_FILE,
   loadLocalTradeExecutions,
+  loadTradeExecutions,
   saveTradeExecutions,
   buildTradeExecution,
   recordTradeExecution,

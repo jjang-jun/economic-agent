@@ -104,8 +104,9 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - GitHub Actions에서는 ignored `data/portfolio.json`을 읽을 수 없으므로 `PORTFOLIO_JSON_BASE64` 또는 `PORTFOLIO_JSON` secret을 통해 비공개 포트폴리오를 주입하도록 지원.
 - 추천 종목별 Yahoo 가격/거래량 기반 `market_profile` 추가. 20일 상대강도, 5일 상대강도, 20일 평균 거래대금, 거래량 배율을 계산하고 유동성 부족 또는 시장 대비 약세 종목은 거래 가능 후보에서 제외.
 - 추천 종목별 20일/60일 고점, 20일 고점 대비 거리, 20일 돌파 여부 추가. 공격형 후보는 20일 고점에서 3% 이내인 종목만 거래 가능 후보로 유지.
+- `npm run trade:performance`와 `trade-performance.yml` 추가. 실제 매매 기록의 현재가 기준 평가손익, 추천 연결 여부, 거래 수를 별도 리포트로 계산.
 
 ## 다음 작업
 
-1. 추천 DB 이력과 실제 거래 이력을 비교하는 성과 리포트 작성
+1. 추천 DB 이력과 실제 거래 이력을 비교하는 성과 리포트 고도화
 2. 주간/월간 성과 리뷰 리포트 추가
