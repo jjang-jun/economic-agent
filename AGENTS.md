@@ -79,7 +79,7 @@ RSS feeds
 - `supabase/migrations/`: Postgres schema migrations for long-term history
 - `scripts/push-supabase.js`, `scripts/pull-supabase.js`: Supabase CLI push and local history mirror scripts
 - `scripts/import-local-history.js`: uploads existing ignored `data/*.json` history into Supabase after schema creation
-- `.github/workflows/`: collector, five digest schedules, stock report schedule
+- `.github/workflows/`: collector, five digest schedules, stock report, portfolio snapshot, and evaluation schedules
 - `docs/README.md`: docs index and folder roles
 - `docs/PROGRESS.md`: human-readable development progress and current operating context
 - `docs/portfolio.example.json`: private `data/portfolio.json` template
