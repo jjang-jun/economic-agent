@@ -87,10 +87,12 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - SQLite 확인: `articles=8`, `daily_summaries=2`, `stock_reports=2`, `recommendations=0`
 - GitHub Actions `news-alert.yml` 수동 실행 성공. 신규 score 4+ 기사가 없어 Supabase row 수 증가는 없었지만, Secrets 주입과 수집 파이프라인은 정상 확인.
 - Node.js 22와 `actions/checkout@v6`, `actions/setup-node@v6`, `actions/cache@v5` 조합으로 `news-alert.yml` 재검증 성공. Node 20 actions deprecation 경고 제거.
+- `evaluate-recommendations.yml` 수동 실행 성공. Actions 캐시에 있던 추천 4건이 Supabase `recommendations` 테이블로 동기화됨.
 
 ## 다음 작업
 
 1. 실제 보유 종목/현금 비중을 포트폴리오 설정에 반영
 2. 시장 레짐 점수에 수급, 추세, 변동성 지표 추가
 3. 추천과 실제 매매 실행 기록을 분리 저장
-4. 주간/월간 성과 리뷰 리포트 추가
+4. 추천 DB 이력을 기준으로 승률/초과수익률 리포트 고도화
+5. 주간/월간 성과 리뷰 리포트 추가
