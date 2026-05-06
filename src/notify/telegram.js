@@ -175,14 +175,18 @@ function formatStockReport(report) {
   const decision = report.decision || {};
   const regime = decision.market?.regime || 'UNKNOWN';
   const regimeScore = typeof decision.market?.score === 'number' ? ` (${decision.market.score})` : '';
+  const regimeTags = (decision.market?.tags || []).map(tag => `#${escapeHtml(tag)}`).join(' ');
   const decisionReasons = (decision.market?.reasons || []).map(item => `└ ${escapeHtml(item)}`);
+  const decisionWarnings = (decision.market?.warnings || []).map(item => `▸ ${escapeHtml(item)}`);
   const decisionActions = (decision.actions || []).map(item => `▸ ${escapeHtml(item)}`);
   const portfolio = decision.portfolio || {};
   const portfolioSummary = portfolio.summary || {};
+  const riskBudget = portfolio.riskBudget || {};
   const portfolioLines = [
     portfolioSummary.totalAssetValue ? `총자산: ${formatKRW(portfolioSummary.totalAssetValue)}` : '',
     portfolioSummary.cashAmount ? `현금: ${formatKRW(portfolioSummary.cashAmount)} (${portfolioSummary.cashPct}%)` : `현금 비중: ${portfolioSummary.cashPct ?? 0}%`,
     portfolioSummary.maxNewBuyAmount ? `1회 신규 매수 상한: ${formatKRW(portfolioSummary.maxNewBuyAmount)}` : '',
+    riskBudget.maxRisk1Pct ? `거래 1회 손실 허용: ${formatKRW(riskBudget.maxRisk1Pct)}~${formatKRW(riskBudget.maxRisk2Pct)}` : '',
     `보유 종목: ${portfolioSummary.positionCount ?? 0}개`,
   ].filter(Boolean).map(item => `▸ ${escapeHtml(item)}`);
 
@@ -197,7 +201,9 @@ function formatStockReport(report) {
     [
       `<b>1. 시장 레짐</b>`,
       `${escapeHtml(regime)}${regimeScore}`,
+      regimeTags,
       decisionReasons.join('\n'),
+      decisionWarnings.length > 0 ? `<b>경고</b>\n${decisionWarnings.join('\n')}` : '',
     ].join('\n'),
 
     [

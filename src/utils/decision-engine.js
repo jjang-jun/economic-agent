@@ -12,6 +12,10 @@ function findSnapshot(snapshot, symbol) {
   return (snapshot || []).find(item => item.symbol === symbol);
 }
 
+function getChange(item) {
+  return typeof item?.changePercent === 'number' ? item.changePercent : null;
+}
+
 function getTrendSignal(snapshot, symbols) {
   const items = symbols
     .map(symbol => findSnapshot(snapshot, symbol))
@@ -89,6 +93,8 @@ function scoreMarketRegime({ articles, indicators }) {
   const snapshot = indicators.marketSnapshot || [];
   let score = 0;
   const reasons = [];
+  const tags = [];
+  const warnings = [];
 
   const bearishRatio = articles.length > 0 ? sentiment.bearish / articles.length : 0;
   const bullishRatio = articles.length > 0 ? sentiment.bullish / articles.length : 0;
@@ -131,6 +137,36 @@ function scoreMarketRegime({ articles, indicators }) {
     reasons.push(`국내 지수 개선: ${domesticTrend.details.join(', ')}`);
   }
 
+  const kospi = findSnapshot(snapshot, '^KS11');
+  const kosdaq = findSnapshot(snapshot, '^KQ11');
+  const samsung = findSnapshot(snapshot, '005930.KS');
+  const hynix = findSnapshot(snapshot, '000660.KS');
+  const kospiChange = getChange(kospi);
+  const kosdaqChange = getChange(kosdaq);
+  const samsungChange = getChange(samsung);
+  const hynixChange = getChange(hynix);
+  const leaderChanges = [samsungChange, hynixChange].filter(value => typeof value === 'number');
+  const leaderAvg = leaderChanges.length > 0
+    ? leaderChanges.reduce((acc, value) => acc + value, 0) / leaderChanges.length
+    : null;
+
+  if (typeof kospiChange === 'number' && kospiChange >= 3) {
+    tags.push('OVERHEATED');
+    warnings.push(`KOSPI 당일 ${kospiChange}% 급등: 신규 진입은 분할만 허용`);
+  }
+  if (typeof kospiChange === 'number' && typeof kosdaqChange === 'number' && kospiChange - kosdaqChange >= 2) {
+    tags.push('CONCENTRATED_LEADERSHIP');
+    warnings.push(`KOSPI가 KOSDAQ보다 ${Math.round((kospiChange - kosdaqChange) * 10) / 10}%p 강함: 대형주 쏠림 확인`);
+  }
+  if (typeof leaderAvg === 'number' && typeof kospiChange === 'number' && leaderAvg - kospiChange >= 3) {
+    tags.push('SEMICONDUCTOR_LEADERSHIP');
+    reasons.push(`반도체 주도주 상대강도 우위: 삼성전자/SK하이닉스 평균 ${Math.round(leaderAvg * 10) / 10}%`);
+  }
+  if (typeof kospiChange === 'number' && typeof kosdaqChange === 'number' && kospiChange >= 1.5 && kosdaqChange >= 1.5) {
+    tags.push('BROAD_RALLY');
+    reasons.push('KOSPI/KOSDAQ 동반 상승으로 상승 폭 확산 신호');
+  }
+
   const globalTrend = getTrendSignal(snapshot, ['SPY', 'QQQ', 'SOXX']);
   if (globalTrend.weak >= 3) {
     score -= 2;
@@ -149,9 +185,15 @@ function scoreMarketRegime({ articles, indicators }) {
   score += investorFlow.score;
   reasons.push(...investorFlow.reasons);
 
-  if (score <= -2) return { regime: 'RISK_OFF', score, reasons, sentiment };
-  if (score >= 2) return { regime: 'RISK_ON', score, reasons, sentiment };
-  return { regime: 'NEUTRAL', score, reasons, sentiment };
+  const uniqueTags = [...new Set(tags)];
+  if (score >= 2 && uniqueTags.includes('OVERHEATED')) {
+    uniqueTags.push('MOMENTUM_ALLOWED');
+  }
+
+  const base = { score, reasons, sentiment, tags: uniqueTags, warnings };
+  if (score <= -2) return { regime: 'RISK_OFF', ...base };
+  if (score >= 2) return { regime: 'RISK_ON', ...base };
+  return { regime: 'NEUTRAL', ...base };
 }
 
 function summarizePortfolio(portfolio) {
@@ -189,8 +231,21 @@ function formatKRW(value) {
   return `${Math.round(value).toLocaleString('ko-KR')}원`;
 }
 
-function buildActions(regime, portfolio) {
+function buildRiskBudget(summary, portfolio) {
+  const maxRisk1Pct = portfolio.totalAssetValue ? Math.floor(portfolio.totalAssetValue * 0.01) : null;
+  const maxRisk2Pct = portfolio.totalAssetValue ? Math.floor(portfolio.totalAssetValue * 0.02) : null;
+  return {
+    maxRisk1Pct,
+    maxRisk2Pct,
+    maxNewBuyAmount: summary.maxNewBuyAmount,
+  };
+}
+
+function buildActions(market, portfolio) {
+  const regime = market.regime;
+  const tags = market.tags || [];
   const summary = summarizePortfolio(portfolio);
+  const riskBudget = buildRiskBudget(summary, portfolio);
   const portfolioChecks = [
     `현재 현금 비중 약 ${summary.cashPct}%, 보유 종목 ${summary.positionCount}개 기준으로 판단`,
     summary.maxNewBuyAmount
@@ -198,6 +253,14 @@ function buildActions(regime, portfolio) {
       : '',
     ...summary.overweight.map(item => `${item}: 신규 매수보다 비중 점검 우선`),
     ...summary.overweightSectors.map(item => `${item}: 섹터 쏠림 완화 후보 점검`),
+  ].filter(Boolean);
+
+  const aggressiveChecks = [
+    tags.includes('OVERHEATED') ? '급등 당일 전액 진입 금지, 최소 3회 분할 진입' : '',
+    tags.includes('SEMICONDUCTOR_LEADERSHIP') ? '반도체/AI 핵심주와 직접 수혜주만 공격 후보로 제한' : '',
+    tags.includes('CONCENTRATED_LEADERSHIP') ? '주변 테마주 추격 금지, 지수보다 약한 종목은 제외' : '',
+    riskBudget.maxRisk1Pct ? `거래 1회 손실 허용액 ${formatKRW(riskBudget.maxRisk1Pct)}~${formatKRW(riskBudget.maxRisk2Pct)} 이내` : '',
+    '손절선 없는 신규 매수 금지',
   ].filter(Boolean);
 
   if (regime === 'RISK_OFF') {
@@ -213,6 +276,7 @@ function buildActions(regime, portfolio) {
       `high 확신도 추천만 총 자산의 ${Math.round(portfolio.maxNewBuyRatio * 100)}% 이내 분할 매수 후보`,
       '섹터 쏠림과 종목별 최대 비중을 넘기지 않음',
       '호재 공시가 있는 종목은 다음날 거래량 확인 후 진입',
+      ...aggressiveChecks,
       ...portfolioChecks,
     ];
   }
@@ -227,6 +291,7 @@ function buildActions(regime, portfolio) {
 function buildDecisionContext({ articles, indicators }) {
   const market = scoreMarketRegime({ articles, indicators });
   const portfolio = loadPortfolio();
+  const portfolioSummary = summarizePortfolio(portfolio);
   return {
     market,
     portfolio: {
@@ -239,9 +304,10 @@ function buildDecisionContext({ articles, indicators }) {
       stopLossPct: portfolio.stopLossPct,
       trimProfitPct: portfolio.trimProfitPct,
       positions: portfolio.positions,
-      summary: summarizePortfolio(portfolio),
+      summary: portfolioSummary,
+      riskBudget: buildRiskBudget(portfolioSummary, portfolio),
     },
-    actions: buildActions(market.regime, portfolio),
+    actions: buildActions(market, portfolio),
   };
 }
 

@@ -89,6 +89,9 @@ Rules:
 - Use low conviction if the evidence is only indirect or macro-level
 - Do not invent ticker codes
 - Avoid unconditional buy/sell wording; frame outputs as candidates gated by market regime and risk
+- In a strong but overheated market, prefer trend-following candidates only when they have direct AI/semiconductor/infrastructure linkage, strong relative strength, sufficient liquidity, and foreign/institution support
+- Penalize vague theme stocks, weak relative-strength stocks, large one-day chase entries, and recommendations without an invalidation or stop-loss condition
+- For aggressive candidates, mention split-entry and the condition that would invalidate the setup
 - This is for informational purposes, not investment advice`;
 
   try {

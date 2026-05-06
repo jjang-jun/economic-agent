@@ -94,10 +94,12 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - `evaluate-recommendations.yml` 수동 실행 성공. Actions 캐시에 있던 추천 4건이 Supabase `recommendations` 테이블로 동기화됨.
 - Yahoo Finance 실제 스냅샷에서 5일/20일 수익률 필드 확인. Supabase `market_snapshots` 추세 컬럼 migration 적용 완료.
 - 네이버 금융 일자별 순매수 표를 기반으로 KOSPI 외국인/기관 수급 수집 모듈 추가. 시장 레짐 점수, AI 브리핑 입력, Supabase `investor_flows` 저장 대상으로 연결.
+- 2026-05-06 코스피 급등 사례를 반영해 강세장도 `OVERHEATED`, `CONCENTRATED_LEADERSHIP`, `SEMICONDUCTOR_LEADERSHIP`, `MOMENTUM_ALLOWED` 태그로 세분화. RISK_ON이어도 급등 당일 전액 진입 금지, 3회 이상 분할 진입, 1회 손실 허용액 1~2% 가드레일을 Telegram 리포트에 표시.
 
 ## 다음 작업
 
 1. 추천과 실제 매매 실행 기록을 분리 저장
 2. 종목별 현재가와 평가손익 자동 계산
-3. 추천 DB 이력을 기준으로 승률/초과수익률 리포트 고도화
-4. 주간/월간 성과 리뷰 리포트 추가
+3. 상대강도/거래대금/신고가 여부를 종목 추천 점수에 구조화
+4. 추천 DB 이력을 기준으로 승률/초과수익률 리포트 고도화
+5. 주간/월간 성과 리뷰 리포트 추가

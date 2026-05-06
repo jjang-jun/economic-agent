@@ -27,6 +27,7 @@
 - [x] 다이제스트 시간 최적화
 - [x] 프리마켓/시장 스냅샷
 - [x] 시장 레짐 초안: `RISK_ON`, `NEUTRAL`, `RISK_OFF`
+- [x] 강세장 세부 태그: `OVERHEATED`, `CONCENTRATED_LEADERSHIP`, `SEMICONDUCTOR_LEADERSHIP`, `MOMENTUM_ALLOWED`
 - [x] 포트폴리오 설정 초안
 - [x] 종목 리포트에 행동 가드레일 추가
 
@@ -47,6 +48,7 @@
 
 ## Phase 4: 시장 레짐 고도화
 - [x] KOSPI/KOSDAQ/S&P/Nasdaq/반도체 5일·20일 추세 지표
+- [x] 급등장 과열/쏠림 감지와 분할진입 가드레일
 - [ ] VIX, 달러, 환율, 유가, 금리 기반 위험 점수
 - [x] 외국인/기관 수급 데이터 추가
 - [ ] 뉴스/공시 악재 비율과 가격 반응 결합

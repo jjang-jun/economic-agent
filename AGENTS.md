@@ -61,6 +61,7 @@ RSS feeds
 - `src/utils/article-archive.js`: daily scored article archive used by stock reports and later performance review
 - `src/utils/recommendation-log.js`: stores stock signals and evaluates returns against KOSPI benchmark when available
 - `src/utils/decision-engine.js`: rule-based market regime, index trend scoring, and action guardrails
+- Market regime can include tags such as `OVERHEATED`, `CONCENTRATED_LEADERSHIP`, `SEMICONDUCTOR_LEADERSHIP`, and `MOMENTUM_ALLOWED`. Treat these as risk controls, not pure buy signals.
 - `src/utils/portfolio.js`: loads ignored local portfolio data and derives cash/position risk inputs
 - `src/utils/persistence.js`: optional Supabase REST persistence for articles, summaries, reports, recommendations, snapshots, investor flows, decisions
 - `src/config/keywords.js`: keyword weights, sentiment dictionary, sectors
