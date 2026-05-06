@@ -237,16 +237,16 @@ Telegram Bot
 - [x] 공유방/비공개방 Telegram 라우팅 분리: `TELEGRAM_CHAT_ID`, `TELEGRAM_PRIVATE_CHAT_ID`
 - [x] Supabase 원본 포트폴리오 테이블 추가: `portfolio_accounts`, `positions`, `risk_policy`
 - [x] 대화/승인 테이블 추가: `conversation_messages`, `pending_actions`
-- [ ] `src/server/telegram-webhook.js` 추가
-- [ ] `src/agent/agent-router.js`와 기본 명령어 라우팅 추가
-- [ ] `/portfolio`, `/goal`, `/risk` 조회 명령 구현
+- [x] `src/server/telegram-webhook.js` 추가
+- [x] `src/agent/agent-router.js`와 기본 명령어 라우팅 추가
+- [x] `/portfolio`, `/goal`, `/risk` 조회 명령 구현
 - [ ] `/buy`, `/sell`, `/cash`를 pending action + 버튼 승인 방식으로 구현
-- [ ] Telegram `chat_id` allowlist와 webhook secret 검증
+- [x] Telegram `chat_id` allowlist와 webhook secret 검증
 - [ ] Cloud Run 또는 Fly.io/Render 배포 문서 추가
 
 ## 현재 가장 중요한 다음 작업
-1. KIS 계정 키를 설정하고 국내 현재가 provider 실호출을 검증한다.
-2. `src/server/telegram-webhook.js`와 `src/agent/agent-router.js` 초안을 만든다.
+1. `/buy`, `/sell`, `/cash`를 pending action과 Telegram 승인 버튼으로 구현한다.
+2. FMP/Alpaca 계정 키를 설정하고 해외 provider 실호출을 검증한다.
 3. KRX/공공데이터 일별 종가 백필 provider를 추가한다.
 4. 추천 JSON schema 검증을 추가해 근거, 기준 가격, 손절선, 손익비, 제안 비중이 없는 추천 저장을 차단한다.
 5. `performance-lab.js`와 `behavior-reviewer.js`로 추천/실거래/행동 패턴을 분리 분석한다.

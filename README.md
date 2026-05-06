@@ -265,6 +265,38 @@ npm run dashboard
 
 `db:push`에는 `SUPABASE_PROJECT_URL`과 `SUPABASE_DB_PASSWORD`가 필요합니다. 네트워크가 Supabase direct DB의 IPv6 연결을 지원하지 않으면 Supabase 대시보드의 pooler 연결 문자열을 `SUPABASE_DB_URL`로 넣어 우회합니다. 런타임 저장과 `db:pull`에는 `SUPABASE_PROJECT_URL`과 `SUPABASE_PUBLISHABLE_KEY`를 사용합니다.
 
+## 대화형 Agent 서버
+
+Telegram 대화형 Agent는 별도 서버로 실행합니다.
+
+```bash
+npm run agent:server
+```
+
+현재 endpoint:
+
+```text
+GET  /health
+POST /telegram/webhook
+```
+
+현재 지원 명령:
+
+```text
+/portfolio
+/goal
+/risk
+/help
+```
+
+포트폴리오와 경제적 자유 상태를 다루므로 Telegram `chat_id` allowlist를 통과한 채팅만 응답합니다. allowlist는 `TELEGRAM_SECRET_CHAT_ID`, `TELEGRAM_PRIVATE_CHAT_ID`, `TELEGRAM_AGENT_CHAT_ID`, `TELEGRAM_PORTFOLIO_CHAT_ID`, `TELEGRAM_CHAT_ID` 순서로 구성됩니다.
+
+Telegram webhook secret token을 쓰려면 아래 값을 설정하고, Bot API `setWebhook`에도 같은 secret token을 넣습니다.
+
+```bash
+TELEGRAM_WEBHOOK_SECRET=...
+```
+
 ## 설치 및 실행
 
 ### 요구 사항

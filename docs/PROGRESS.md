@@ -130,10 +130,11 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 가격 소스 계층을 `price-provider.js`로 분리. 국내 주식은 KIS REST -> Naver Finance -> Yahoo fallback 순서로 조회하고, 사용한 가격은 Supabase `price_snapshots`에 source/as_of와 함께 저장.
 - 해외 주식 가격 provider 후보 추가. 글로벌 종목은 Alpaca Market Data -> FMP -> Alpha Vantage -> Tiingo EOD -> Yahoo fallback 순서로 조회하며, FMP는 미국 기업 재무/실적 분석 엔진으로 확장 예정.
 - KIS App Key/Secret 실호출 검증 완료. `.env`의 `KIS_BASE_URL` 오타를 자동 보정하고, KIS 접근토큰은 `data/kis-token.json` 캐시로 재사용하며, 현재가 호출은 1.1초 간격 큐로 직렬화해 초당 거래건수 제한을 회피.
+- 대화형 Agent 서버 초안 추가. `npm run agent:server`가 `/health`, `/telegram/webhook`을 제공하고, Telegram allowlist를 통과한 `/portfolio`, `/goal`, `/risk`, `/help` 명령에 응답하며 `conversation_messages`에 대화 로그를 저장.
 
 ## 다음 작업
 
-1. `src/server/telegram-webhook.js`와 `src/agent/agent-router.js` 초안 구현
+1. `/buy`, `/sell`, `/cash`를 pending action + Telegram 승인 버튼으로 구현
 2. FMP/Alpaca 계정 키 설정 후 해외 provider 실호출 검증
 3. KRX/공공데이터 일별 종가 백필 provider 추가
 4. 추천 JSON schema 검증 추가: 근거, 기준 가격, 손절선, 손익비, 제안 비중 누락 시 저장 차단

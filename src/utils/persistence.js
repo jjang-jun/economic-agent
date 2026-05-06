@@ -377,6 +377,25 @@ async function persistFinancialFreedomGoal(status) {
   }], 'id');
 }
 
+async function persistConversationMessage(message) {
+  if (!message?.id) return { saved: 0 };
+  return upsert('conversation_messages', [{
+    id: message.id,
+    chat_id: message.chatId || '',
+    message_id: message.messageId || '',
+    direction: message.direction || 'inbound',
+    intent: message.intent || '',
+    text: message.text || '',
+    response: message.response || '',
+    tools: message.tools || [],
+    data_cutoff: message.dataCutoff || {},
+    pending_action_id: message.pendingActionId || null,
+    status: message.status || 'recorded',
+    payload: message.payload || {},
+    created_at: new Date().toISOString(),
+  }], 'id');
+}
+
 module.exports = {
   isPersistenceEnabled,
   selectRows,
@@ -395,4 +414,5 @@ module.exports = {
   persistDecisionContext,
   persistPerformanceReview,
   persistFinancialFreedomGoal,
+  persistConversationMessage,
 };

@@ -21,6 +21,7 @@
     "freedom:report": "node --env-file=.env scripts/freedom-report.js",
     "portfolio:snapshot": "node --env-file=.env scripts/portfolio-snapshot.js",
     "portfolio:sync-secret": "bash scripts/sync-portfolio-secret.sh",
+    "agent:server": "node --env-file=.env src/server/index.js",
     "db:push": "node --env-file=.env scripts/push-supabase.js",
     "db:pull": "node --env-file=.env scripts/pull-supabase.js",
     "db:import-local": "node --env-file=.env scripts/import-local-history.js",

@@ -203,3 +203,17 @@ pending_actions
 5. `agent-router.js`와 기본 명령어 `/portfolio`, `/goal`, `/risk` 구현
 6. `/buy`, `/sell`, `/cash`는 pending action과 버튼 승인 방식으로 구현
 7. Cloud Run 또는 Fly.io/Render 배포
+
+현재 구현:
+- `npm run agent:server`
+- `GET /health`
+- `POST /telegram/webhook`
+- `/portfolio`, `/goal`, `/risk`, `/help`
+- Telegram chat_id allowlist
+- `TELEGRAM_WEBHOOK_SECRET` 검증
+- `conversation_messages` 저장
+
+아직 미구현:
+- `/buy`, `/sell`, `/cash` pending action
+- Telegram inline keyboard 승인 버튼
+- Cloud Run/Fly/Render 배포 설정
