@@ -83,6 +83,10 @@ src/
 │   ├── fred-api.js            # FRED 미국 경제지표 API
 │   ├── price-provider.js      # 가격 소스 우선순위 라우터
 │   ├── kis-api.js             # 한국투자증권 Open API REST 가격 조회
+│   ├── alpaca-api.js          # 미국 주식 실시간/히스토리 provider 후보
+│   ├── fmp-api.js             # 해외 주식 가격/재무/실적 provider 후보
+│   ├── alpha-vantage-api.js   # 해외 주식 fallback 가격 provider
+│   ├── tiingo-api.js          # 해외 EOD/조정주가 fallback provider
 │   ├── naver-finance.js       # 국내 종목 현재가 fallback
 │   └── yahoo-finance.js       # 해외 종목/글로벌 fallback 가격 조회
 ├── filters/
@@ -438,7 +442,9 @@ module.exports = {
 
 ### 가격 데이터
 
-가격 조회는 `src/sources/price-provider.js`를 통해 호출합니다. 국내 6자리 종목코드는 한국투자증권 Open API REST를 1차로 사용하고, 키가 없거나 실패하면 Naver Finance, 마지막으로 Yahoo Finance fallback을 사용합니다. Yahoo Finance는 기본적으로 해외 종목과 글로벌 지수/환율 용도입니다. 국내 현재가가 KIS 또는 Naver에서 확인된 경우 Yahoo의 국내 history 기반 5일/20일 수익률은 사용하지 않습니다.
+가격 조회는 `src/sources/price-provider.js`를 통해 호출합니다. 국내 6자리 종목코드는 한국투자증권 Open API REST를 1차로 사용하고, 키가 없거나 실패하면 Naver Finance, 마지막으로 Yahoo Finance fallback을 사용합니다. 국내 현재가가 KIS 또는 Naver에서 확인된 경우 Yahoo의 국내 history 기반 5일/20일 수익률은 사용하지 않습니다.
+
+해외 주식은 Alpaca Market Data, FMP, Alpha Vantage, Tiingo EOD, Yahoo fallback 순서로 조회합니다. 키가 없는 provider는 자동으로 건너뛰므로 초기에는 Yahoo fallback으로 계속 동작하고, `FMP_API_KEY`를 넣으면 미국 기업 재무/실적 분석까지 확장할 수 있습니다. 미국 장중 실시간 알림이 중요해지면 Alpaca WebSocket 또는 Massive를 별도 실시간 계층으로 추가합니다.
 
 포트폴리오에 미국 주식과 한국 주식이 섞여 있으면 USD 종목은 USD/KRW로 KRW 환산해 총자산을 계산합니다.
 
@@ -451,6 +457,14 @@ KIS_APP_KEY=...
 KIS_APP_SECRET=...
 # 선택: 기본값은 실전 REST URL
 KIS_BASE_URL=https://openapi.koreainvestment.com:9443
+
+# 해외 주식 선택 provider
+ALPACA_API_KEY_ID=...
+ALPACA_API_SECRET_KEY=...
+ALPACA_DATA_FEED=iex
+FMP_API_KEY=...
+ALPHA_VANTAGE_API_KEY=...
+TIINGO_API_TOKEN=...
 ```
 
 ### 실제 포트폴리오

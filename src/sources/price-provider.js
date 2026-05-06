@@ -1,6 +1,10 @@
 const { PRICE_SOURCE_POLICY } = require('../config/price-source-policy');
 const { fetchKisCurrentPrice, normalizeKisTicker } = require('./kis-api');
 const { fetchNaverQuote } = require('./naver-finance');
+const { fetchAlpacaQuote } = require('./alpaca-api');
+const { fetchFmpQuote } = require('./fmp-api');
+const { fetchAlphaVantageQuote } = require('./alpha-vantage-api');
+const { fetchTiingoQuote } = require('./tiingo-api');
 const {
   fetchQuote: fetchYahooQuote,
   fetchBenchmarkQuote: fetchYahooBenchmarkQuote,
@@ -60,6 +64,25 @@ async function fetchDomesticCurrentPrice(ticker) {
   return null;
 }
 
+async function fetchGlobalCurrentPrice(ticker) {
+  const sources = PRICE_SOURCE_POLICY.currentPrice.global;
+
+  for (const source of sources) {
+    let quote = null;
+    if (source === 'alpaca-market-data') quote = await fetchAlpacaQuote(ticker);
+    if (source === 'fmp') quote = await fetchFmpQuote(ticker);
+    if (source === 'alpha-vantage') quote = await fetchAlphaVantageQuote(ticker);
+    if (source === 'tiingo-eod') quote = await fetchTiingoQuote(ticker);
+    if (source === 'yahoo-finance') quote = await fetchYahooQuote(ticker);
+    if (quote) {
+      quote.sourcePriority = sources;
+      await persistQuoteSnapshot(quote, ticker);
+      return quote;
+    }
+  }
+  return null;
+}
+
 async function fetchCurrentPrice(ticker) {
   const rawTicker = String(ticker || '').trim();
   if (!rawTicker) return null;
@@ -68,12 +91,7 @@ async function fetchCurrentPrice(ticker) {
     return fetchDomesticCurrentPrice(rawTicker);
   }
 
-  const quote = await fetchYahooQuote(rawTicker);
-  if (quote) {
-    quote.sourcePriority = PRICE_SOURCE_POLICY.currentPrice.global;
-    await persistQuoteSnapshot(quote, rawTicker);
-  }
-  return quote;
+  return fetchGlobalCurrentPrice(rawTicker);
 }
 
 async function fetchBenchmarkQuote() {
@@ -86,6 +104,7 @@ module.exports = {
   PRICE_SOURCE_POLICY,
   fetchCurrentPrice,
   fetchBenchmarkQuote,
+  fetchGlobalCurrentPrice,
   normalizeYahooSymbol,
   isDomesticTicker,
   toPriceSnapshot,

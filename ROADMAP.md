@@ -158,11 +158,15 @@ Telegram Bot
 - [x] `price-provider.js`로 가격 소스 우선순위 분리
 - [x] 한국투자증권 Open API REST provider 골격 추가
 - [x] 국내 현재가 우선순위: KIS REST -> Naver Finance -> Yahoo fallback
-- [x] 해외 종목/환율/글로벌 지수는 Yahoo fallback 유지
+- [x] 해외 현재가 우선순위: Alpaca -> FMP -> Alpha Vantage -> Tiingo EOD -> Yahoo fallback
+- [x] FMP provider 골격 추가: 미국 기업 profile/fundamental 확장 준비
 - [x] 사용 가격의 source/as_of/price_type 저장
 - [ ] KIS 계정 키 설정 후 국내 현재가 실호출 검증
+- [ ] FMP API key 설정 후 보유 미국 주식 재무/실적 profile 수집
+- [ ] Alpaca API key 설정 후 프리마켓/애프터마켓 현재가 검증
 - [ ] KIS 일봉 데이터를 추천 성과 평가에 연결
 - [ ] KRX Open API 또는 공공데이터포털로 공식 일별 종가 백필
+- [ ] Massive는 미국 주식 고품질 히스토리/실시간이 필요해질 때 유료 계층으로 추가
 - [ ] pykrx/FinanceDataReader는 로컬 백테스트 worker로 분리
 - [ ] 가격 source별 품질/오류율 모니터링
 
