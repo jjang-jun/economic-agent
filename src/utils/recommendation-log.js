@@ -84,6 +84,7 @@ async function buildRecommendation(stock, articles, indicators, date) {
     failureReason: stock.failure_reason || stock.failureReason || '',
     riskProfile: stock.risk_profile || null,
     marketProfile: stock.market_profile || null,
+    fundamentalProfile: stock.fundamental_profile || null,
     riskReview: stock.risk_review || null,
     relatedNews: getRelatedArticleIds(stock, articles),
     indicators,

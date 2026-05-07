@@ -1,4 +1,5 @@
 const { fetchCurrentPrice, fetchBenchmarkQuote, normalizeYahooSymbol } = require('../sources/price-provider');
+const { fetchFmpProfile, normalizeFmpSymbol } = require('../sources/fmp-api');
 
 const MIN_AVG_TURNOVER_KRW = 5000000000;
 
@@ -46,17 +47,53 @@ function buildMarketProfile(quote, benchmark) {
   };
 }
 
+function buildFundamentalProfile(profile) {
+  if (!profile) return null;
+  const marketCap = Number.isFinite(Number(profile.marketCap)) ? Number(profile.marketCap) : null;
+  const beta = Number.isFinite(Number(profile.beta)) ? Number(profile.beta) : null;
+
+  return {
+    symbol: profile.symbol || '',
+    name: profile.companyName || '',
+    sector: profile.sector || '',
+    industry: profile.industry || '',
+    country: profile.country || '',
+    exchange: profile.exchange || profile.exchangeFullName || '',
+    currency: profile.currency || '',
+    marketCap,
+    marketCapUsd: profile.currency === 'USD' ? marketCap : null,
+    beta,
+    isEtf: profile.isEtf ?? null,
+    isAdr: profile.isAdr ?? null,
+    isFund: profile.isFund ?? null,
+    isActivelyTrading: profile.isActivelyTrading ?? null,
+    ipoDate: profile.ipoDate || '',
+    source: 'fmp-profile',
+  };
+}
+
+async function fetchFundamentalProfile(stock) {
+  const symbol = normalizeFmpSymbol(stock.ticker || stock.symbol || '');
+  if (!symbol) return null;
+  const profile = await fetchFmpProfile(symbol);
+  return buildFundamentalProfile(profile);
+}
+
 async function applyRecommendationMarketData(report) {
   if (!report?.stocks?.length) return report;
   const benchmark = await fetchBenchmarkQuote();
-  const quotes = await Promise.all(report.stocks.map(stock => {
-    const symbol = normalizeYahooSymbol(stock.ticker || stock.symbol || '');
-    return symbol ? fetchCurrentPrice(symbol) : null;
-  }));
+  const [quotes, fundamentals] = await Promise.all([
+    Promise.all(report.stocks.map(stock => {
+      const symbol = normalizeYahooSymbol(stock.ticker || stock.symbol || '');
+      return symbol ? fetchCurrentPrice(symbol) : null;
+    })),
+    Promise.all(report.stocks.map(stock => fetchFundamentalProfile(stock))),
+  ]);
 
   report.stocks = report.stocks.map((stock, index) => ({
     ...stock,
     market_profile: buildMarketProfile(quotes[index], benchmark),
+    fundamental_profile: fundamentals[index],
   }));
   return report;
 }
@@ -64,5 +101,6 @@ async function applyRecommendationMarketData(report) {
 module.exports = {
   MIN_AVG_TURNOVER_KRW,
   buildMarketProfile,
+  buildFundamentalProfile,
   applyRecommendationMarketData,
 };

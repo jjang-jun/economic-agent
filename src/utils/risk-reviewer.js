@@ -8,6 +8,7 @@ function reviewStock(stock, decision = {}) {
   const profile = stock.risk_profile || {};
   const positionSize = profile.positionSize || profile.position_size || {};
   const market = stock.market_profile || {};
+  const fundamental = stock.fundamental_profile || stock.fundamentalProfile || {};
   const marketRegime = decision.market?.regime || 'UNKNOWN';
   const marketTags = decision.market?.tags || [];
   const factors = [];
@@ -22,6 +23,7 @@ function reviewStock(stock, decision = {}) {
   addFactor(factors, 'relative_strength', market.relativeStrength20d === null || market.relativeStrength20d === undefined || market.relativeStrength20d >= 0, typeof market.relativeStrength20d === 'number' ? `${market.relativeStrength20d}%p` : 'missing');
   addFactor(factors, 'momentum', market.near20dHigh !== false, typeof market.distanceFrom20dHighPct === 'number' ? `${market.distanceFrom20dHighPct}% from 20d high` : 'missing');
   addFactor(factors, 'position_size', Boolean(profile.suggestedAmount), profile.suggestedAmount ? `${profile.suggestedAmount.toLocaleString('ko-KR')} KRW` : 'missing');
+  addFactor(factors, 'active_trading', fundamental.isActivelyTrading !== false, fundamental.isActivelyTrading === false ? 'inactive' : (fundamental.source || 'n/a'));
 
   for (const factor of factors) {
     if (!factor.passed) blockers.push(`${factor.name}: ${factor.detail}`);
@@ -41,6 +43,18 @@ function reviewStock(stock, decision = {}) {
   }
   if (!profile.invalidation) {
     warnings.push('무효화 조건 누락');
+  }
+  if (typeof fundamental.marketCapUsd === 'number' && fundamental.marketCapUsd < 1_000_000_000) {
+    warnings.push(`미국 소형주: 시가총액 ${Math.round(fundamental.marketCapUsd).toLocaleString('ko-KR')} USD`);
+  }
+  if (typeof fundamental.beta === 'number' && fundamental.beta > 2) {
+    warnings.push(`고베타 종목: beta ${fundamental.beta}`);
+  }
+  if (fundamental.isAdr === true) {
+    warnings.push('ADR 종목: 원시장/환율/예탁 리스크 확인 필요');
+  }
+  if (fundamental.isEtf === true) {
+    warnings.push('ETF: 개별 기업 재무보다 보유자산/섹터 노출 기준으로 검토');
   }
 
   const approved = blockers.length === 0 && profile.tradeable !== false;
