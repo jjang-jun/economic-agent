@@ -147,16 +147,19 @@ async function createPendingAction({ chatId, text }) {
   };
 }
 
-function ensureActionUsable(row, token) {
+function ensureActionUsable(row, token, options = {}) {
   if (!row) throw new Error('pending action not found');
   if (row.status !== 'pending') throw new Error(`already ${row.status}`);
   if (row.confirmation_token !== token) throw new Error('invalid token');
+  if (options.chatId && row.chat_id && String(row.chat_id) !== String(options.chatId)) {
+    throw new Error('chat mismatch');
+  }
   if (row.expires_at && new Date(row.expires_at).getTime() < Date.now()) throw new Error('expired action');
 }
 
-async function confirmPendingAction(actionId, token) {
+async function confirmPendingAction(actionId, token, options = {}) {
   const row = await loadPendingAction(actionId);
-  ensureActionUsable(row, token);
+  ensureActionUsable(row, token, options);
   const payload = row.requested_payload || {};
 
   if (row.type === 'buy' || row.type === 'sell') {
@@ -208,9 +211,9 @@ async function confirmPendingAction(actionId, token) {
   throw new Error('unsupported action type');
 }
 
-async function cancelPendingAction(actionId, token) {
+async function cancelPendingAction(actionId, token, options = {}) {
   const row = await loadPendingAction(actionId);
-  ensureActionUsable(row, token);
+  ensureActionUsable(row, token, options);
   await persistPendingAction({
     id: row.id,
     chatId: row.chat_id,
@@ -226,14 +229,14 @@ async function cancelPendingAction(actionId, token) {
   return '취소했습니다.';
 }
 
-async function handlePendingActionCallback(data = '') {
+async function handlePendingActionCallback(data = '', options = {}) {
   const [verb, actionId, token] = String(data || '').split(':');
   if (!['confirm', 'cancel'].includes(verb) || !actionId || !token) {
     throw new Error('invalid callback data');
   }
   const response = verb === 'confirm'
-    ? await confirmPendingAction(actionId, token)
-    : await cancelPendingAction(actionId, token);
+    ? await confirmPendingAction(actionId, token, options)
+    : await cancelPendingAction(actionId, token, options);
   return { verb, actionId, response };
 }
 
@@ -242,4 +245,5 @@ module.exports = {
   handlePendingActionCallback,
   confirmPendingAction,
   cancelPendingAction,
+  ensureActionUsable,
 };

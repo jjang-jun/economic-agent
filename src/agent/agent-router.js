@@ -16,13 +16,15 @@ const {
 const { createPendingAction, handlePendingActionCallback } = require('./pending-actions');
 
 function getAllowedChatIds() {
-  return [
+  const privateIds = [
     process.env.TELEGRAM_SECRET_CHAT_ID,
     process.env.TELEGRAM_PRIVATE_CHAT_ID,
     process.env.TELEGRAM_AGENT_CHAT_ID,
     process.env.TELEGRAM_PORTFOLIO_CHAT_ID,
-    process.env.TELEGRAM_CHAT_ID,
   ].filter(Boolean).map(String);
+  if (privateIds.length > 0) return [...new Set(privateIds)];
+
+  return [process.env.TELEGRAM_CHAT_ID].filter(Boolean).map(String);
 }
 
 function isAllowedChat(chatId) {
@@ -197,7 +199,7 @@ async function routeTelegramCallback(callbackQuery = {}) {
     return { allowed: false, response: '허용되지 않은 Telegram chat_id입니다.' };
   }
 
-  const result = await handlePendingActionCallback(data);
+  const result = await handlePendingActionCallback(data, { chatId });
   await persistConversationMessage({
     id,
     chatId: String(chatId),

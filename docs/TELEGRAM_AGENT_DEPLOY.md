@@ -30,7 +30,7 @@ FMP_API_KEY=...
 DISABLE_FINBERT=1
 ```
 
-`TELEGRAM_SECRET_CHAT_ID`는 개인방 chat id다. 공유방에는 포트폴리오 명령을 열지 않는다.
+`TELEGRAM_SECRET_CHAT_ID`는 개인방 chat id다. 개인방 id가 하나라도 설정되어 있으면 Agent 명령 allowlist는 개인방만 사용하고, 공유방 `TELEGRAM_CHAT_ID`는 포트폴리오 명령에 열지 않는다.
 
 `JOB_SECRET`은 Scheduler가 `POST /jobs/news-collector`를 호출할 때 쓰는 공유 secret이다. Telegram secret과 다르게 둔다.
 

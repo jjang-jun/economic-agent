@@ -163,10 +163,11 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - `collector:ops-report`와 `collector-ops-report.yml` 추가. 평일 23:50 KST에 최근 1일 수집 성공률, 실패, lookback, 즉시 알림 실패, catch-up 대기 이상치를 private Telegram으로 전송.
 - 해외 추천 평가 EOD 계층 추가. FMP historical EOD를 우선 사용하고 Tiingo/Alpha/Yahoo를 fallback으로 두어 미국 주식 추천도 평가 대상일 종가와 high/low history 기반으로 평가 가능.
 - 다이제스트/캐치업 알림 이벤트 상태 정리. 즉시 전송 대상이 아닌 digest/catch_up 항목은 `pending` 대신 `buffered`로 저장하고, 중복 방지 active 상태에 포함. 운영 이상치 알림의 catch-up 기준은 기본 20건 초과로 완화.
+- Telegram Agent 보안 보강. 개인방 chat id가 설정되어 있으면 공유방 `TELEGRAM_CHAT_ID`를 Agent 명령 allowlist에서 제외하고, pending action callback은 action 생성 chat과 승인 chat이 일치해야 처리.
 
 ## 다음 작업
 
 1. KRX Open API 공식 일별/통계 검증 provider 추가
-2. Telegram `/buy`, `/sell`, `/cash` end-to-end 운영 검증
+2. Telegram `/buy`, `/sell`, `/cash` 실제 private 채팅 end-to-end 운영 검증
 3. FMP 재무제표/실적 데이터를 종목 후보 스키마에 연결
 4. Telegram 명령 기반 실제 거래 기록과 추천 ID 연결 UX 개선
