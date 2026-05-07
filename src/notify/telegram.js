@@ -195,6 +195,10 @@ function formatStockReport(report) {
     return `${icon.bar} <b>${escapeHtml(s.name)}</b>  [${icon.label}]\n└ ${escapeHtml(s.reason)}`;
   });
 
+  const decision = report.decision || {};
+  const portfolio = decision.portfolio || {};
+  const portfolioSummary = portfolio.summary || {};
+
   const stockLines = (report.stocks || []).map(s => {
     const icon = SENTIMENT[s.signal] || SENTIMENT.neutral;
     const ticker = s.ticker ? `  ${s.ticker}` : '';
@@ -205,7 +209,12 @@ function formatStockReport(report) {
     const review = s.risk_review || {};
     const rr = profile.riskReward ? `손익비 ${profile.riskReward}:1 (최소 2:1)` : '';
     const stop = profile.expectedLossPct ? `예상 손실폭 ${profile.expectedLossPct}%` : '';
-    const size = profile.suggestedAmount ? `제안 매수 ${formatKRW(profile.suggestedAmount)} (계좌 ${profile.suggestedWeightPct}%)` : '';
+    const suggestedCashPct = profile.suggestedAmount && portfolioSummary.cashAmount
+      ? round((profile.suggestedAmount / portfolioSummary.cashAmount) * 100, 1)
+      : null;
+    const size = profile.suggestedAmount
+      ? `제안 매수 ${formatKRW(profile.suggestedAmount)} (총자산 ${profile.suggestedWeightPct}%, 현금 ${suggestedCashPct ?? '?'}%)`
+      : '';
     const rs = typeof market.relativeStrength20d === 'number' ? `RS20 ${market.relativeStrength20d}%p` : '';
     const volume = typeof market.volumeRatio20d === 'number' ? `거래량 ${market.volumeRatio20d}x` : '';
     const high = market.breakout20d
@@ -225,15 +234,12 @@ function formatStockReport(report) {
   const riskLines = (report.risk_flags || []).map(item =>
     `▸ ${escapeHtml(item)}`
   );
-  const decision = report.decision || {};
   const regime = decision.market?.regime || 'UNKNOWN';
   const regimeScore = typeof decision.market?.score === 'number' ? ` (${decision.market.score})` : '';
   const regimeTags = (decision.market?.tags || []).map(tag => `#${escapeHtml(tag)}`).join(' ');
   const decisionReasons = (decision.market?.reasons || []).map(item => `└ ${escapeHtml(item)}`);
   const decisionWarnings = (decision.market?.warnings || []).map(item => `▸ ${escapeHtml(item)}`);
   const decisionActions = (decision.actions || []).map(item => `▸ ${escapeHtml(item)}`);
-  const portfolio = decision.portfolio || {};
-  const portfolioSummary = portfolio.summary || {};
   const riskBudget = portfolio.riskBudget || {};
   const portfolioLines = [
     portfolioSummary.totalAssetValue ? `총자산: ${formatKRW(portfolioSummary.totalAssetValue)}` : '',
