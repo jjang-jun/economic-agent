@@ -13,7 +13,7 @@ const {
   formatRiskStatus,
   formatHelp,
 } = require('./response-composer');
-const { createPendingAction, handlePendingActionCallback } = require('./pending-actions');
+const { createPendingAction, handlePendingActionCallback, formatPendingActions } = require('./pending-actions');
 
 function getAllowedChatIds() {
   const privateIds = [
@@ -110,6 +110,13 @@ async function buildResponse(text) {
     };
   }
 
+  if (command === '/pending') {
+    return {
+      intent: 'pending_actions',
+      response: '대기 중인 승인 작업은 Telegram 대화에서만 조회할 수 있습니다.',
+    };
+  }
+
   if (isPendingActionCommand(command)) {
     return {
       intent: 'pending_action_requires_chat',
@@ -145,7 +152,12 @@ async function routeTelegramMessage(message = {}) {
 
   const command = normalizeCommand(text);
   let result;
-  if (isPendingActionCommand(command)) {
+  if (command === '/pending') {
+    result = {
+      intent: 'pending_actions',
+      response: await formatPendingActions(chatId),
+    };
+  } else if (isPendingActionCommand(command)) {
     try {
       const draft = await createPendingAction({ chatId, text });
       result = {

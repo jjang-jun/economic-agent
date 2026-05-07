@@ -493,6 +493,18 @@ async function loadPendingAction(id) {
   return result.rows?.[0] || null;
 }
 
+async function loadPendingActionsForChat(chatId, options = {}) {
+  if (!chatId) return [];
+  const result = await selectRows('pending_actions', {
+    select: '*',
+    chat_id: `eq.${String(chatId)}`,
+    status: `eq.${options.status || 'pending'}`,
+    order: 'created_at.desc',
+    limit: String(options.limit || 5),
+  });
+  return result.rows || [];
+}
+
 function makeId(prefix = 'id') {
   if (globalThis.crypto?.randomUUID) return `${prefix}:${globalThis.crypto.randomUUID()}`;
   return `${prefix}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
@@ -638,6 +650,7 @@ module.exports = {
   persistConversationMessage,
   persistPendingAction,
   loadPendingAction,
+  loadPendingActionsForChat,
   createCollectorRun,
   updateCollectorRun,
   getLastSuccessfulCollectorRun,

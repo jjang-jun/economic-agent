@@ -6,7 +6,7 @@ const {
   applyTradeToPortfolio,
 } = require('../utils/portfolio');
 const { recordTradeExecution, buildTradeExecution } = require('../utils/trade-log');
-const { persistPendingAction, loadPendingAction } = require('../utils/persistence');
+const { persistPendingAction, loadPendingAction, loadPendingActionsForChat } = require('../utils/persistence');
 const {
   loadStoredPortfolio,
   updateStoredCash,
@@ -34,6 +34,27 @@ function buildToken() {
 
 function formatAmount(value) {
   return typeof value === 'number' ? formatKRW(value) : 'n/a';
+}
+
+function describePendingAction(row = {}) {
+  const payload = row.requested_payload || {};
+  if (row.type === 'cash') {
+    return `▸ ${row.id} · 현금 ${formatAmount(payload.cashAmount)} · 만료 ${row.expires_at || 'n/a'}`;
+  }
+  const amount = typeof payload.amount === 'number'
+    ? formatAmount(payload.amount)
+    : formatAmount((payload.quantity || 0) * (payload.price || 0));
+  return `▸ ${row.id} · ${row.type} ${escapeHtml(payload.name || payload.ticker || payload.symbol || '')} ${payload.quantity || '?'}주 @ ${Number(payload.price || 0).toLocaleString('ko-KR')} · ${amount}`;
+}
+
+async function formatPendingActions(chatId) {
+  const rows = await loadPendingActionsForChat(chatId, { status: 'pending', limit: 5 });
+  return [
+    '<b>대기 중인 승인 작업</b>',
+    rows.length > 0
+      ? rows.map(describePendingAction).join('\n')
+      : '대기 중인 작업이 없습니다.',
+  ].join('\n');
 }
 
 function buildTradeDraft({ side, parts }) {
@@ -242,6 +263,7 @@ async function handlePendingActionCallback(data = '', options = {}) {
 
 module.exports = {
   createPendingAction,
+  formatPendingActions,
   handlePendingActionCallback,
   confirmPendingAction,
   cancelPendingAction,

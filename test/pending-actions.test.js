@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { ensureActionUsable } = require('../src/agent/pending-actions');
+const { ensureActionUsable, formatPendingActions } = require('../src/agent/pending-actions');
 
 test('ensureActionUsable rejects callback from a different chat', () => {
   assert.throws(() => ensureActionUsable({
@@ -18,4 +18,11 @@ test('ensureActionUsable accepts matching chat and token', () => {
     confirmation_token: 'token',
     expires_at: new Date(Date.now() + 60_000).toISOString(),
   }, 'token', { chatId: 'private-chat' }));
+});
+
+test('formatPendingActions renders empty state without persistence', async () => {
+  const text = await formatPendingActions('chat');
+
+  assert.match(text, /대기 중인 승인 작업/);
+  assert.match(text, /대기 중인 작업이 없습니다/);
 });

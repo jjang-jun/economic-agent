@@ -103,6 +103,7 @@ function formatHelp() {
     '/buy TICKER 수량 가격 [이름] - 매수 기록 초안',
     '/sell TICKER 수량 가격 [이름] - 매도 기록 초안',
     '/cash 금액 - 현금 잔액 변경 초안',
+    '/pending - 대기 중인 승인 작업 확인',
     '/help - 명령어 보기',
     '',
     '매수/매도/현금 변경은 승인 버튼을 눌러야만 Supabase 포트폴리오에 반영됩니다.',
