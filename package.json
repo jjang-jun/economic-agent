@@ -9,6 +9,7 @@
   "scripts": {
     "start": "node --env-file=.env src/check-news.js",
     "collect:news": "node --env-file-if-exists=.env src/check-news.js",
+    "collector:scheduled": "node --env-file-if-exists=.env scripts/run-scheduled-news-collector.js",
     "digest": "node --env-file=.env src/digest.js",
     "report": "node --env-file=.env src/stock-report.js",
     "evaluate": "node --env-file=.env src/evaluate-recommendations.js",

@@ -1,0 +1,77 @@
+services:
+  - type: web
+    name: economic-agent
+    runtime: node
+    plan: starter
+    region: singapore
+    buildCommand: npm ci
+    startCommand: npm run agent:server
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_SECRET_CHAT_ID
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        sync: false
+      - key: JOB_SECRET
+        sync: false
+      - key: SUPABASE_PROJECT_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: PORTFOLIO_JSON_BASE64
+        sync: false
+      - key: DART_API_KEY
+        sync: false
+      - key: BOK_API_KEY
+        sync: false
+      - key: FRED_API_KEY
+        sync: false
+      - key: KIS_APP_KEY
+        sync: false
+      - key: KIS_APP_SECRET
+        sync: false
+      - key: KIS_BASE_URL
+        value: https://openapi.koreainvestment.com:9443
+      - key: ALPACA_API_KEY_ID
+        sync: false
+      - key: ALPACA_API_SECRET_KEY
+        sync: false
+      - key: ALPACA_DATA_FEED
+        value: iex
+      - key: FMP_BASE_URL
+        value: https://financialmodelingprep.com/stable/
+      - key: FMP_API_KEY
+        sync: false
+
+  - type: cron
+    name: economic-agent-news-collector
+    runtime: node
+    plan: starter
+    region: singapore
+    schedule: "*/5 * * * *"
+    buildCommand: npm ci
+    startCommand: npm run collector:scheduled
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: COLLECTOR_TRIGGER_SOURCE
+        value: render_cron
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: TELEGRAM_SECRET_CHAT_ID
+        sync: false
+      - key: SUPABASE_PROJECT_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: DART_API_KEY
+        sync: false
+      - key: BOK_API_KEY
+        sync: false
+      - key: FRED_API_KEY
+        sync: false

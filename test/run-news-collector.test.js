@@ -5,6 +5,7 @@ const {
   isWithinLookback,
   splitAlerts,
 } = require('../src/jobs/run-news-collector');
+const { isCollectorWindow } = require('../scripts/run-scheduled-news-collector');
 
 test('calculateLookbackMinutes expands window after missed runs', () => {
   const now = new Date('2026-05-07T10:20:00+09:00');
@@ -56,4 +57,10 @@ test('isWithinLookback keeps same-day DART date-only disclosures', () => {
   };
 
   assert.equal(isWithinLookback(article, since), true);
+});
+
+test('isCollectorWindow allows KST weekday collection hours only', () => {
+  assert.equal(isCollectorWindow(new Date('2026-05-07T10:20:00+09:00')), true);
+  assert.equal(isCollectorWindow(new Date('2026-05-07T06:59:00+09:00')), false);
+  assert.equal(isCollectorWindow(new Date('2026-05-09T10:20:00+09:00')), false);
 });

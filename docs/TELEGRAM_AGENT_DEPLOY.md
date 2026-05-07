@@ -63,6 +63,25 @@ curl https://YOUR_AGENT_URL/health
 {"ok":true,"service":"economic-agent","mode":"agent-server"}
 ```
 
+### Render Blueprint
+
+`render.yaml`을 repo root에 추가했다. Render에서 Blueprint로 이 repo를 연결하면 아래 두 서비스가 생성된다.
+
+```text
+economic-agent
+= Telegram webhook용 web service
+
+economic-agent-news-collector
+= 5분마다 실행되는 cron job
+```
+
+Render cron은 `*/5 * * * *`로 실행하지만, `npm run collector:scheduled`가 KST 평일 07:00~23:59 밖에서는 바로 종료한다.
+
+주의:
+- `plan: starter` 기준이라 Render 비용이 발생할 수 있다.
+- `sync: false` 환경변수는 Render Dashboard에서 직접 입력해야 한다.
+- Web service가 뜬 뒤 Telegram webhook URL을 등록해야 한다.
+
 ## 3. Telegram webhook 등록
 
 배포 URL이 `https://YOUR_AGENT_URL`이면 webhook URL은 아래다.
@@ -140,6 +159,16 @@ gcloud scheduler jobs create http economic-agent-news-collector \
 ```
 
 GitHub Actions `news-alert.yml`은 15분 백업 수집기로 남겨둔다. 메인 수집이 장애나도 다음 백업 실행에서 lookback으로 따라잡는다.
+
+### Render Cron 직접 실행 방식
+
+Render Blueprint를 쓰면 HTTP endpoint 호출 대신 cron job이 직접 아래 명령을 실행한다.
+
+```bash
+npm run collector:scheduled
+```
+
+이 방식은 Agent Server URL을 몰라도 되고, 같은 Supabase lock/state를 사용하므로 GitHub Actions 백업 수집기와 겹쳐도 중복 알림을 줄인다.
 
 ## 6. 주의
 

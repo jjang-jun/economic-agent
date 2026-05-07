@@ -243,13 +243,16 @@ Telegram Bot
 - [x] `/buy`, `/sell`, `/cash`를 pending action + 버튼 승인 방식으로 구현
 - [x] Telegram `chat_id` allowlist와 webhook secret 검증
 - [x] Cloud Run 또는 Fly.io/Render 배포 문서 추가
+- [x] Render Blueprint와 5분 cron guard 추가
+- [x] 뉴스 수집 endpoint 수동 검증 스크립트 추가
 
 ## 현재 가장 중요한 다음 작업
-1. Cloud Run/Render/Fly 중 하나로 실제 Agent Server를 배포한다.
-2. FMP profile/financial statement를 보유 미국 종목 분석 리포트에 연결한다.
-3. KRX/공공데이터 일별 종가 백필 provider를 추가한다.
-4. 추천 JSON schema 검증을 추가해 근거, 기준 가격, 손절선, 손익비, 제안 비중이 없는 추천 저장을 차단한다.
-5. `performance-lab.js`와 `behavior-reviewer.js`로 추천/실거래/행동 패턴을 분리 분석한다.
+1. Render Blueprint 또는 Cloud Run으로 실제 Agent Server를 배포한다.
+2. 배포 URL에 Telegram webhook을 등록하고 5분 수집 cron이 `collector_runs`를 쌓는지 확인한다.
+3. FMP profile/financial statement를 보유 미국 종목 분석 리포트에 연결한다.
+4. KRX/공공데이터 일별 종가 백필 provider를 추가한다.
+5. 추천 JSON schema 검증을 추가해 근거, 기준 가격, 손절선, 손익비, 제안 비중이 없는 추천 저장을 차단한다.
+6. `performance-lab.js`와 `behavior-reviewer.js`로 추천/실거래/행동 패턴을 분리 분석한다.
 
 ## 운영 루프
 
