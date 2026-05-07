@@ -42,6 +42,31 @@ async function upsert(table, rows, onConflict) {
   }
 }
 
+async function deleteRows(table, filterParams = {}) {
+  if (!isPersistenceEnabled()) return { deleted: 0, disabled: true };
+  const url = new URL(`/rest/v1/${table}`, SUPABASE_URL);
+  for (const [key, value] of Object.entries(filterParams || {})) {
+    if (value !== undefined && value !== null) {
+      url.searchParams.set(key, value);
+    }
+  }
+
+  try {
+    const res = await fetch(url, {
+      method: 'DELETE',
+      headers: getHeaders('return=minimal'),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`${res.status} ${body}`);
+    }
+    return { deleted: 1 };
+  } catch (err) {
+    console.warn(`[DB] ${table} 삭제 실패: ${err.message}`);
+    return { deleted: 0, error: err };
+  }
+}
+
 async function patchRows(table, filterParams, payload) {
   if (!isPersistenceEnabled()) return { saved: 0, disabled: true };
   const url = new URL(`/rest/v1/${table}`, SUPABASE_URL);
@@ -570,6 +595,8 @@ async function persistAlertEvents(events) {
 module.exports = {
   isPersistenceEnabled,
   selectRows,
+  upsertRows: upsert,
+  deleteRows,
   persistArticles,
   persistDailySummary,
   persistStockReport,

@@ -1,7 +1,17 @@
 const crypto = require('crypto');
-const { loadPortfolio, normalizePortfolio, savePortfolioFile } = require('../utils/portfolio');
+const {
+  loadPortfolio,
+  normalizePortfolio,
+  savePortfolioFile,
+  applyTradeToPortfolio,
+} = require('../utils/portfolio');
 const { recordTradeExecution, buildTradeExecution } = require('../utils/trade-log');
 const { persistPendingAction, loadPendingAction } = require('../utils/persistence');
+const {
+  loadStoredPortfolio,
+  updateStoredCash,
+  applyTradeToStoredPortfolio,
+} = require('../utils/portfolio-store');
 const { formatKRW } = require('../utils/decision-engine');
 const { escapeHtml } = require('./response-composer');
 
@@ -75,13 +85,34 @@ function buildCashDraft(parts) {
   };
 }
 
+async function buildCashDraftAsync(parts) {
+  const cashAmount = parseNumber(parts[1]);
+  if (cashAmount === null || cashAmount < 0) {
+    throw new Error('/cash 형식: /cash 현금잔액');
+  }
+  const stored = await loadStoredPortfolio();
+  const portfolio = stored || normalizePortfolio(loadPortfolio());
+  return {
+    type: 'cash',
+    requestedPayload: {
+      cashAmount,
+      previousCashAmount: portfolio.cashAmount,
+    },
+    preview: [
+      '<b>현금 잔액 변경 초안</b>',
+      `기존 현금: ${formatAmount(portfolio.cashAmount)}`,
+      `변경 현금: ${formatAmount(cashAmount)}`,
+    ].join('\n'),
+  };
+}
+
 async function createPendingAction({ chatId, text }) {
   const parts = getActionCommandParts(text);
   const command = (parts[0] || '').replace(/@[\w_]+$/, '').toLowerCase();
   let draft;
   if (command === '/buy') draft = buildTradeDraft({ side: 'buy', parts });
   else if (command === '/sell') draft = buildTradeDraft({ side: 'sell', parts });
-  else if (command === '/cash') draft = buildCashDraft(parts);
+  else if (command === '/cash') draft = await buildCashDraftAsync(parts);
   else throw new Error('unsupported pending action');
 
   const token = buildToken();
@@ -131,8 +162,12 @@ async function confirmPendingAction(actionId, token) {
   if (row.type === 'buy' || row.type === 'sell') {
     const trade = await recordTradeExecution({
       ...payload,
-      updatePortfolio: true,
+      updatePortfolio: false,
     });
+    const updatedStored = await applyTradeToStoredPortfolio(trade);
+    if (!updatedStored) {
+      savePortfolioFile(applyTradeToPortfolio(normalizePortfolio(loadPortfolio()), trade));
+    }
     await persistPendingAction({
       id: row.id,
       chatId: row.chat_id,
@@ -149,9 +184,12 @@ async function confirmPendingAction(actionId, token) {
   }
 
   if (row.type === 'cash') {
-    const portfolio = normalizePortfolio(loadPortfolio());
-    portfolio.cashAmount = payload.cashAmount;
-    savePortfolioFile(portfolio);
+    const updatedStored = await updateStoredCash(payload.cashAmount);
+    if (!updatedStored) {
+      const portfolio = normalizePortfolio(loadPortfolio());
+      portfolio.cashAmount = payload.cashAmount;
+      savePortfolioFile(portfolio);
+    }
     await persistPendingAction({
       id: row.id,
       chatId: row.chat_id,

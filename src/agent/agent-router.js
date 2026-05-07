@@ -6,6 +6,7 @@ const {
   persistConversationMessage,
   loadLatestPersistedPortfolioSnapshot,
 } = require('../utils/persistence');
+const { loadStoredPortfolio } = require('../utils/portfolio-store');
 const {
   formatPortfolioStatus,
   formatGoalStatus,
@@ -40,6 +41,11 @@ function isPendingActionCommand(command) {
 }
 
 async function getEnrichedPortfolio() {
+  const storedPortfolio = await loadStoredPortfolio();
+  if (storedPortfolio?.cashAmount !== null || (storedPortfolio?.positions || []).length > 0) {
+    return enrichPortfolio(storedPortfolio);
+  }
+
   const rawPortfolio = loadPortfolio();
   if (!rawPortfolio.totalAssetValue && !rawPortfolio.cashAmount && (rawPortfolio.positions || []).length === 0) {
     const persisted = await loadLatestPersistedPortfolioSnapshot();

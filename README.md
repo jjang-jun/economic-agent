@@ -200,12 +200,15 @@ npm run trade:record -- --side buy --ticker 005930 --name 삼성전자 --quantit
 npm run recommendations:list
 npm run action:report
 npm run freedom:report
+npm run portfolio:seed-store
 npm run trade:performance
 npm run review:weekly
 npm run review:monthly
 ```
 
 `trade:record`는 기본적으로 `data/portfolio.json`의 현금, 보유수량, 평균단가를 함께 갱신합니다. 거래만 기록하고 포트폴리오를 건드리지 않으려면 `--noPortfolio`를 붙입니다.
+
+대화형 Agent 배포 후에는 `portfolio:seed-store`로 현재 로컬 포트폴리오를 Supabase `portfolio_accounts`, `positions`에 올립니다. 이후 Telegram `/portfolio`는 Supabase 원본을 우선 읽고, `/cash`, `/buy`, `/sell` 승인도 Supabase 포트폴리오를 갱신합니다. `PORTFOLIO_JSON_BASE64`는 bootstrap/fallback 용도입니다.
 
 ## 추천 생성 원칙
 

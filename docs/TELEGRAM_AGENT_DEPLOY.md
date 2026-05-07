@@ -43,6 +43,14 @@ base64 -i data/portfolio.json
 
 Cloud Run 환경 변수에 넣은 뒤 새 revision으로 재배포한다. Supabase에 최신 `portfolio_snapshots`가 있으면 Agent가 보조 fallback으로 사용하지만, 기준 원본은 `PORTFOLIO_JSON_BASE64`다.
 
+운영 전에는 로컬 포트폴리오를 Supabase 원본 테이블로 seed한다.
+
+```bash
+npm run portfolio:seed-store
+```
+
+이후 `/portfolio`는 Supabase `portfolio_accounts`, `positions`를 우선 읽고, `/cash`, `/buy`, `/sell` 승인도 Supabase를 갱신한다. `PORTFOLIO_JSON_BASE64`는 bootstrap/fallback으로만 남긴다.
+
 ## 2. 배포
 
 컨테이너 기반 플랫폼에 배포한다.
