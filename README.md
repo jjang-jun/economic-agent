@@ -557,6 +557,20 @@ npm run freedom:report
 | Telegram / BOK / FRED / DART API | 무료 |
 | Supabase | 무료 티어로 시작 가능 |
 
+## 수집 신뢰도
+
+뉴스/DART 수집은 두 계층으로 운영합니다.
+
+```text
+Agent Server + Scheduler
+= 5분 메인 수집, POST /jobs/news-collector
+
+GitHub Actions
+= 15분 백업 수집, 브리핑/리포트/평가
+```
+
+GitHub Actions schedule은 지연/누락 가능성이 있으므로 실시간성 수집의 단일 기준으로 쓰지 않습니다. 수집기는 마지막 성공 시각 이후를 겹쳐 조회하고, 오래된 긴급 기사는 즉시 알림 폭탄이 아니라 다이제스트/캐치업으로 넘깁니다.
+
 ## 라이선스
 
 MIT

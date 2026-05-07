@@ -178,6 +178,10 @@ positions
 risk_policy
 conversation_messages
 pending_actions
+collector_runs
+source_cursors
+alert_events
+job_locks
 ```
 
 민감 데이터 원칙:
@@ -204,6 +208,36 @@ pending_actions
 6. `/buy`, `/sell`, `/cash`는 pending action과 버튼 승인 방식으로 구현
 7. Cloud Run 또는 Fly.io/Render 배포
 
+## 수집 런타임
+
+GitHub Actions schedule은 5분 cron을 설정할 수 있지만 정시성과 실행 보장을 기대하면 안 된다. 뉴스와 DART 주요 공시는 다음 계층으로 운영한다.
+
+```text
+Agent Server + Scheduler = 5분 메인 수집
+GitHub Actions = 15분 백업 수집
+GitHub Actions = 브리핑/리포트/평가
+Supabase = 수집 상태와 중복 방지 기준 저장소
+```
+
+메인 수집 endpoint:
+
+```text
+POST /jobs/news-collector
+x-job-secret: <JOB_SECRET>
+x-trigger-source: cloud_scheduler | fly_cron | render_cron
+```
+
+`runNewsCollector()`는 CLI와 HTTP endpoint가 같이 쓰는 공용 job이다. 마지막 성공 실행 이후 시간을 기준으로 lookback window를 계산하고, 기본 30분, 최대 240분까지 뒤로 겹쳐 수집한다. 실행 간격이 벌어진 catch-up run에서는 오래된 score 5 기사를 즉시 알림으로 쏟지 않고 다이제스트/캐치업 버퍼로 넘긴다.
+
+수집 상태 테이블:
+
+```text
+collector_runs = 실행 이력, lookback, 수집/알림 건수, 실패 사유
+source_cursors = 마지막 성공 시각과 마지막 published_at
+alert_events = immediate/digest/catch_up 알림 상태
+job_locks = 동시 실행 방지용 TTL lock
+```
+
 현재 구현:
 - `npm run agent:server`
 - `GET /health`
@@ -214,6 +248,11 @@ pending_actions
 - `TELEGRAM_WEBHOOK_SECRET` 검증
 - `conversation_messages` 저장
 - Telegram inline keyboard 승인/취소
+- `POST /jobs/news-collector`
+- `src/jobs/run-news-collector.js`
+- `collector_runs`, `source_cursors`, `alert_events`, `job_locks`
+- GitHub Actions `news-alert.yml` 15분 백업 수집기 전환
 
 아직 미구현:
 - Cloud Run/Fly/Render 배포 설정
+- Cloud Scheduler/Fly cron/Render cron 5분 메인 수집 연결

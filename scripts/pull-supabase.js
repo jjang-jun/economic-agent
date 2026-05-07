@@ -22,6 +22,10 @@ const TABLES = [
   'price_snapshots',
   'investor_flows',
   'decision_contexts',
+  'collector_runs',
+  'source_cursors',
+  'alert_events',
+  'job_locks',
 ];
 
 function assertConfig() {

@@ -140,11 +140,16 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 로컬 스코어링 보강. 단일 최고 키워드 방식에서 `importanceScore`, `tradabilityScore`, `urgencyScore`, `eventType`, `matchedKeywords`를 계산하는 구조로 변경해 중요 뉴스와 실제 매매 연결 가능 뉴스를 구분.
 - DART 공시 시간 표시 보정. DART 목록 API는 접수 시각이 아니라 접수일만 제공하므로 Telegram 알림에는 `00:00` 대신 `공시일`로 표시.
 - 중복 제거와 스코어링 회귀 테스트 추가. `npm test` 기준 6개 테스트 통과.
+- 뉴스 수집기를 `src/jobs/run-news-collector.js` 공용 job으로 분리. CLI(`npm run collect:news`)와 Agent Server `POST /jobs/news-collector`가 같은 로직을 호출한다.
+- 수집 신뢰도 계층 도입. GitHub Actions `news-alert.yml`은 5분 메인 수집기에서 15분 백업 수집기로 격하하고, 메인 5분 수집은 Agent Server + 외부 Scheduler가 담당하도록 구조 변경. GitHub Actions cron은 timezone 필드가 아니라 UTC cron 두 줄로 KST 평일 07:00~23:00을 표현.
+- 수집 상태 테이블 추가. `collector_runs`, `source_cursors`, `alert_events`, `job_locks` migration/schema를 추가해 lookback, 실행 성공/실패, 알림 이벤트, 동시 실행 방지 상태를 Supabase에 남길 수 있게 함.
+- 마지막 성공 시각 기준 lookback 계산 추가. 기본 30분, 최대 240분, 10분 버퍼로 실행 누락을 따라잡고, catch-up run의 오래된 긴급 기사는 즉시 알림 폭탄 대신 버퍼로 이월.
+- Supabase `20260507110000_add_collector_state.sql` migration 원격 적용 완료.
 
 ## 다음 작업
 
-1. Agent Server 배포 준비: Cloud Run/Fly/Render 중 하나 선택, webhook URL/setWebhook 절차 문서화
-2. Cloud Run/Render/Fly 중 하나로 실제 Agent Server 배포
+1. Cloud Run/Render/Fly 중 하나로 실제 Agent Server 배포
+2. Cloud Scheduler/Fly cron/Render cron으로 `POST /jobs/news-collector` 5분 호출 연결
 3. KRX/공공데이터 일별 종가 백필 provider 추가
 4. 추천 JSON schema 검증 추가: 근거, 기준 가격, 손절선, 손익비, 제안 비중 누락 시 저장 차단
 5. `performance-lab.js`, `behavior-reviewer.js` 추가: 추천/실거래/반복 행동 패턴 분리 분석

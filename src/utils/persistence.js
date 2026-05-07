@@ -42,6 +42,32 @@ async function upsert(table, rows, onConflict) {
   }
 }
 
+async function patchRows(table, filterParams, payload) {
+  if (!isPersistenceEnabled()) return { saved: 0, disabled: true };
+  const url = new URL(`/rest/v1/${table}`, SUPABASE_URL);
+  for (const [key, value] of Object.entries(filterParams || {})) {
+    if (value !== undefined && value !== null) {
+      url.searchParams.set(key, value);
+    }
+  }
+
+  try {
+    const res = await fetch(url, {
+      method: 'PATCH',
+      headers: getHeaders('return=minimal'),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`${res.status} ${body}`);
+    }
+    return { saved: 1 };
+  } catch (err) {
+    console.warn(`[DB] ${table} 갱신 실패: ${err.message}`);
+    return { saved: 0, error: err };
+  }
+}
+
 async function selectRows(table, params = {}) {
   if (!isPersistenceEnabled()) return { rows: null, disabled: true };
 
@@ -424,6 +450,111 @@ async function loadPendingAction(id) {
   return result.rows?.[0] || null;
 }
 
+function makeId(prefix = 'id') {
+  if (globalThis.crypto?.randomUUID) return `${prefix}:${globalThis.crypto.randomUUID()}`;
+  return `${prefix}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+}
+
+async function createCollectorRun(run) {
+  const id = run.id || makeId('collector-run');
+  const row = {
+    id,
+    job_name: run.jobName,
+    trigger_source: run.triggerSource || 'manual',
+    scheduled_at: run.scheduledAt || null,
+    started_at: run.startedAt || new Date().toISOString(),
+    status: 'running',
+    lookback_minutes: run.lookbackMinutes ?? null,
+  };
+  await upsert('collector_runs', [row], 'id');
+  return { id, ...run };
+}
+
+async function updateCollectorRun(id, update) {
+  if (!id) return { saved: 0 };
+  return patchRows('collector_runs', { id: `eq.${id}` }, {
+    finished_at: update.finishedAt || null,
+    status: update.status || 'running',
+    lookback_minutes: update.lookbackMinutes ?? null,
+    rss_fetched_count: update.rssFetchedCount ?? null,
+    dart_fetched_count: update.dartFetchedCount ?? null,
+    new_article_count: update.newArticleCount ?? null,
+    immediate_alert_count: update.immediateAlertCount ?? null,
+    digest_buffer_count: update.digestBufferCount ?? null,
+    error_message: update.errorMessage || null,
+  });
+}
+
+async function getLastSuccessfulCollectorRun(jobName) {
+  const result = await selectRows('collector_runs', {
+    select: 'finished_at',
+    job_name: `eq.${jobName}`,
+    status: 'eq.success',
+    order: 'finished_at.desc',
+    limit: '1',
+  });
+  return result.rows?.[0]?.finished_at || null;
+}
+
+async function upsertSourceCursor(sourceName, cursor = {}) {
+  if (!sourceName) return { saved: 0 };
+  return upsert('source_cursors', [{
+    source_name: sourceName,
+    last_success_at: cursor.lastSuccessAt || null,
+    last_seen_published_at: cursor.lastSeenPublishedAt || null,
+    last_seen_external_id: cursor.lastSeenExternalId || null,
+    updated_at: cursor.updatedAt || new Date().toISOString(),
+  }], 'source_name');
+}
+
+async function tryAcquireJobLock(jobName, options = {}) {
+  if (!isPersistenceEnabled()) return { acquired: true, disabled: true };
+  const now = new Date();
+  const result = await selectRows('job_locks', {
+    select: '*',
+    job_name: `eq.${jobName}`,
+    limit: '1',
+  });
+  const existing = result.rows?.[0];
+  if (existing?.locked_until && new Date(existing.locked_until) > now) {
+    return { acquired: false, lockedUntil: existing.locked_until };
+  }
+
+  const lockedUntil = new Date(now.getTime() + (options.ttlSeconds || 600) * 1000).toISOString();
+  await upsert('job_locks', [{
+    job_name: jobName,
+    locked_until: lockedUntil,
+    locked_by: options.lockedBy || '',
+    updated_at: now.toISOString(),
+  }], 'job_name');
+  return { acquired: true, lockedUntil };
+}
+
+async function releaseJobLock(jobName) {
+  if (!isPersistenceEnabled()) return { saved: 0, disabled: true };
+  return upsert('job_locks', [{
+    job_name: jobName,
+    locked_until: new Date(0).toISOString(),
+    locked_by: '',
+    updated_at: new Date().toISOString(),
+  }], 'job_name');
+}
+
+async function persistAlertEvents(events) {
+  const rows = (events || [])
+    .filter(event => event?.articleId && event?.alertType)
+    .map(event => ({
+      id: event.id || `${event.articleId}:${event.alertType}`,
+      article_id: event.articleId,
+      alert_type: event.alertType,
+      sent_at: event.sentAt || null,
+      telegram_message_id: event.telegramMessageId || null,
+      status: event.status || 'pending',
+      payload: event.payload || {},
+    }));
+  return upsert('alert_events', rows, 'article_id,alert_type');
+}
+
 module.exports = {
   isPersistenceEnabled,
   selectRows,
@@ -445,4 +576,11 @@ module.exports = {
   persistConversationMessage,
   persistPendingAction,
   loadPendingAction,
+  createCollectorRun,
+  updateCollectorRun,
+  getLastSuccessfulCollectorRun,
+  upsertSourceCursor,
+  tryAcquireJobLock,
+  releaseJobLock,
+  persistAlertEvents,
 };
