@@ -5,9 +5,13 @@ const { getArticleKeys, isSimilarArticle } = require('./article-identity');
 const DATA_DIR = path.join(__dirname, '..', '..', 'data');
 const BUFFER_FILE = path.join(DATA_DIR, 'article-buffer.json');
 
+function getBufferFile() {
+  return process.env.ARTICLE_BUFFER_FILE || BUFFER_FILE;
+}
+
 function loadBuffer() {
   try {
-    const data = fs.readFileSync(BUFFER_FILE, 'utf-8');
+    const data = fs.readFileSync(getBufferFile(), 'utf-8');
     return JSON.parse(data);
   } catch {
     return [];
@@ -15,20 +19,22 @@ function loadBuffer() {
 }
 
 function saveBuffer(articles) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(BUFFER_FILE, JSON.stringify(articles, null, 2));
+  const file = getBufferFile();
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify(articles, null, 2));
 }
 
 function addToBuffer(newArticles) {
   const buffer = loadBuffer();
   const existingKeys = new Set(buffer.flatMap(getArticleKeys));
-  const toAdd = newArticles.filter(article => {
+  const toAdd = [];
+  for (const article of newArticles) {
     const keys = getArticleKeys(article);
-    if (keys.some(key => existingKeys.has(key))) return false;
-    if ([...buffer, ...toAdd].some(existing => isSimilarArticle(existing, article))) return false;
+    if (keys.some(key => existingKeys.has(key))) continue;
+    if ([...buffer, ...toAdd].some(existing => isSimilarArticle(existing, article))) continue;
     for (const key of keys) existingKeys.add(key);
-    return true;
-  });
+    toAdd.push(article);
+  }
   buffer.push(...toAdd);
   saveBuffer(buffer);
   return toAdd.length;
