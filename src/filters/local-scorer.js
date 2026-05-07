@@ -111,6 +111,8 @@ function buildScoreDetails(article, text, sectors, sentiment, sentimentConfidenc
  */
 async function scoreArticles(articles) {
   if (articles.length === 0) return [];
+  const finbertEnabled = process.env.DISABLE_FINBERT !== '1'
+    && process.env.FINBERT_ENABLED !== 'false';
 
   // 영문/한국어 분리
   const englishArticles = [];
@@ -126,7 +128,10 @@ async function scoreArticles(articles) {
 
   // 영문 기사: FinBERT 감성 분석
   let finbertResults = [];
-  if (englishArticles.length > 0) {
+  if (!finbertEnabled && englishArticles.length > 0) {
+    console.log(`[FinBERT] 비활성화됨, 영문 기사 ${englishArticles.length}건은 키워드 사전으로 대체`);
+    finbertResults = englishArticles.map(a => ({ ...a, sentiment: null }));
+  } else if (englishArticles.length > 0) {
     try {
       console.log(`[FinBERT] 영문 기사 ${englishArticles.length}건 감성 분석 중...`);
       finbertResults = await analyzeArticlesSentiment(englishArticles);

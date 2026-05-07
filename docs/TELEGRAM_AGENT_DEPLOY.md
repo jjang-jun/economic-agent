@@ -29,6 +29,7 @@ ALPACA_DATA_FEED=iex
 
 FMP_BASE_URL=https://financialmodelingprep.com/stable/
 FMP_API_KEY=...
+DISABLE_FINBERT=1
 ```
 
 `TELEGRAM_SECRET_CHAT_ID`는 개인방 chat id다. 공유방에는 포트폴리오 명령을 열지 않는다.
@@ -50,6 +51,8 @@ npm run portfolio:seed-store
 ```
 
 이후 `/portfolio`는 Supabase `portfolio_accounts`, `positions`를 우선 읽고, `/cash`, `/buy`, `/sell` 승인도 Supabase를 갱신한다. `PORTFOLIO_JSON_BASE64`는 bootstrap/fallback으로만 남긴다.
+
+Cloud Run 수집기는 컨테이너 메모리와 콜드스타트 안정성을 위해 `DISABLE_FINBERT=1`을 기본으로 둔다. 영문 기사는 키워드/사전 감성으로 fallback하고, FinBERT가 필요한 정밀 스코어링은 GitHub Actions 백업 수집기나 로컬 실행에서 사용할 수 있다.
 
 ## 2. 배포
 
