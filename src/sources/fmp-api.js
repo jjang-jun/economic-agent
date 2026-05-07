@@ -20,6 +20,12 @@ function parseNumber(value) {
   return Number.isFinite(num) ? num : null;
 }
 
+function round(value, digits = 4) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  const factor = 10 ** digits;
+  return Math.round(value * factor) / factor;
+}
+
 function buildFmpUrl(endpoint) {
   const base = FMP_BASE_URL.endsWith('/') ? FMP_BASE_URL : `${FMP_BASE_URL}/`;
   return new URL(String(endpoint || '').replace(/^\//, ''), base);
@@ -150,6 +156,84 @@ async function fetchFmpProfile(symbol) {
   }
 }
 
+async function fetchFmpStatement(endpoint, symbol, options = {}) {
+  const ticker = normalizeFmpSymbol(symbol);
+  if (!ticker || !isFmpConfigured()) return [];
+
+  try {
+    const url = buildFmpUrl(endpoint);
+    url.searchParams.set('symbol', ticker);
+    url.searchParams.set('period', options.period || 'annual');
+    url.searchParams.set('limit', String(options.limit || 4));
+    url.searchParams.set('apikey', FMP_API_KEY);
+
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.warn(`[FMP] ${ticker} ${endpoint} 조회 실패: ${err.message}`);
+    return [];
+  }
+}
+
+function calculateGrowthPct(current, previous) {
+  const left = parseNumber(current);
+  const right = parseNumber(previous);
+  if (typeof left !== 'number' || typeof right !== 'number' || right === 0) return null;
+  return round(((left - right) / Math.abs(right)) * 100, 2);
+}
+
+function buildFmpFundamentalSummary({ income = [], cashFlow = [], ratios = [] } = {}) {
+  const latestIncome = income[0] || {};
+  const previousIncome = income[1] || {};
+  const latestCashFlow = cashFlow[0] || {};
+  const latestRatios = ratios[0] || {};
+  const revenue = parseNumber(latestIncome.revenue);
+  const netIncome = parseNumber(latestIncome.netIncome);
+  const freeCashFlow = parseNumber(
+    latestCashFlow.freeCashFlow
+      ?? (
+        parseNumber(latestCashFlow.operatingCashFlow) !== null && parseNumber(latestCashFlow.capitalExpenditure) !== null
+          ? parseNumber(latestCashFlow.operatingCashFlow) - Math.abs(parseNumber(latestCashFlow.capitalExpenditure))
+          : null
+      )
+  );
+
+  return {
+    fiscalDate: latestIncome.date || latestCashFlow.date || latestRatios.date || '',
+    fiscalYear: latestIncome.fiscalYear || latestCashFlow.fiscalYear || latestRatios.fiscalYear || '',
+    revenue,
+    revenueGrowthYoYPct: calculateGrowthPct(revenue, previousIncome.revenue),
+    netIncome,
+    netIncomeGrowthYoYPct: calculateGrowthPct(netIncome, previousIncome.netIncome),
+    freeCashFlow,
+    freeCashFlowMarginPct: revenue && typeof freeCashFlow === 'number'
+      ? round((freeCashFlow / revenue) * 100, 2)
+      : null,
+    grossProfitMarginPct: typeof latestRatios.grossProfitMargin === 'number' ? round(latestRatios.grossProfitMargin * 100, 2) : null,
+    operatingProfitMarginPct: typeof latestRatios.operatingProfitMargin === 'number' ? round(latestRatios.operatingProfitMargin * 100, 2) : null,
+    debtToEquity: parseNumber(latestRatios.debtToEquityRatio ?? latestRatios.debtEquityRatio),
+    currentRatio: parseNumber(latestRatios.currentRatio),
+    peRatio: parseNumber(latestRatios.priceToEarningsRatio ?? latestRatios.peRatio),
+    source: 'fmp-statements',
+  };
+}
+
+async function fetchFmpFundamentalSummary(symbol, options = {}) {
+  const ticker = normalizeFmpSymbol(symbol);
+  if (!ticker || !isFmpConfigured()) return null;
+  const requestOptions = { period: options.period || 'annual', limit: options.limit || 4 };
+  const [income, cashFlow, ratios] = await Promise.all([
+    fetchFmpStatement('income-statement', ticker, requestOptions),
+    fetchFmpStatement('cash-flow-statement', ticker, requestOptions),
+    fetchFmpStatement('ratios', ticker, requestOptions),
+  ]);
+  if (income.length === 0 && cashFlow.length === 0 && ratios.length === 0) return null;
+  return buildFmpFundamentalSummary({ income, cashFlow, ratios });
+}
+
 module.exports = {
   isFmpConfigured,
   normalizeFmpSymbol,
@@ -157,4 +241,7 @@ module.exports = {
   rowToFmpEodQuote,
   fetchFmpDailyOhlcv,
   fetchFmpProfile,
+  fetchFmpStatement,
+  buildFmpFundamentalSummary,
+  fetchFmpFundamentalSummary,
 };

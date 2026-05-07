@@ -167,10 +167,11 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 해외 종목 후보에 FMP `fundamental_profile` 연결. 리스크 리뷰가 비활성 거래 종목을 차단하고, 고베타/ADR/미국 소형주/ETF 노출을 경고로 표시. Telegram 종목 리포트에는 섹터, 시가총액, beta를 함께 표시.
 - Telegram `/pending` 명령 추가. private 채팅에서 최근 대기 중인 `/buy`, `/sell`, `/cash` 승인 초안을 조회할 수 있어 승인 전 상태를 확인 가능.
 - Telegram `/recommendations` 명령 추가. 최근 추천 ID, 진입가, 손절가, 제안금액을 확인하고 `/buy ... rec=추천ID` 형태로 실제 거래 기록과 추천을 연결 가능.
+- FMP 재무제표 요약 연결. 해외 후보의 `fundamental_profile.statements`에 매출/순이익 YoY, FCF 마진, 마진율, D/E, current ratio, P/E를 저장하고, 역성장/음수 FCF/높은 D/E를 리스크 리뷰 경고로 표시.
 
 ## 다음 작업
 
 1. KRX Open API 공식 일별/통계 검증 provider 추가
 2. Telegram `/buy`, `/sell`, `/cash` 실제 private 채팅 end-to-end 운영 검증
-3. FMP 재무제표/실적 추이와 earnings calendar를 종목 후보 스키마에 연결
+3. FMP earnings calendar를 종목 후보 스키마와 이벤트 리스크에 연결
 4. Telegram 추천 ID 연결 거래의 실제 end-to-end 운영 검증

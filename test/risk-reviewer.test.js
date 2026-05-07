@@ -49,3 +49,24 @@ test('reviewStock warns on high beta and ADR profile', () => {
   assert.ok(review.warnings.some(item => item.includes('ADR')));
   assert.ok(review.warnings.some(item => item.includes('미국 소형주')));
 });
+
+test('reviewStock warns on weak financial statement trends', () => {
+  const review = reviewStock({
+    ...baseStock,
+    fundamental_profile: {
+      source: 'fmp-profile',
+      isActivelyTrading: true,
+      statements: {
+        revenueGrowthYoYPct: -3,
+        netIncomeGrowthYoYPct: -10,
+        freeCashFlowMarginPct: -1,
+        debtToEquity: 2.5,
+      },
+    },
+  }, { market: { regime: 'RISK_ON', tags: [] } });
+
+  assert.ok(review.warnings.some(item => item.includes('매출 역성장')));
+  assert.ok(review.warnings.some(item => item.includes('순이익 감소')));
+  assert.ok(review.warnings.some(item => item.includes('FCF 마진 음수')));
+  assert.ok(review.warnings.some(item => item.includes('부채비율 주의')));
+});

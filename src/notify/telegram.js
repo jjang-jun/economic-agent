@@ -218,6 +218,7 @@ function formatStockReport(report) {
     const profile = s.risk_profile || {};
     const market = s.market_profile || {};
     const fundamental = s.fundamental_profile || {};
+    const statements = fundamental.statements || {};
     const review = s.risk_review || {};
     const entry = profile.entryReferencePrice ? `기준매수가 ${formatPrice(profile.entryReferencePrice)}` : '';
     const stopPrice = profile.stopLossPrice ? `손절가 ${formatPrice(profile.stopLossPrice)}` : '';
@@ -239,11 +240,13 @@ function formatStockReport(report) {
       ? `시총 $${round(fundamental.marketCapUsd / 1_000_000_000, 1)}B`
       : '';
     const beta = typeof fundamental.beta === 'number' ? `beta ${fundamental.beta}` : '';
+    const revenueGrowth = typeof statements.revenueGrowthYoYPct === 'number' ? `매출YoY ${statements.revenueGrowthYoYPct}%` : '';
+    const fcfMargin = typeof statements.freeCashFlowMarginPct === 'number' ? `FCF마진 ${statements.freeCashFlowMarginPct}%` : '';
     const tradeable = review.action === 'watch_only' || profile.tradeable === false ? '거래불가/관찰' : '';
     const invalidation = profile.invalidation ? `\n무효화: ${escapeHtml(profile.invalidation)}` : '';
     const blockers = (review.blockers || []).slice(0, 2).map(item => `\n차단: ${escapeHtml(item)}`).join('');
     const warnings = (review.warnings || []).slice(0, 1).map(item => `\n주의: ${escapeHtml(item)}`).join('');
-    const riskProfile = [entry, stopPrice, rr, stop, size, rs, volume, high, sector, marketCap, beta, tradeable].filter(Boolean).join(' · ');
+    const riskProfile = [entry, stopPrice, rr, stop, size, rs, volume, high, sector, marketCap, beta, revenueGrowth, fcfMargin, tradeable].filter(Boolean).join(' · ');
     return `${icon.bar} <b>${escapeHtml(s.name)}</b>${ticker}  [${icon.label}${conviction}]\n└ ${escapeHtml(s.reason)}${riskProfile ? `\n└ ${escapeHtml(riskProfile)}` : ''}${invalidation}${blockers}${warnings}${risk}`;
   });
 

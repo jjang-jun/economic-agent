@@ -9,6 +9,7 @@ function reviewStock(stock, decision = {}) {
   const positionSize = profile.positionSize || profile.position_size || {};
   const market = stock.market_profile || {};
   const fundamental = stock.fundamental_profile || stock.fundamentalProfile || {};
+  const statements = fundamental.statements || {};
   const marketRegime = decision.market?.regime || 'UNKNOWN';
   const marketTags = decision.market?.tags || [];
   const factors = [];
@@ -55,6 +56,18 @@ function reviewStock(stock, decision = {}) {
   }
   if (fundamental.isEtf === true) {
     warnings.push('ETF: 개별 기업 재무보다 보유자산/섹터 노출 기준으로 검토');
+  }
+  if (typeof statements.revenueGrowthYoYPct === 'number' && statements.revenueGrowthYoYPct < 0) {
+    warnings.push(`매출 역성장: YoY ${statements.revenueGrowthYoYPct}%`);
+  }
+  if (typeof statements.netIncomeGrowthYoYPct === 'number' && statements.netIncomeGrowthYoYPct < 0) {
+    warnings.push(`순이익 감소: YoY ${statements.netIncomeGrowthYoYPct}%`);
+  }
+  if (typeof statements.freeCashFlowMarginPct === 'number' && statements.freeCashFlowMarginPct < 0) {
+    warnings.push(`FCF 마진 음수: ${statements.freeCashFlowMarginPct}%`);
+  }
+  if (typeof statements.debtToEquity === 'number' && statements.debtToEquity > 2) {
+    warnings.push(`부채비율 주의: D/E ${statements.debtToEquity}`);
   }
 
   const approved = blockers.length === 0 && profile.tradeable !== false;
