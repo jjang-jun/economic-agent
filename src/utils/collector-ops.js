@@ -68,6 +68,37 @@ function summarizeCollectorOps(runs = [], alerts = []) {
   };
 }
 
+function buildCollectorOpsAnomalies(summary = {}, options = {}) {
+  const maxFailedRuns = options.maxFailedRuns ?? 0;
+  const minSuccessRatePct = options.minSuccessRatePct ?? 90;
+  const maxPendingCatchUp = options.maxPendingCatchUp ?? 0;
+  const maxFailedImmediate = options.maxFailedImmediate ?? 0;
+  const maxLookbackMinutes = options.maxLookbackMinutes ?? 90;
+  const anomalies = [];
+
+  if ((summary.failedRuns || 0) > maxFailedRuns) {
+    anomalies.push(`수집 실패 ${summary.failedRuns}건`);
+  }
+  if (
+    typeof summary.successRatePct === 'number'
+    && summary.completedRuns >= 3
+    && summary.successRatePct < minSuccessRatePct
+  ) {
+    anomalies.push(`수집 성공률 ${summary.successRatePct}%`);
+  }
+  if ((summary.alertEvents?.failedImmediate || 0) > maxFailedImmediate) {
+    anomalies.push(`즉시 알림 실패 ${summary.alertEvents.failedImmediate}건`);
+  }
+  if ((summary.alertEvents?.pendingCatchUp || 0) > maxPendingCatchUp) {
+    anomalies.push(`catch-up 대기 ${summary.alertEvents.pendingCatchUp}건`);
+  }
+  if ((summary.maxLookbackMinutes || 0) > maxLookbackMinutes) {
+    anomalies.push(`최대 lookback ${summary.maxLookbackMinutes}분`);
+  }
+
+  return anomalies;
+}
+
 async function buildCollectorOpsSummary({ days = 7 } = {}) {
   const since = startIso(days);
   const [runResult, alertResult] = await Promise.all([
@@ -90,5 +121,6 @@ async function buildCollectorOpsSummary({ days = 7 } = {}) {
 
 module.exports = {
   summarizeCollectorOps,
+  buildCollectorOpsAnomalies,
   buildCollectorOpsSummary,
 };

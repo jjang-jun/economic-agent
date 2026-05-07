@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { summarizeCollectorOps } = require('../src/utils/collector-ops');
+const { summarizeCollectorOps, buildCollectorOpsAnomalies } = require('../src/utils/collector-ops');
 
 test('summarizeCollectorOps reports run health and pending alerts', () => {
   const summary = summarizeCollectorOps([
@@ -32,4 +32,25 @@ test('summarizeCollectorOps reports run health and pending alerts', () => {
   assert.equal(summary.avgLookbackMinutes, 37.5);
   assert.equal(summary.alertEvents.pendingCatchUp, 1);
   assert.equal(summary.healthLabel, 'failed');
+});
+
+test('buildCollectorOpsAnomalies flags unhealthy collector state', () => {
+  const anomalies = buildCollectorOpsAnomalies({
+    completedRuns: 5,
+    failedRuns: 1,
+    successRatePct: 80,
+    maxLookbackMinutes: 120,
+    alertEvents: {
+      failedImmediate: 1,
+      pendingCatchUp: 2,
+    },
+  });
+
+  assert.deepEqual(anomalies, [
+    '수집 실패 1건',
+    '수집 성공률 80%',
+    '즉시 알림 실패 1건',
+    'catch-up 대기 2건',
+    '최대 lookback 120분',
+  ]);
 });

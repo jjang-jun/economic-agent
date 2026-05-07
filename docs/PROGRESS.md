@@ -160,10 +160,11 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 로컬 대시보드 확장. `npm run dashboard` 결과 HTML에 추천 평가 품질, 미실행 추천 평균 성과, 행동 경고, Cloud Run/Scheduler 수집 운영 상태를 표시.
 - Telegram `/help` 최신화. `/buy`, `/sell`, `/cash` 문법과 승인 버튼이 있어야 Supabase 포트폴리오에 반영된다는 운영 원칙을 명시.
 - 추천 성과 평가를 국내 EOD 가격 계층에 연결. 국내 종목 1일/5일/20일 평가는 가능한 경우 공공데이터/KIS 일봉의 평가 대상일 종가와 high/low history를 사용하고, source/priceType/targetDate를 evaluation payload에 남김.
+- `collector:ops-report`와 `collector-ops-report.yml` 추가. 평일 23:50 KST에 최근 1일 수집 성공률, 실패, lookback, 즉시 알림 실패, catch-up 대기 이상치를 private Telegram으로 전송.
 
 ## 다음 작업
 
 1. KRX Open API 공식 일별/통계 검증 provider 추가
 2. Telegram `/buy`, `/sell`, `/cash` end-to-end 운영 검증
-3. Cloud Run/Cloud Scheduler 운영 로그 이상치 알림: 연속 실패, digest pending 과다, catch-up 누적
-4. 해외 주식 평가용 EOD provider(Tiingo/Alpha/FMP) 연결
+3. 해외 주식 평가용 EOD provider(Tiingo/Alpha/FMP) 연결
+4. Cloud Run 수집기에서 pending digest/catch-up 정리 정책 추가
