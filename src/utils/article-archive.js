@@ -29,6 +29,7 @@ function normalizeArticle(article) {
     summary: article.summary || '',
     link: article.link || '',
     pubDate: article.pubDate || '',
+    pubDatePrecision: article.pubDatePrecision || 'datetime',
     source: article.source || '',
     score: article.score,
     sentiment: article.sentiment || 'neutral',

@@ -53,6 +53,7 @@ function normalizeDisclosure(item) {
     pubDate: item.rcept_dt
       ? `${item.rcept_dt.slice(0, 4)}-${item.rcept_dt.slice(4, 6)}-${item.rcept_dt.slice(6, 8)}T00:00:00+09:00`
       : new Date().toISOString(),
+    pubDatePrecision: item.rcept_dt ? 'date' : 'datetime',
     source: 'DART',
     highPriority: isImportantDisclosure(reportName),
     disclosure: {

@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { getArticleKeys } = require('./article-identity');
+const { getArticleKeys, isSimilarArticle } = require('./article-identity');
 
 const DATA_DIR = path.join(__dirname, '..', '..', 'data');
 const BUFFER_FILE = path.join(DATA_DIR, 'article-buffer.json');
@@ -25,6 +25,7 @@ function addToBuffer(newArticles) {
   const toAdd = newArticles.filter(article => {
     const keys = getArticleKeys(article);
     if (keys.some(key => existingKeys.has(key))) return false;
+    if ([...buffer, ...toAdd].some(existing => isSimilarArticle(existing, article))) return false;
     for (const key of keys) existingKeys.add(key);
     return true;
   });

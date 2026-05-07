@@ -10,6 +10,7 @@ const { persistArticles } = require('./utils/persistence');
 const { dedupeArticles, isSeenArticle, markSeenArticle } = require('./utils/article-identity');
 
 const { scoreArticles } = require('./filters/local-scorer');
+const { URGENT_SCORE, MAX_URGENT_ALERTS_PER_RUN } = require('./utils/config');
 
 async function main() {
   console.log(`[${new Date().toISOString()}] 뉴스 수집 시작`);
@@ -50,18 +51,29 @@ async function main() {
   console.log(`[아카이브] 점수화 기사 ${archived}건 신규 저장`);
   await persistArticles(scored);
 
-  // 4. 긴급(5점)은 개인 관련성 필터 후 즉시 알림, 나머지는 버퍼에 저장
-  const urgent = filterByRelevance(scored.filter(a => a.score >= 5));
-  const normal = scored.filter(a => a.score < 5);
+  // 4. 긴급은 상위 일부만 즉시 알림, 나머지는 버퍼에 저장
+  const urgent = filterByRelevance(scored.filter(a => a.score >= URGENT_SCORE))
+    .sort((a, b) => (
+      (b.urgencyScore || 0) - (a.urgencyScore || 0)
+      || (b.importanceScore || 0) - (a.importanceScore || 0)
+      || (b.tradabilityScore || 0) - (a.tradabilityScore || 0)
+      || new Date(b.pubDate || 0) - new Date(a.pubDate || 0)
+    ));
+  const urgentToSend = urgent.slice(0, MAX_URGENT_ALERTS_PER_RUN);
+  const urgentOverflow = urgent.slice(MAX_URGENT_ALERTS_PER_RUN);
+  const normal = scored.filter(a => a.score < URGENT_SCORE);
 
   console.log(`[관련성] 긴급 ${urgent.length}건`);
+  if (urgentOverflow.length > 0) {
+    console.log(`[긴급제한] 즉시 전송 ${urgentToSend.length}건, 다이제스트 이월 ${urgentOverflow.length}건`);
+  }
 
-  if (urgent.length > 0) {
-    const sent = await notifyArticles(urgent);
+  if (urgentToSend.length > 0) {
+    const sent = await notifyArticles(urgentToSend);
     console.log(`[긴급알림] ${sent}건 즉시 전송`);
   }
 
-  const added = addToBuffer(normal);
+  const added = addToBuffer(dedupeArticles([...urgentOverflow, ...normal]));
   console.log(`[버퍼] ${added}건 추가 (다이제스트 대기)`);
 
   // 6. seen 업데이트

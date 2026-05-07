@@ -60,14 +60,20 @@ function formatMessage(article) {
     .map(t => `#${t}`);
   const tags = [...sectorTags, ...relevanceTags].join(' ');
 
-  const date = new Date(article.pubDate).toLocaleString('ko-KR', {
-    timeZone: 'Asia/Seoul',
-    month: '2-digit',
-    day: '2-digit',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: false,
-  });
+  const date = article.pubDatePrecision === 'date'
+    ? `${new Date(article.pubDate).toLocaleDateString('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      month: '2-digit',
+      day: '2-digit',
+    })} 공시일`
+    : new Date(article.pubDate).toLocaleString('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      month: '2-digit',
+      day: '2-digit',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: false,
+    });
 
   // 영문 기사는 번역 제목 사용
   const displayTitle = article.titleKo || article.title;
