@@ -1,6 +1,6 @@
 # Telegram Agent Deploy
 
-Telegram 채팅창에서 `/portfolio`, `/goal`, `/risk`, `/buy`, `/sell`, `/cash`, `/pending`을 쓰려면 Agent 서버가 외부 HTTPS URL에서 항상 떠 있어야 한다.
+Telegram 채팅창에서 `/portfolio`, `/goal`, `/risk`, `/buy`, `/sell`, `/cash`, `/pending`, `/recommendations`를 쓰려면 Agent 서버가 외부 HTTPS URL에서 항상 떠 있어야 한다.
 
 ## 1. 필요한 환경 변수
 

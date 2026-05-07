@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { ensureActionUsable, formatPendingActions } = require('../src/agent/pending-actions');
+const { ensureActionUsable, formatPendingActions, parseTradeMetadata } = require('../src/agent/pending-actions');
 
 test('ensureActionUsable rejects callback from a different chat', () => {
   assert.throws(() => ensureActionUsable({
@@ -25,4 +25,15 @@ test('formatPendingActions renders empty state without persistence', async () =>
 
   assert.match(text, /대기 중인 승인 작업/);
   assert.match(text, /대기 중인 작업이 없습니다/);
+});
+
+test('parseTradeMetadata separates recommendation id from display name', () => {
+  assert.deepEqual(
+    parseTradeMetadata(['삼성전자', 'rec=2026-05-07:005930:bullish']),
+    { name: '삼성전자', recommendationId: '2026-05-07:005930:bullish' }
+  );
+  assert.deepEqual(
+    parseTradeMetadata(['Netflix', '--rec', 'rec-1']),
+    { name: 'Netflix', recommendationId: 'rec-1' }
+  );
 });

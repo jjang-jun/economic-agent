@@ -36,6 +36,32 @@ function formatAmount(value) {
   return typeof value === 'number' ? formatKRW(value) : 'n/a';
 }
 
+function parseTradeMetadata(tokens = []) {
+  const nameTokens = [];
+  let recommendationId = '';
+
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    const lower = String(token || '').toLowerCase();
+    if (['--rec', '--recommendation', '--recommendationid'].includes(lower)) {
+      recommendationId = tokens[i + 1] || '';
+      i++;
+      continue;
+    }
+    const match = String(token || '').match(/^(?:--)?(?:rec|recommendation|recommendationId)=(.+)$/i);
+    if (match) {
+      recommendationId = match[1];
+      continue;
+    }
+    nameTokens.push(token);
+  }
+
+  return {
+    name: nameTokens.join(' '),
+    recommendationId,
+  };
+}
+
 function describePendingAction(row = {}) {
   const payload = row.requested_payload || {};
   if (row.type === 'cash') {
@@ -61,9 +87,9 @@ function buildTradeDraft({ side, parts }) {
   const ticker = parts[1] || '';
   const quantity = parseNumber(parts[2]);
   const price = parseNumber(parts[3]);
-  const name = parts.slice(4).join(' ');
+  const { name, recommendationId } = parseTradeMetadata(parts.slice(4));
   if (!ticker || !quantity || !price) {
-    throw new Error(`/${side} 형식: /${side} TICKER 수량 가격 [이름]`);
+    throw new Error(`/${side} 형식: /${side} TICKER 수량 가격 [이름] [rec=추천ID]`);
   }
   const trade = buildTradeExecution({
     side,
@@ -71,6 +97,7 @@ function buildTradeDraft({ side, parts }) {
     quantity,
     price,
     name,
+    recommendationId,
     notes: 'telegram-agent',
   });
   return {
@@ -82,6 +109,7 @@ function buildTradeDraft({ side, parts }) {
       `수량: ${quantity}`,
       `단가: ${Number(price).toLocaleString('ko-KR')}`,
       `금액: ${formatAmount(trade.amount)}`,
+      recommendationId ? `추천 연결: ${escapeHtml(recommendationId)}` : '추천 연결: 없음',
     ].join('\n'),
   };
 }
@@ -264,6 +292,7 @@ async function handlePendingActionCallback(data = '', options = {}) {
 module.exports = {
   createPendingAction,
   formatPendingActions,
+  parseTradeMetadata,
   handlePendingActionCallback,
   confirmPendingAction,
   cancelPendingAction,

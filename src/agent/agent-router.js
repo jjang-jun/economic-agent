@@ -14,6 +14,7 @@ const {
   formatHelp,
 } = require('./response-composer');
 const { createPendingAction, handlePendingActionCallback, formatPendingActions } = require('./pending-actions');
+const { formatRecentRecommendations } = require('./recommendations-view');
 
 function getAllowedChatIds() {
   const privateIds = [
@@ -117,6 +118,13 @@ async function buildResponse(text) {
     };
   }
 
+  if (command === '/recommendations' || command === '/recs') {
+    return {
+      intent: 'recent_recommendations_requires_chat',
+      response: '최근 추천 목록은 Telegram 대화에서만 조회할 수 있습니다.',
+    };
+  }
+
   if (isPendingActionCommand(command)) {
     return {
       intent: 'pending_action_requires_chat',
@@ -156,6 +164,11 @@ async function routeTelegramMessage(message = {}) {
     result = {
       intent: 'pending_actions',
       response: await formatPendingActions(chatId),
+    };
+  } else if (command === '/recommendations' || command === '/recs') {
+    result = {
+      intent: 'recent_recommendations',
+      response: await formatRecentRecommendations({ limit: 5 }),
     };
   } else if (isPendingActionCommand(command)) {
     try {
