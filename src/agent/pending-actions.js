@@ -123,7 +123,7 @@ async function createPendingAction({ chatId, text }) {
     status: 'pending',
     requestedPayload: draft.requestedPayload,
     riskReview: {
-      note: '승인 전 초안입니다. 실제 주문이 아니라 로컬 거래/현금 기록만 반영합니다.',
+      note: '승인 전 초안입니다. 실제 주문이 아니라 Supabase 포트폴리오/거래 기록만 반영합니다.',
     },
     confirmationToken: token,
     expiresAt: expiresAt(),

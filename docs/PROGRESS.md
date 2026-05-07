@@ -158,10 +158,11 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 공공데이터포털 주식시세정보 provider 추가. 국내 EOD 가격은 `data-go-kr`를 우선 사용하고 KIS 일봉 fallback으로 `price_snapshots`에 백필할 수 있으며, `npm run prices:backfill-eod -- 005930,000660 2026-05-01 2026-05-07` 명령을 추가.
 - 수집 운영 리뷰 추가. 주간/월간 성과 리뷰가 `collector_runs`와 `alert_events`를 조회해 Cloud Run/Scheduler 성공률, 실패 건수, lookback, 즉시 알림/다이제스트 대기 상태를 Telegram 점검 항목으로 표시.
 - 로컬 대시보드 확장. `npm run dashboard` 결과 HTML에 추천 평가 품질, 미실행 추천 평균 성과, 행동 경고, Cloud Run/Scheduler 수집 운영 상태를 표시.
+- Telegram `/help` 최신화. `/buy`, `/sell`, `/cash` 문법과 승인 버튼이 있어야 Supabase 포트폴리오에 반영된다는 운영 원칙을 명시.
 
 ## 다음 작업
 
 1. KRX Open API 공식 일별/통계 검증 provider 추가
-2. Telegram `/buy`, `/sell`, `/cash` end-to-end 운영 검증과 문구 개선
+2. Telegram `/buy`, `/sell`, `/cash` end-to-end 운영 검증
 3. Cloud Run/Cloud Scheduler 운영 로그 이상치 알림: 연속 실패, digest pending 과다, catch-up 누적
 4. 추천 평가 EOD 가격을 `price_snapshots` 공식 종가와 연결
