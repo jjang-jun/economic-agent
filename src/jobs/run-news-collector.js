@@ -15,6 +15,7 @@ const {
   tryAcquireJobLock,
   releaseJobLock,
   persistAlertEvents,
+  loadAlertEventsForArticles,
 } = require('../utils/persistence');
 const { dedupeArticles, isSeenArticle, markSeenArticle } = require('../utils/article-identity');
 const { scoreArticles } = require('../filters/local-scorer');
@@ -82,6 +83,34 @@ function splitAlerts(urgent, { now, isCatchUpRun }) {
     ],
     catchUp,
   };
+}
+
+function alertKey(articleId, alertType) {
+  return `${articleId}:${alertType}`;
+}
+
+function buildExistingAlertSets(rows = []) {
+  const sent = new Set();
+  const active = new Set();
+
+  for (const row of rows) {
+    const key = alertKey(row.article_id, row.alert_type);
+    if (row.status === 'sent') sent.add(key);
+    if (['sent', 'pending'].includes(row.status)) active.add(key);
+  }
+
+  return { sent, active };
+}
+
+function filterUnsentImmediateAlerts(articles = [], existingAlerts) {
+  return articles.filter(article => !existingAlerts.sent.has(alertKey(article.id, 'immediate')));
+}
+
+function filterUnqueuedAlerts(articles = [], existingAlerts) {
+  return articles.filter(article => {
+    const type = article.alertType || 'digest';
+    return !existingAlerts.active.has(alertKey(article.id, type));
+  });
 }
 
 async function runNewsCollector(options = {}) {
@@ -181,32 +210,45 @@ async function runNewsCollector(options = {}) {
       ));
     const normal = scored.filter(a => a.score < URGENT_SCORE);
     const alertSplit = splitAlerts(urgent, { now, isCatchUpRun });
+    const existingAlerts = buildExistingAlertSets(
+      await loadAlertEventsForArticles(scored.map(article => article.id))
+    );
+    const immediateToSend = filterUnsentImmediateAlerts(alertSplit.immediate, existingAlerts);
+    const suppressedImmediateCount = alertSplit.immediate.length - immediateToSend.length;
+    const overflowToQueue = filterUnqueuedAlerts(alertSplit.overflow, existingAlerts);
+    const normalToQueue = filterUnqueuedAlerts(
+      normal.map(article => ({ ...article, alertType: 'digest' })),
+      existingAlerts
+    );
 
     console.log(`[관련성] 긴급 ${urgent.length}건`);
+    if (suppressedImmediateCount > 0) {
+      console.log(`[중복알림] 이미 전송한 즉시 알림 ${suppressedImmediateCount}건 생략`);
+    }
     if (alertSplit.overflow.length > 0) {
-      console.log(`[긴급제한] 즉시 전송 ${alertSplit.immediate.length}건, 다이제스트/캐치업 이월 ${alertSplit.overflow.length}건`);
+      console.log(`[긴급제한] 즉시 전송 후보 ${immediateToSend.length}건, 다이제스트/캐치업 이월 ${overflowToQueue.length}건`);
     }
 
     let sent = 0;
-    if (alertSplit.immediate.length > 0) {
-      sent = await notifyArticles(alertSplit.immediate);
+    if (immediateToSend.length > 0) {
+      sent = await notifyArticles(immediateToSend);
       console.log(`[긴급알림] ${sent}건 즉시 전송`);
     }
     await persistAlertEvents([
-      ...alertSplit.immediate.map((article, index) => ({
+      ...immediateToSend.map((article, index) => ({
         articleId: article.id,
         alertType: 'immediate',
         status: index < sent ? 'sent' : 'failed',
         sentAt: index < sent ? new Date().toISOString() : null,
         payload: article,
       })),
-      ...alertSplit.overflow.map(article => ({
+      ...overflowToQueue.map(article => ({
         articleId: article.id,
         alertType: article.alertType || 'digest',
         status: 'pending',
         payload: article,
       })),
-      ...normal.map(article => ({
+      ...normalToQueue.map(article => ({
         articleId: article.id,
         alertType: 'digest',
         status: 'pending',
@@ -214,7 +256,7 @@ async function runNewsCollector(options = {}) {
       })),
     ]);
 
-    const added = addToBuffer(dedupeArticles([...alertSplit.overflow, ...normal]));
+    const added = addToBuffer(dedupeArticles([...overflowToQueue, ...normalToQueue]));
     console.log(`[버퍼] ${added}건 추가 (다이제스트 대기)`);
 
     for (const article of newArticles) markSeenArticle(article, seen);
@@ -267,4 +309,7 @@ module.exports = {
   calculateLookbackMinutes,
   isWithinLookback,
   splitAlerts,
+  buildExistingAlertSets,
+  filterUnsentImmediateAlerts,
+  filterUnqueuedAlerts,
 };

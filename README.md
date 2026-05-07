@@ -493,7 +493,9 @@ module.exports = {
 
 ### 가격 데이터
 
-가격 조회는 `src/sources/price-provider.js`를 통해 호출합니다. 국내 6자리 종목코드는 한국투자증권 Open API REST를 1차로 사용하고, 키가 없거나 실패하면 Naver Finance, 마지막으로 Yahoo Finance fallback을 사용합니다. 국내 현재가가 KIS 또는 Naver에서 확인된 경우 Yahoo의 국내 history 기반 5일/20일 수익률은 사용하지 않습니다.
+가격 조회는 `src/sources/price-provider.js`를 통해 호출합니다. 국내 6자리 종목코드는 장중/현재가에서는 한국투자증권 Open API REST를 1차로 사용하고, 키가 없거나 실패하면 Naver Finance, 마지막으로 Yahoo Finance fallback을 사용합니다. 국내 현재가가 KIS 또는 Naver에서 확인된 경우 Yahoo의 국내 history 기반 5일/20일 수익률은 사용하지 않습니다.
+
+추천 성과 평가와 백테스트용 일별 종가는 현재가와 분리합니다. 국내 EOD 가격은 공공데이터포털 주식시세정보(`data-go-kr`)를 우선 사용하고, 없으면 KIS 일봉으로 fallback합니다. KRX Open API는 공식 일별/통계 검증 계층으로 추가할 예정입니다.
 
 해외 주식은 Alpaca Market Data, FMP, Alpha Vantage, Tiingo EOD, Yahoo fallback 순서로 조회합니다. 키가 없는 provider는 자동으로 건너뛰므로 초기에는 Yahoo fallback으로 계속 동작하고, `FMP_API_KEY`를 넣으면 미국 기업 재무/실적 분석까지 확장할 수 있습니다. 미국 장중 실시간 알림이 중요해지면 Alpaca WebSocket 또는 Massive를 별도 실시간 계층으로 추가합니다.
 
@@ -517,9 +519,18 @@ ALPACA_DATA_FEED=iex
 FMP_API_KEY=...
 ALPHA_VANTAGE_API_KEY=...
 TIINGO_API_TOKEN=...
+
+# 국내 EOD 백필 선택 provider
+DATA_GO_KR_API_KEY=...
 ```
 
 KIS 접근토큰은 발급 제한이 있으므로 런타임에서 `data/kis-token.json`에 캐시합니다. 현재가 조회는 기본 1.1초 간격으로 직렬화합니다.
+
+국내 일별 종가를 Supabase `price_snapshots`에 백필하려면:
+
+```bash
+npm run prices:backfill-eod -- 005930,000660 2026-05-01 2026-05-07
+```
 
 KIS WebSocket은 장중 실시간 체결/호가 알림용입니다. 현재 운영은 REST 현재가/일봉을 우선 사용하고, WebSocket은 항상 켜진 Agent Server가 생긴 뒤 별도 모듈로 붙입니다.
 

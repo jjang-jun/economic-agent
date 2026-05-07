@@ -24,6 +24,7 @@
     "portfolio:snapshot": "node --env-file=.env scripts/portfolio-snapshot.js",
     "portfolio:seed-store": "node --env-file=.env scripts/seed-portfolio-store.js",
     "portfolio:sync-secret": "bash scripts/sync-portfolio-secret.sh",
+    "prices:backfill-eod": "node --env-file=.env scripts/backfill-eod-prices.js",
     "agent:server": "node --env-file-if-exists=.env src/server/index.js",
     "telegram:set-webhook": "node --env-file-if-exists=.env scripts/set-telegram-webhook.js",
     "collector:call": "node --env-file-if-exists=.env scripts/call-news-collector.js",

@@ -154,10 +154,12 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - Cloud Run Agent Server 운영 시작. `/health`, Telegram webhook, `/jobs/news-collector` 동작 확인. Cloud Scheduler가 5분 메인 수집을 담당하고 GitHub Actions는 백업 수집기로 유지.
 - Cloud Run 메모리를 1GiB로 상향하고 `DISABLE_FINBERT=1` 적용. 5분 메인 수집은 안정성 우선으로 키워드/사전 감성을 사용하고, FinBERT는 GitHub Actions/로컬/배치 분석에서 사용.
 - Supabase 포트폴리오 원본 전환. `portfolio_accounts`, `positions`를 `/portfolio` 우선 저장소로 쓰고 `/cash`, `/buy`, `/sell` 승인 시 Supabase 포트폴리오를 갱신. `PORTFOLIO_JSON_BASE64`는 bootstrap/fallback으로 격하.
+- Cloud Run 중복 알림 방지 보강. 로컬 `seen-articles` 파일에만 의존하지 않고 Telegram 전송 전에 Supabase `alert_events`의 `sent`/`pending` 상태를 조회해 이미 보낸 즉시 알림과 이미 큐에 들어간 다이제스트 항목을 제외.
+- 공공데이터포털 주식시세정보 provider 추가. 국내 EOD 가격은 `data-go-kr`를 우선 사용하고 KIS 일봉 fallback으로 `price_snapshots`에 백필할 수 있으며, `npm run prices:backfill-eod -- 005930,000660 2026-05-01 2026-05-07` 명령을 추가.
 
 ## 다음 작업
 
-1. KRX/공공데이터 일별 종가 백필 provider 추가
+1. KRX Open API 공식 일별/통계 검증 provider 추가
 2. 성과 리뷰를 로컬 대시보드에 시각화: 추천 품질, 미실행 추천 성과, 행동 경고 추세
 3. Telegram `/buy`, `/sell`, `/cash` end-to-end 운영 검증과 문구 개선
 4. Cloud Run/Cloud Scheduler 운영 로그를 주간 리뷰에 요약

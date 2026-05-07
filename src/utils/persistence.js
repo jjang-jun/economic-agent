@@ -118,6 +118,12 @@ async function selectRows(table, params = {}) {
   }
 }
 
+function postgrestIn(values = []) {
+  const unique = [...new Set(values.filter(Boolean).map(String))];
+  const escaped = unique.map(value => `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`);
+  return `in.(${escaped.join(',')})`;
+}
+
 function articleRow(article, date = getKSTDate()) {
   return {
     id: article.id,
@@ -592,6 +598,22 @@ async function persistAlertEvents(events) {
   return upsert('alert_events', rows, 'article_id,alert_type');
 }
 
+async function loadAlertEventsForArticles(articleIds = []) {
+  const ids = [...new Set((articleIds || []).filter(Boolean).map(String))];
+  if (ids.length === 0) return [];
+
+  const rows = [];
+  for (let i = 0; i < ids.length; i += 100) {
+    const batch = ids.slice(i, i + 100);
+    const result = await selectRows('alert_events', {
+      select: 'article_id,alert_type,status,sent_at',
+      article_id: postgrestIn(batch),
+    });
+    if (result.rows) rows.push(...result.rows);
+  }
+  return rows;
+}
+
 module.exports = {
   isPersistenceEnabled,
   selectRows,
@@ -623,4 +645,5 @@ module.exports = {
   tryAcquireJobLock,
   releaseJobLock,
   persistAlertEvents,
+  loadAlertEventsForArticles,
 };

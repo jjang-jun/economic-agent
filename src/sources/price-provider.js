@@ -1,6 +1,7 @@
 const { PRICE_SOURCE_POLICY } = require('../config/price-source-policy');
-const { fetchKisCurrentPrice, normalizeKisTicker } = require('./kis-api');
+const { fetchKisCurrentPrice, fetchKisDailyOhlcv, normalizeKisTicker } = require('./kis-api');
 const { fetchNaverQuote } = require('./naver-finance');
+const { fetchDataGoKrEodPrice, fetchDataGoKrDailyOhlcv } = require('./data-go-kr-stocks');
 const { fetchAlpacaQuote } = require('./alpaca-api');
 const { fetchFmpQuote } = require('./fmp-api');
 const { fetchAlphaVantageQuote } = require('./alpha-vantage-api');
@@ -47,6 +48,36 @@ async function persistQuoteSnapshot(quote, requestedSymbol) {
   await persistPriceSnapshots([snapshot]);
 }
 
+function kisDailyRowToQuote(row, ticker) {
+  const code = normalizeKisTicker(ticker);
+  if (!code || typeof row?.close !== 'number') return null;
+  const date = String(row.date || '');
+  const marketTime = /^\d{8}$/.test(date)
+    ? new Date(`${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T15:30:00+09:00`).toISOString()
+    : new Date().toISOString();
+
+  return {
+    symbol: `${code}.KS`,
+    ticker: code,
+    name: '',
+    market: 'KR',
+    price: row.close,
+    open: row.open ?? null,
+    high: row.high ?? null,
+    low: row.low ?? null,
+    close: row.close,
+    volume: row.volume ?? null,
+    tradingValue: row.tradingValue ?? null,
+    currency: 'KRW',
+    priceType: 'eod',
+    isRealtime: false,
+    isAdjusted: false,
+    marketTime,
+    source: 'kis-rest',
+    raw: row,
+  };
+}
+
 async function fetchDomesticCurrentPrice(ticker) {
   const sources = PRICE_SOURCE_POLICY.currentPrice.domestic;
 
@@ -62,6 +93,44 @@ async function fetchDomesticCurrentPrice(ticker) {
     }
   }
   return null;
+}
+
+async function fetchDomesticEodPrice(ticker, date) {
+  const sources = PRICE_SOURCE_POLICY.eodOfficial.domestic;
+
+  for (const source of sources) {
+    let quote = null;
+    if (source === 'data-go-kr') quote = await fetchDataGoKrEodPrice(ticker, date);
+    if (source === 'kis-rest') {
+      const rows = await fetchKisDailyOhlcv(ticker, date, date);
+      quote = kisDailyRowToQuote(rows.at(-1), ticker);
+    }
+    if (quote) {
+      quote.sourcePriority = sources;
+      await persistQuoteSnapshot(quote, ticker);
+      return quote;
+    }
+  }
+  return null;
+}
+
+async function fetchDomesticDailyOhlcv(ticker, from, to) {
+  const sources = PRICE_SOURCE_POLICY.eodOfficial.domestic;
+
+  for (const source of sources) {
+    let rows = [];
+    if (source === 'data-go-kr') rows = await fetchDataGoKrDailyOhlcv(ticker, from, to);
+    if (source === 'kis-rest') {
+      const kisRows = await fetchKisDailyOhlcv(ticker, from, to);
+      rows = kisRows.map(row => kisDailyRowToQuote(row, ticker)).filter(Boolean);
+    }
+    if (rows.length > 0) {
+      const snapshots = rows.map(row => toPriceSnapshot({ ...row, sourcePriority: sources }, ticker)).filter(Boolean);
+      await persistPriceSnapshots(snapshots);
+      return rows;
+    }
+  }
+  return [];
 }
 
 async function fetchGlobalCurrentPrice(ticker) {
@@ -94,6 +163,17 @@ async function fetchCurrentPrice(ticker) {
   return fetchGlobalCurrentPrice(rawTicker);
 }
 
+async function fetchOfficialEodPrice(ticker, date) {
+  const rawTicker = String(ticker || '').trim();
+  if (!rawTicker) return null;
+
+  if (isDomesticTicker(rawTicker)) {
+    return fetchDomesticEodPrice(rawTicker, date);
+  }
+
+  return null;
+}
+
 async function fetchBenchmarkQuote() {
   const quote = await fetchYahooBenchmarkQuote();
   if (quote) await persistQuoteSnapshot(quote, '^KS11');
@@ -105,6 +185,9 @@ module.exports = {
   fetchCurrentPrice,
   fetchBenchmarkQuote,
   fetchGlobalCurrentPrice,
+  fetchDomesticEodPrice,
+  fetchDomesticDailyOhlcv,
+  fetchOfficialEodPrice,
   normalizeYahooSymbol,
   isDomesticTicker,
   toPriceSnapshot,

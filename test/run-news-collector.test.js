@@ -4,6 +4,9 @@ const {
   calculateLookbackMinutes,
   isWithinLookback,
   splitAlerts,
+  buildExistingAlertSets,
+  filterUnsentImmediateAlerts,
+  filterUnqueuedAlerts,
 } = require('../src/jobs/run-news-collector');
 const { isCollectorWindow } = require('../scripts/run-scheduled-news-collector');
 
@@ -63,4 +66,21 @@ test('isCollectorWindow allows KST weekday collection hours only', () => {
   assert.equal(isCollectorWindow(new Date('2026-05-07T10:20:00+09:00')), true);
   assert.equal(isCollectorWindow(new Date('2026-05-07T06:59:00+09:00')), false);
   assert.equal(isCollectorWindow(new Date('2026-05-09T10:20:00+09:00')), false);
+});
+
+test('sent alert events suppress duplicate immediate Telegram sends', () => {
+  const existing = buildExistingAlertSets([
+    { article_id: 'a1', alert_type: 'immediate', status: 'sent' },
+    { article_id: 'a2', alert_type: 'digest', status: 'pending' },
+  ]);
+
+  assert.deepEqual(
+    filterUnsentImmediateAlerts([{ id: 'a1' }, { id: 'a3' }], existing).map(article => article.id),
+    ['a3']
+  );
+  assert.deepEqual(
+    filterUnqueuedAlerts([{ id: 'a2', alertType: 'digest' }, { id: 'a3', alertType: 'digest' }], existing)
+      .map(article => article.id),
+    ['a3']
+  );
 });
