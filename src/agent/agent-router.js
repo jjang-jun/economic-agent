@@ -2,7 +2,10 @@ const crypto = require('crypto');
 const { loadPortfolio, enrichPortfolio, loadLatestPortfolioSnapshot } = require('../utils/portfolio');
 const { buildFreedomStatus } = require('../utils/freedom-engine');
 const strategyPolicy = require('../config/strategy-policy');
-const { persistConversationMessage } = require('../utils/persistence');
+const {
+  persistConversationMessage,
+  loadLatestPersistedPortfolioSnapshot,
+} = require('../utils/persistence');
 const {
   formatPortfolioStatus,
   formatGoalStatus,
@@ -37,11 +40,21 @@ function isPendingActionCommand(command) {
 }
 
 async function getEnrichedPortfolio() {
-  const portfolio = await enrichPortfolio(loadPortfolio());
+  const rawPortfolio = loadPortfolio();
+  if (!rawPortfolio.totalAssetValue && !rawPortfolio.cashAmount && (rawPortfolio.positions || []).length === 0) {
+    const persisted = await loadLatestPersistedPortfolioSnapshot();
+    const snapshot = persisted.rows?.[0];
+    if (snapshot?.totalAssetValue) return snapshot;
+  }
+
+  const portfolio = await enrichPortfolio(rawPortfolio);
   const missingMarketValues = (portfolio.positions || []).some(position => !position.marketValue);
   if (missingMarketValues) {
     const latest = loadLatestPortfolioSnapshot();
     if (latest?.totalAssetValue) return latest;
+    const persisted = await loadLatestPersistedPortfolioSnapshot();
+    const snapshot = persisted.rows?.[0];
+    if (snapshot?.totalAssetValue) return snapshot;
   }
   return portfolio;
 }

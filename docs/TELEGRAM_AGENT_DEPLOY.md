@@ -35,6 +35,14 @@ FMP_API_KEY=...
 
 `JOB_SECRET`은 Scheduler가 `POST /jobs/news-collector`를 호출할 때 쓰는 공유 secret이다. Telegram secret과 다르게 둔다.
 
+`PORTFOLIO_JSON_BASE64`가 없으면 컨테이너에는 로컬 `data/portfolio.json`이 포함되지 않으므로 `/portfolio`가 0원으로 보일 수 있다. 로컬에서 아래 명령으로 GitHub secret과 같은 값을 만들 수 있다.
+
+```bash
+base64 -i data/portfolio.json
+```
+
+Cloud Run 환경 변수에 넣은 뒤 새 revision으로 재배포한다. Supabase에 최신 `portfolio_snapshots`가 있으면 Agent가 보조 fallback으로 사용하지만, 기준 원본은 `PORTFOLIO_JSON_BASE64`다.
+
 ## 2. 배포
 
 컨테이너 기반 플랫폼에 배포한다.

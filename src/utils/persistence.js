@@ -288,6 +288,18 @@ async function persistPortfolioSnapshot(snapshot) {
   }], 'id');
 }
 
+async function loadLatestPersistedPortfolioSnapshot() {
+  const result = await selectRows('portfolio_snapshots', {
+    select: 'payload',
+    order: 'captured_at.desc',
+    limit: '1',
+  });
+  if (!result.rows) return result;
+  return {
+    rows: result.rows.map(row => row.payload).filter(Boolean),
+  };
+}
+
 async function persistMarketSnapshots(snapshots, session = '', capturedAt = new Date().toISOString()) {
   const rows = (snapshots || [])
     .filter(item => item && item.symbol)
@@ -567,6 +579,7 @@ module.exports = {
   persistTradeExecutions,
   loadPersistedTradeExecutions,
   persistPortfolioSnapshot,
+  loadLatestPersistedPortfolioSnapshot,
   persistMarketSnapshots,
   persistPriceSnapshots,
   persistInvestorFlow,
