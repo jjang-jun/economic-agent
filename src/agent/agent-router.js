@@ -43,7 +43,16 @@ function isPendingActionCommand(command) {
 async function getEnrichedPortfolio() {
   const storedPortfolio = await loadStoredPortfolio();
   if (storedPortfolio?.cashAmount !== null || (storedPortfolio?.positions || []).length > 0) {
-    return enrichPortfolio(storedPortfolio);
+    const portfolio = await enrichPortfolio(storedPortfolio);
+    const missingMarketValues = (portfolio.positions || []).some(position => !position.marketValue);
+    if (!missingMarketValues) return portfolio;
+
+    const latest = loadLatestPortfolioSnapshot();
+    if (latest?.totalAssetValue) return latest;
+    const persisted = await loadLatestPersistedPortfolioSnapshot();
+    const snapshot = persisted.rows?.[0];
+    if (snapshot?.totalAssetValue) return snapshot;
+    return portfolio;
   }
 
   const rawPortfolio = loadPortfolio();
