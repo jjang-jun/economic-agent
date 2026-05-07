@@ -495,7 +495,7 @@ module.exports = {
 
 가격 조회는 `src/sources/price-provider.js`를 통해 호출합니다. 국내 6자리 종목코드는 장중/현재가에서는 한국투자증권 Open API REST를 1차로 사용하고, 키가 없거나 실패하면 Naver Finance, 마지막으로 Yahoo Finance fallback을 사용합니다. 국내 현재가가 KIS 또는 Naver에서 확인된 경우 Yahoo의 국내 history 기반 5일/20일 수익률은 사용하지 않습니다.
 
-추천 성과 평가와 백테스트용 일별 종가는 현재가와 분리합니다. 국내 EOD 가격은 공공데이터포털 주식시세정보(`data-go-kr`)를 우선 사용하고, 없으면 KIS 일봉으로 fallback합니다. KRX Open API는 공식 일별/통계 검증 계층으로 추가할 예정입니다.
+추천 성과 평가와 백테스트용 일별 종가는 현재가와 분리합니다. 국내 EOD 가격은 공공데이터포털 주식시세정보(`data-go-kr`)를 우선 사용하고, 없으면 KIS 일봉으로 fallback합니다. 추천 1일/5일/20일 평가는 가능한 경우 평가 대상일의 EOD 가격과 EOD high/low history로 수익률, MFE/MAE, 손절/목표 터치 여부를 계산합니다. KRX Open API는 공식 일별/통계 검증 계층으로 추가할 예정입니다.
 
 해외 주식은 Alpaca Market Data, FMP, Alpha Vantage, Tiingo EOD, Yahoo fallback 순서로 조회합니다. 키가 없는 provider는 자동으로 건너뛰므로 초기에는 Yahoo fallback으로 계속 동작하고, `FMP_API_KEY`를 넣으면 미국 기업 재무/실적 분석까지 확장할 수 있습니다. 미국 장중 실시간 알림이 중요해지면 Alpaca WebSocket 또는 Massive를 별도 실시간 계층으로 추가합니다.
 

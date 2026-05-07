@@ -1,7 +1,13 @@
 const fs = require('fs');
 const path = require('path');
 const { getKSTDate } = require('./article-archive');
-const { fetchCurrentPrice, fetchBenchmarkQuote, normalizeYahooSymbol } = require('../sources/price-provider');
+const {
+  fetchCurrentPrice,
+  fetchBenchmarkQuote,
+  fetchDomesticDailyOhlcv,
+  normalizeYahooSymbol,
+  isDomesticTicker,
+} = require('../sources/price-provider');
 const {
   persistRecommendations,
   persistRecommendationEvaluations,
@@ -85,6 +91,8 @@ async function buildRecommendation(stock, articles, indicators, date) {
           price: quote.price,
           currency: quote.currency,
           marketTime: quote.marketTime,
+          source: quote.source || '',
+          priceType: quote.priceType || 'current',
         }
       : null,
     benchmark: benchmark
@@ -98,6 +106,65 @@ async function buildRecommendation(stock, articles, indicators, date) {
     evaluations: {},
     status: quote ? 'open' : 'missing_price',
   };
+}
+
+function addKstDays(date, days) {
+  const start = new Date(`${date}T00:00:00+09:00`);
+  start.setDate(start.getDate() + days);
+  return start.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+}
+
+function historyFromEodRows(rows = []) {
+  return rows.map(row => ({
+    date: row.marketTime || row.date || '',
+    close: row.close ?? row.price,
+    high: row.high,
+    low: row.low,
+    volume: row.volume,
+  })).filter(row => typeof row.close === 'number');
+}
+
+function buildEodEvaluationQuote(rows = [], requestedSymbol = '') {
+  const sorted = [...rows]
+    .filter(row => typeof row?.price === 'number')
+    .sort((a, b) => new Date(a.marketTime || 0) - new Date(b.marketTime || 0));
+  const latest = sorted.at(-1);
+  if (!latest) return null;
+
+  return {
+    ...latest,
+    symbol: latest.symbol || requestedSymbol,
+    price: latest.price,
+    priceType: latest.priceType || 'eod',
+    isRealtime: false,
+    history: historyFromEodRows(sorted),
+  };
+}
+
+async function fetchEvaluationQuote(recommendation, day) {
+  const targetDate = addKstDays(recommendation.date, day);
+  const symbol = recommendation.symbol || recommendation.ticker;
+
+  if (isDomesticTicker(symbol)) {
+    const rows = await fetchDomesticDailyOhlcv(symbol, recommendation.date, targetDate);
+    const quote = buildEodEvaluationQuote(rows, symbol);
+    if (quote) {
+      return {
+        ...quote,
+        evaluationTargetDate: targetDate,
+        evaluationPriceMode: 'official_eod',
+      };
+    }
+  }
+
+  const quote = await fetchCurrentPrice(symbol);
+  return quote
+    ? {
+        ...quote,
+        evaluationTargetDate: targetDate,
+        evaluationPriceMode: 'current_fallback',
+      }
+    : null;
 }
 
 async function logRecommendations(report, context = {}) {
@@ -224,13 +291,13 @@ async function evaluateRecommendations() {
     );
     if (dueTargets.length === 0) continue;
 
-    const [quote, benchmarkQuote] = await Promise.all([
-      fetchCurrentPrice(recommendation.symbol),
-      recommendation.benchmark?.symbol ? fetchCurrentPrice(recommendation.benchmark.symbol) : null,
-    ]);
-    if (!quote) continue;
+    const benchmarkQuote = recommendation.benchmark?.symbol
+      ? await fetchCurrentPrice(recommendation.benchmark.symbol)
+      : null;
 
     for (const day of dueTargets) {
+      const quote = await fetchEvaluationQuote(recommendation, day);
+      if (!quote) continue;
       const result = calculateReturn(
         recommendation.signal,
         recommendation.entry.price,
@@ -242,6 +309,10 @@ async function evaluateRecommendations() {
         price: quote.price,
         currency: quote.currency,
         marketTime: quote.marketTime,
+        source: quote.source || '',
+        priceType: quote.priceType || '',
+        priceMode: quote.evaluationPriceMode || '',
+        targetDate: quote.evaluationTargetDate || addKstDays(recommendation.date, day),
         ...result,
         ...getEvaluationStats(recommendation, quote),
       };
@@ -284,6 +355,10 @@ module.exports = {
   evaluateRecommendations,
   calculateReturn,
   calculateBenchmarkReturn,
+  addKstDays,
+  historyFromEodRows,
+  buildEodEvaluationQuote,
+  fetchEvaluationQuote,
   getEvaluationStats,
   getResultLabel,
 };
