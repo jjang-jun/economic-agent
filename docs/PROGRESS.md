@@ -145,6 +145,9 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 수집 상태 테이블 추가. `collector_runs`, `source_cursors`, `alert_events`, `job_locks` migration/schema를 추가해 lookback, 실행 성공/실패, 알림 이벤트, 동시 실행 방지 상태를 Supabase에 남길 수 있게 함.
 - 마지막 성공 시각 기준 lookback 계산 추가. 기본 30분, 최대 240분, 10분 버퍼로 실행 누락을 따라잡고, catch-up run의 오래된 긴급 기사는 즉시 알림 폭탄 대신 버퍼로 이월.
 - Supabase `20260507110000_add_collector_state.sql` migration 원격 적용 완료.
+- `npm run collector:call` 추가. 배포된 Agent Server의 `POST /jobs/news-collector` endpoint를 `JOB_SECRET`으로 수동 검증할 수 있음.
+- 운영 배포 보안 보강. `NODE_ENV=production`에서 `JOB_SECRET`이 없으면 `/jobs/news-collector`가 500으로 실패하도록 fail-closed 처리.
+- 로컬 Agent Server smoke 확인 완료. `/health` 정상 응답, production에서 `JOB_SECRET` 미설정 수집 endpoint 차단 확인.
 
 ## 다음 작업
 

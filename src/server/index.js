@@ -41,6 +41,10 @@ async function requestHandler(req, res) {
   if (req.method === 'POST' && url.pathname === '/jobs/news-collector') {
     const expectedSecret = process.env.JOB_SECRET || process.env.NEWS_COLLECTOR_JOB_SECRET;
     const providedSecret = req.headers['x-job-secret'];
+    if (!expectedSecret && process.env.NODE_ENV === 'production') {
+      sendJson(res, 500, { ok: false, error: 'job secret is not configured' });
+      return;
+    }
     if (expectedSecret && providedSecret !== expectedSecret) {
       sendJson(res, 401, { ok: false, error: 'unauthorized' });
       return;

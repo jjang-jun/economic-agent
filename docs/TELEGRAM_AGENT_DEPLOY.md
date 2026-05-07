@@ -15,6 +15,7 @@ SUPABASE_PROJECT_URL=...
 SUPABASE_PUBLISHABLE_KEY=...
 
 PORT=3000
+JOB_SECRET=...
 
 PORTFOLIO_JSON_BASE64=...
 
@@ -31,6 +32,8 @@ FMP_API_KEY=...
 ```
 
 `TELEGRAM_SECRET_CHAT_ID`는 개인방 chat id다. 공유방에는 포트폴리오 명령을 열지 않는다.
+
+`JOB_SECRET`은 Scheduler가 `POST /jobs/news-collector`를 호출할 때 쓰는 공유 secret이다. Telegram secret과 다르게 둔다.
 
 ## 2. 배포
 
@@ -94,9 +97,54 @@ npm run telegram:set-webhook -- https://YOUR_AGENT_URL/telegram/webhook
 
 `/cash`, `/buy`, `/sell`은 바로 반영되지 않고 `기록하기`/`취소` 버튼을 보여준다.
 
-## 5. 주의
+## 5. 뉴스 수집 Scheduler 연결
+
+메인 5분 수집은 Agent Server의 아래 endpoint를 호출한다.
+
+```text
+POST https://YOUR_AGENT_URL/jobs/news-collector
+x-job-secret: <JOB_SECRET>
+x-trigger-source: cloud_scheduler
+```
+
+로컬에서 배포 서버를 수동 검증:
+
+```bash
+AGENT_BASE_URL=https://YOUR_AGENT_URL JOB_SECRET=... npm run collector:call
+```
+
+정상 응답 예:
+
+```json
+{
+  "ok": true,
+  "newArticleCount": 0,
+  "immediateAlertCount": 0,
+  "digestBufferCount": 0,
+  "lookbackMinutes": 30
+}
+```
+
+### Cloud Run + Cloud Scheduler 예시
+
+Cloud Run에는 이 repo의 `Dockerfile`을 배포한다. 서비스 URL이 정해지면 Cloud Scheduler가 5분마다 HTTP POST를 보낸다.
+
+```bash
+gcloud scheduler jobs create http economic-agent-news-collector \
+  --schedule="2/5 7-23 * * 1-5" \
+  --time-zone="Asia/Seoul" \
+  --uri="https://YOUR_AGENT_URL/jobs/news-collector" \
+  --http-method=POST \
+  --headers="x-job-secret=YOUR_JOB_SECRET,x-trigger-source=cloud_scheduler" \
+  --attempt-deadline=180s
+```
+
+GitHub Actions `news-alert.yml`은 15분 백업 수집기로 남겨둔다. 메인 수집이 장애나도 다음 백업 실행에서 lookback으로 따라잡는다.
+
+## 6. 주의
 
 - Agent 서버는 실제 주문을 넣지 않는다.
 - `/buy`, `/sell`은 거래 기록과 로컬 포트폴리오 갱신만 수행한다.
 - Telegram webhook은 HTTPS URL만 사용할 수 있다.
 - 로컬 `localhost`는 Telegram에서 접근할 수 없다.
+- `JOB_SECRET`이 없으면 `/jobs/news-collector` endpoint는 인증 없이 열릴 수 있으므로 운영 배포에는 반드시 설정한다.
