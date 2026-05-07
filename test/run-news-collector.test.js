@@ -71,7 +71,7 @@ test('isCollectorWindow allows KST weekday collection hours only', () => {
 test('sent alert events suppress duplicate immediate Telegram sends', () => {
   const existing = buildExistingAlertSets([
     { article_id: 'a1', alert_type: 'immediate', status: 'sent' },
-    { article_id: 'a2', alert_type: 'digest', status: 'pending' },
+    { article_id: 'a2', alert_type: 'digest', status: 'buffered' },
   ]);
 
   assert.deepEqual(

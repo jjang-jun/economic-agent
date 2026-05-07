@@ -96,7 +96,7 @@ function buildExistingAlertSets(rows = []) {
   for (const row of rows) {
     const key = alertKey(row.article_id, row.alert_type);
     if (row.status === 'sent') sent.add(key);
-    if (['sent', 'pending'].includes(row.status)) active.add(key);
+    if (['sent', 'pending', 'buffered'].includes(row.status)) active.add(key);
   }
 
   return { sent, active };
@@ -245,13 +245,13 @@ async function runNewsCollector(options = {}) {
       ...overflowToQueue.map(article => ({
         articleId: article.id,
         alertType: article.alertType || 'digest',
-        status: 'pending',
+        status: 'buffered',
         payload: article,
       })),
       ...normalToQueue.map(article => ({
         articleId: article.id,
         alertType: 'digest',
-        status: 'pending',
+        status: 'buffered',
         payload: article,
       })),
     ]);

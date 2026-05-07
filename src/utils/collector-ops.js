@@ -56,8 +56,8 @@ function summarizeCollectorOps(runs = [], alerts = []) {
       total: alerts.length,
       sentImmediate: alertByTypeStatus['immediate:sent'] || 0,
       failedImmediate: alertByTypeStatus['immediate:failed'] || 0,
-      pendingDigest: alertByTypeStatus['digest:pending'] || 0,
-      pendingCatchUp: alertByTypeStatus['catch_up:pending'] || 0,
+      pendingDigest: (alertByTypeStatus['digest:pending'] || 0) + (alertByTypeStatus['digest:buffered'] || 0),
+      pendingCatchUp: (alertByTypeStatus['catch_up:pending'] || 0) + (alertByTypeStatus['catch_up:buffered'] || 0),
     },
     recentFailures: failed.slice(0, 3).map(run => ({
       startedAt: run.started_at,
@@ -71,7 +71,7 @@ function summarizeCollectorOps(runs = [], alerts = []) {
 function buildCollectorOpsAnomalies(summary = {}, options = {}) {
   const maxFailedRuns = options.maxFailedRuns ?? 0;
   const minSuccessRatePct = options.minSuccessRatePct ?? 90;
-  const maxPendingCatchUp = options.maxPendingCatchUp ?? 0;
+  const maxPendingCatchUp = options.maxPendingCatchUp ?? 20;
   const maxFailedImmediate = options.maxFailedImmediate ?? 0;
   const maxLookbackMinutes = options.maxLookbackMinutes ?? 90;
   const anomalies = [];
