@@ -589,6 +589,8 @@ function formatPerformanceReview(review) {
   const missed = lab.missedRecommendationQuality || {};
   const behavior = review.behaviorReview || {};
   const tradeBehavior = behavior.tradeReview || {};
+  const collector = review.collectorOps || {};
+  const alerts = collector.alertEvents || {};
   const freedom = review.freedomStatus || {};
   const notes = (review.notes || []).map(item => `▸ ${escapeHtml(item)}`);
   return [
@@ -603,6 +605,9 @@ function formatPerformanceReview(review) {
     `실제 거래: ${trade.total ?? 0}건 · 추천 연결 ${trade.linked ?? 0}건 (${trade.linkedRatePct ?? 'n/a'}%)`,
     tradeBehavior.buyTrades
       ? `행동 점검: 미연결 매수 ${tradeBehavior.unlinkedBuys ?? 0}건 · 차단후보 매수 ${tradeBehavior.watchOnlyBuys ?? 0}건`
+      : '',
+    collector.totalRuns
+      ? `수집 운영: 성공 ${collector.successfulRuns ?? 0}/${collector.completedRuns ?? collector.totalRuns} · 실패 ${collector.failedRuns ?? 0} · 즉시 ${collector.totalImmediateAlerts ?? 0} · 대기 digest ${alerts.pendingDigest ?? 0}/catch-up ${alerts.pendingCatchUp ?? 0}`
       : '',
     notes.length > 0 ? [`<b>점검</b>`, ...notes].join('\n') : '',
   ].filter(Boolean).join('\n');

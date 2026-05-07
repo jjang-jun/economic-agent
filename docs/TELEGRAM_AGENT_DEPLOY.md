@@ -17,8 +17,6 @@ SUPABASE_PUBLISHABLE_KEY=...
 PORT=3000
 JOB_SECRET=...
 
-PORTFOLIO_JSON_BASE64=...
-
 KIS_APP_KEY=...
 KIS_APP_SECRET=...
 KIS_BASE_URL=https://openapi.koreainvestment.com:9443
@@ -35,14 +33,6 @@ DISABLE_FINBERT=1
 `TELEGRAM_SECRET_CHAT_ID`는 개인방 chat id다. 공유방에는 포트폴리오 명령을 열지 않는다.
 
 `JOB_SECRET`은 Scheduler가 `POST /jobs/news-collector`를 호출할 때 쓰는 공유 secret이다. Telegram secret과 다르게 둔다.
-
-`PORTFOLIO_JSON_BASE64`가 없으면 컨테이너에는 로컬 `data/portfolio.json`이 포함되지 않으므로 `/portfolio`가 0원으로 보일 수 있다. 로컬에서 아래 명령으로 GitHub secret과 같은 값을 만들 수 있다.
-
-```bash
-base64 -i data/portfolio.json
-```
-
-Cloud Run 환경 변수에 넣은 뒤 새 revision으로 재배포한다. Supabase에 최신 `portfolio_snapshots`가 있으면 Agent가 보조 fallback으로 사용하지만, 기준 원본은 `PORTFOLIO_JSON_BASE64`다.
 
 운영 전에는 로컬 포트폴리오를 Supabase 원본 테이블로 seed한다.
 
@@ -192,7 +182,7 @@ npm run collector:scheduled
 ## 6. 주의
 
 - Agent 서버는 실제 주문을 넣지 않는다.
-- `/buy`, `/sell`은 거래 기록과 로컬 포트폴리오 갱신만 수행한다.
+- `/buy`, `/sell`은 거래 기록과 Supabase 포트폴리오 갱신만 수행한다.
 - Telegram webhook은 HTTPS URL만 사용할 수 있다.
 - 로컬 `localhost`는 Telegram에서 접근할 수 없다.
 - `JOB_SECRET`이 없으면 `/jobs/news-collector` endpoint는 인증 없이 열릴 수 있으므로 운영 배포에는 반드시 설정한다.

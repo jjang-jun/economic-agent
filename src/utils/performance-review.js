@@ -8,6 +8,7 @@ const { buildFreedomStatus, saveFreedomStatus } = require('./freedom-engine');
 const { persistFinancialFreedomGoal } = require('./persistence');
 const { buildPerformanceLab } = require('./performance-lab');
 const { buildBehaviorReview } = require('./behavior-reviewer');
+const { buildCollectorOpsSummary } = require('./collector-ops');
 
 const REVIEW_DIR = path.join(__dirname, '..', '..', 'data', 'performance-reviews');
 
@@ -105,6 +106,7 @@ async function buildPerformanceReview(period = 'weekly') {
     recommendations: periodRecommendations,
     trades: periodTrades,
   });
+  const collectorOps = await buildCollectorOpsSummary({ days });
   let freedomPortfolio = null;
   if (period === 'monthly') {
     const enriched = await enrichPortfolio(loadPortfolio());
@@ -131,12 +133,13 @@ async function buildPerformanceReview(period = 'weekly') {
     tradeSummary,
     performanceLab,
     behaviorReview,
+    collectorOps,
     freedomStatus,
-    notes: buildNotes(recommendationSummary, tradeSummary, behaviorReview),
+    notes: buildNotes(recommendationSummary, tradeSummary, behaviorReview, collectorOps),
   };
 }
 
-function buildNotes(recommendationSummary, tradeSummary, behaviorReview = {}) {
+function buildNotes(recommendationSummary, tradeSummary, behaviorReview = {}, collectorOps = {}) {
   const notes = [];
   if (recommendationSummary.evaluated === 0) {
     notes.push('평가 완료된 추천이 아직 부족합니다.');
@@ -151,6 +154,15 @@ function buildNotes(recommendationSummary, tradeSummary, behaviorReview = {}) {
   }
   for (const warning of behaviorReview.warnings || []) {
     notes.push(warning);
+  }
+  if (collectorOps.failedRuns > 0) {
+    notes.push(`최근 수집 작업 실패 ${collectorOps.failedRuns}건이 있습니다. Cloud Run/Scheduler 로그를 확인해야 합니다.`);
+  }
+  if ((collectorOps.alertEvents?.failedImmediate || 0) > 0) {
+    notes.push(`즉시 알림 전송 실패 ${collectorOps.alertEvents.failedImmediate}건이 있습니다.`);
+  }
+  if ((collectorOps.alertEvents?.pendingCatchUp || 0) > 0) {
+    notes.push(`catch-up 중요 알림 ${collectorOps.alertEvents.pendingCatchUp}건이 다이제스트 대기 중입니다.`);
   }
   return notes;
 }
