@@ -473,6 +473,17 @@ function formatPerformanceReport(completed) {
     hour12: false,
   });
 
+  const signalLabel = {
+    bullish: '상승 의견',
+    bearish: '하락/회피 의견',
+    neutral: '중립',
+  };
+  const convictionLabel = {
+    high: '높음',
+    medium: '보통',
+    low: '낮음',
+  };
+
   const lines = completed.map(({ recommendation, day, evaluation }) => {
     const icon = evaluation.signalReturnPct >= 0 ? '🔴' : '🔵';
     const ticker = recommendation.ticker ? ` ${escapeHtml(recommendation.ticker)}` : '';
@@ -480,9 +491,9 @@ function formatPerformanceReport(completed) {
       ? ` · 초과 ${evaluation.alphaPct}%`
       : '';
     return [
-      `${icon} <b>${escapeHtml(recommendation.name)}</b>${ticker} · ${day}일`,
-      `└ 실제 ${evaluation.returnPct}% · 신호기준 ${evaluation.signalReturnPct}%${alpha}`,
-      `└ ${escapeHtml(recommendation.signal)} / ${escapeHtml(recommendation.conviction)}`,
+      `${icon} <b>${escapeHtml(recommendation.name)}</b>${ticker} · 추천 후 ${day}일 평가`,
+      `└ 실제 가격수익률 ${evaluation.returnPct}% · 방향 반영 수익률 ${evaluation.signalReturnPct}%${alpha}`,
+      `└ 신호: ${escapeHtml(signalLabel[recommendation.signal] || recommendation.signal)} · 확신도: ${escapeHtml(convictionLabel[recommendation.conviction] || recommendation.conviction)}`,
     ].join('\n');
   });
 
@@ -491,7 +502,7 @@ function formatPerformanceReport(completed) {
   return [
     `📈 <b>추천 성과 평가</b>`,
     `⏰ ${now}`,
-    `평균 신호기준 수익률: <b>${avg.toFixed(2)}%</b>`,
+    `평균 방향 반영 수익률: <b>${avg.toFixed(2)}%</b>`,
     '',
     lines.join('\n\n'),
   ].join('\n');
