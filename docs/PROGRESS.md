@@ -150,11 +150,14 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 로컬 Agent Server smoke 확인 완료. `/health` 정상 응답, production에서 `JOB_SECRET` 미설정 수집 endpoint 차단 확인.
 - Render Blueprint 추가. `render.yaml`로 web service와 5분 cron job을 정의하고, `npm run collector:scheduled`가 KST 평일 07:00~23:59 밖에서는 수집을 건너뛰도록 guard 추가.
 - `performance-lab.js`, `behavior-reviewer.js` 추가. 주간/월간 리뷰에서 전체 추천, 실제 매수로 연결된 추천, 매수하지 않은 추천의 성과를 분리하고, 추천과 연결되지 않은 매수/차단 후보 매수/최소 손익비 미달 매수 같은 행동 경고를 생성.
+- `recommendation-schema.js` 추가. 근거 기사, 기준 가격, 손절 기준, 손익비, 제안 비중/금액, 무효화 조건이 없는 후보는 `watch_only`로 강등하고 추천 성과 로그 저장에서 제외.
+- Cloud Run Agent Server 운영 시작. `/health`, Telegram webhook, `/jobs/news-collector` 동작 확인. Cloud Scheduler가 5분 메인 수집을 담당하고 GitHub Actions는 백업 수집기로 유지.
+- Cloud Run 메모리를 1GiB로 상향하고 `DISABLE_FINBERT=1` 적용. 5분 메인 수집은 안정성 우선으로 키워드/사전 감성을 사용하고, FinBERT는 GitHub Actions/로컬/배치 분석에서 사용.
+- Supabase 포트폴리오 원본 전환. `portfolio_accounts`, `positions`를 `/portfolio` 우선 저장소로 쓰고 `/cash`, `/buy`, `/sell` 승인 시 Supabase 포트폴리오를 갱신. `PORTFOLIO_JSON_BASE64`는 bootstrap/fallback으로 격하.
 
 ## 다음 작업
 
-1. Cloud Run/Render/Fly 중 하나로 실제 Agent Server 배포
-2. Cloud Scheduler/Fly cron/Render cron으로 `POST /jobs/news-collector` 5분 호출 연결
-3. KRX/공공데이터 일별 종가 백필 provider 추가
-4. 추천 JSON schema 검증 추가: 근거, 기준 가격, 손절선, 손익비, 제안 비중 누락 시 저장 차단
-5. 성과 리뷰를 로컬 대시보드에 시각화: 추천 품질, 미실행 추천 성과, 행동 경고 추세
+1. KRX/공공데이터 일별 종가 백필 provider 추가
+2. 성과 리뷰를 로컬 대시보드에 시각화: 추천 품질, 미실행 추천 성과, 행동 경고 추세
+3. Telegram `/buy`, `/sell`, `/cash` end-to-end 운영 검증과 문구 개선
+4. Cloud Run/Cloud Scheduler 운영 로그를 주간 리뷰에 요약

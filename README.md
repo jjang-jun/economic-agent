@@ -243,6 +243,8 @@ suggested_buy_amount = min(position_by_risk, position_by_cap, available_cash)
 
 신규 매수 후보는 기본적으로 손익비 1:2 미만, 손절폭 과다, 유동성 기준 미달, 시장 대비 상대강도 약세, RISK_OFF 레짐에서는 차단 또는 강등됩니다.
 
+`recommendation-schema.js`는 추천 저장 전 최소 계약을 검증합니다. 근거 기사, 기준 가격, 손절 기준, 손익비, 제안 비중/금액, 무효화 조건이 없으면 `schema_validation.passed=false`로 표시하고 `risk_review`를 `watch_only`로 강등합니다. 이런 후보는 Telegram 리포트에는 차단 사유로 보이지만 추천 성과 로그에는 저장하지 않습니다.
+
 ## 성과 평가 기준
 
 추천은 단순 수익률만 보지 않습니다. `recommendation_evaluations`에는 1일/5일/20일 단위로 아래 값을 저장합니다.

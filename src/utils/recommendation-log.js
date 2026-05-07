@@ -111,6 +111,10 @@ async function logRecommendations(report, context = {}) {
   let skipped = 0;
 
   for (const stock of stocks) {
+    if (stock.schema_validation?.passed === false) {
+      skipped++;
+      continue;
+    }
     const id = getRecommendationId(date, stock);
     if (byId.has(id)) {
       skipped++;
