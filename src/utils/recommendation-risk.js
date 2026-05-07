@@ -24,6 +24,7 @@ function firstNumber(...values) {
 function normalizeRecommendationRisk(stock, decision) {
   const portfolio = decision?.portfolio || {};
   const totalAssetValue = portfolio.totalAssetValue || portfolio.summary?.totalAssetValue || null;
+  const marketProfile = stock.market_profile || stock.marketProfile || {};
 
   const expectedUpsidePct = firstNumber(
     stock.expected_upside_pct,
@@ -47,6 +48,18 @@ function normalizeRecommendationRisk(stock, decision) {
   const riskReward = expectedUpsidePct && expectedLossPct
     ? round(expectedUpsidePct / expectedLossPct)
     : null;
+  const entryReferencePrice = firstNumber(
+    stock.entry_reference_price,
+    stock.entryReferencePrice,
+    stock.buy_price,
+    stock.buyPrice,
+    stock.reference_price,
+    stock.referencePrice,
+    marketProfile.price
+  );
+  const stopLossPrice = entryReferencePrice && expectedLossPct
+    ? round(entryReferencePrice * (1 - expectedLossPct / 100), 0)
+    : null;
   const positionSize = calculatePositionSize({
     portfolio,
     market: decision?.market || {},
@@ -60,7 +73,6 @@ function normalizeRecommendationRisk(stock, decision) {
   const maxWeightPct = typeof portfolio.maxPositionRatio === 'number'
     ? round(portfolio.maxPositionRatio * 100)
     : null;
-  const marketProfile = stock.market_profile || stock.marketProfile || {};
   const relativeStrengthPass = typeof marketProfile.relativeStrength20d === 'number'
     ? marketProfile.relativeStrength20d >= 0
     : null;
@@ -80,6 +92,8 @@ function normalizeRecommendationRisk(stock, decision) {
 
   return {
     upsideProbabilityPct,
+    entryReferencePrice,
+    stopLossPrice,
     expectedUpsidePct,
     expectedLossPct: expectedLossPct || null,
     riskReward,

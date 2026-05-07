@@ -23,6 +23,17 @@ function formatKRW(value) {
   return `${Math.round(value).toLocaleString('ko-KR')}원`;
 }
 
+function round(value, digits = 2) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  const factor = 10 ** digits;
+  return Math.round(value * factor) / factor;
+}
+
+function formatPrice(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '';
+  return `${Math.round(value).toLocaleString('ko-KR')}원`;
+}
+
 // FinBERT confidence 기반 강도 표시
 function getSentimentDisplay(article) {
   const base = SENTIMENT[article.sentiment] || SENTIMENT.neutral;
@@ -207,6 +218,8 @@ function formatStockReport(report) {
     const profile = s.risk_profile || {};
     const market = s.market_profile || {};
     const review = s.risk_review || {};
+    const entry = profile.entryReferencePrice ? `기준매수가 ${formatPrice(profile.entryReferencePrice)}` : '';
+    const stopPrice = profile.stopLossPrice ? `손절가 ${formatPrice(profile.stopLossPrice)}` : '';
     const rr = profile.riskReward ? `손익비 ${profile.riskReward}:1 (최소 2:1)` : '';
     const stop = profile.expectedLossPct ? `예상 손실폭 ${profile.expectedLossPct}%` : '';
     const suggestedCashPct = profile.suggestedAmount && portfolioSummary.cashAmount
@@ -224,7 +237,7 @@ function formatStockReport(report) {
     const invalidation = profile.invalidation ? `\n무효화: ${escapeHtml(profile.invalidation)}` : '';
     const blockers = (review.blockers || []).slice(0, 2).map(item => `\n차단: ${escapeHtml(item)}`).join('');
     const warnings = (review.warnings || []).slice(0, 1).map(item => `\n주의: ${escapeHtml(item)}`).join('');
-    const riskProfile = [rr, stop, size, rs, volume, high, tradeable].filter(Boolean).join(' · ');
+    const riskProfile = [entry, stopPrice, rr, stop, size, rs, volume, high, tradeable].filter(Boolean).join(' · ');
     return `${icon.bar} <b>${escapeHtml(s.name)}</b>${ticker}  [${icon.label}${conviction}]\n└ ${escapeHtml(s.reason)}${riskProfile ? `\n└ ${escapeHtml(riskProfile)}` : ''}${invalidation}${blockers}${warnings}${risk}`;
   });
 
