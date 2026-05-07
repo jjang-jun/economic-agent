@@ -585,6 +585,10 @@ function formatPerformanceReview(review) {
   const title = review.period === 'monthly' ? '월간 성과 리뷰' : '주간 성과 리뷰';
   const rec = review.recommendationSummary || {};
   const trade = review.tradeSummary || {};
+  const lab = review.performanceLab || {};
+  const missed = lab.missedRecommendationQuality || {};
+  const behavior = review.behaviorReview || {};
+  const tradeBehavior = behavior.tradeReview || {};
   const freedom = review.freedomStatus || {};
   const notes = (review.notes || []).map(item => `▸ ${escapeHtml(item)}`);
   return [
@@ -593,7 +597,13 @@ function formatPerformanceReview(review) {
     freedom.goal ? `경제적 자유: ${formatKRW(freedom.currentNetWorth)} / ${formatKRW(freedom.goal.targetNetWorth)} (${freedom.targetProgressPct ?? 'n/a'}%) · 예상 ${escapeHtml(freedom.estimatedTargetDate || 'n/a')}` : '',
     `추천: ${rec.total ?? 0}건 · 평가완료 ${rec.evaluated ?? 0}건`,
     `승률: ${rec.winRatePct ?? 'n/a'}% · 평균 신호수익률 ${rec.avgSignalReturnPct ?? 'n/a'}% · 평균 초과수익 ${rec.avgAlphaPct ?? 'n/a'}%`,
+    typeof missed.avgSignalReturnPct === 'number'
+      ? `미실행 추천: 평가 ${missed.evaluated ?? 0}건 · 평균 ${missed.avgSignalReturnPct}%`
+      : '',
     `실제 거래: ${trade.total ?? 0}건 · 추천 연결 ${trade.linked ?? 0}건 (${trade.linkedRatePct ?? 'n/a'}%)`,
+    tradeBehavior.buyTrades
+      ? `행동 점검: 미연결 매수 ${tradeBehavior.unlinkedBuys ?? 0}건 · 차단후보 매수 ${tradeBehavior.watchOnlyBuys ?? 0}건`
+      : '',
     notes.length > 0 ? [`<b>점검</b>`, ...notes].join('\n') : '',
   ].filter(Boolean).join('\n');
 }

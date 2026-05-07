@@ -6,6 +6,8 @@ const { getKSTDate } = require('./article-archive');
 const { loadPortfolio, enrichPortfolio, loadLatestPortfolioSnapshot } = require('./portfolio');
 const { buildFreedomStatus, saveFreedomStatus } = require('./freedom-engine');
 const { persistFinancialFreedomGoal } = require('./persistence');
+const { buildPerformanceLab } = require('./performance-lab');
+const { buildBehaviorReview } = require('./behavior-reviewer');
 
 const REVIEW_DIR = path.join(__dirname, '..', '..', 'data', 'performance-reviews');
 
@@ -95,6 +97,14 @@ async function buildPerformanceReview(period = 'weekly') {
   const periodTrades = filterByWindow(trades, 'date', startDate);
   const recommendationSummary = summarizeRecommendations(periodRecommendations);
   const tradeSummary = summarizeTrades(periodTrades, periodRecommendations);
+  const performanceLab = buildPerformanceLab({
+    recommendations: periodRecommendations,
+    trades: periodTrades,
+  });
+  const behaviorReview = buildBehaviorReview({
+    recommendations: periodRecommendations,
+    trades: periodTrades,
+  });
   let freedomPortfolio = null;
   if (period === 'monthly') {
     const enriched = await enrichPortfolio(loadPortfolio());
@@ -119,12 +129,14 @@ async function buildPerformanceReview(period = 'weekly') {
     generatedAt: new Date().toISOString(),
     recommendationSummary,
     tradeSummary,
+    performanceLab,
+    behaviorReview,
     freedomStatus,
-    notes: buildNotes(recommendationSummary, tradeSummary),
+    notes: buildNotes(recommendationSummary, tradeSummary, behaviorReview),
   };
 }
 
-function buildNotes(recommendationSummary, tradeSummary) {
+function buildNotes(recommendationSummary, tradeSummary, behaviorReview = {}) {
   const notes = [];
   if (recommendationSummary.evaluated === 0) {
     notes.push('평가 완료된 추천이 아직 부족합니다.');
@@ -136,6 +148,9 @@ function buildNotes(recommendationSummary, tradeSummary) {
   }
   if (recommendationSummary.winRatePct !== null && recommendationSummary.winRatePct < 50) {
     notes.push('추천 승률이 50% 미만입니다. 추천 조건과 리스크 차단 기준을 재검토해야 합니다.');
+  }
+  for (const warning of behaviorReview.warnings || []) {
+    notes.push(warning);
   }
   return notes;
 }

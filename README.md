@@ -252,6 +252,13 @@ suggested_buy_amount = min(position_by_risk, position_by_cap, available_cash)
 - 목표 수익구간 터치 여부
 - 결과 라벨: `target_touched`, `stop_touched`, `beat_benchmark` 등
 
+주간/월간 리뷰는 `performance-lab.js`와 `behavior-reviewer.js`를 통해 추천 품질과 실제 행동을 분리해서 봅니다.
+
+- 전체 추천, 실제 매수로 연결된 추천, 매수하지 않은 추천의 성과를 따로 비교
+- 손익비 구간, 신뢰도, 신호 방향별 성과 분해
+- 추천과 연결되지 않은 매수, 관찰/차단 후보 매수, 최소 손익비 미달 매수 경고
+- 손절 기준이나 근거 기사 없이 생성된 호재 후보 점검
+
 보유 종목의 현재가와 평가손익은 장 마감 리포트 생성 시 자동 계산되며, 필요하면 별도로 스냅샷을 만들 수 있습니다.
 
 ```bash

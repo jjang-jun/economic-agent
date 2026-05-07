@@ -149,6 +149,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 운영 배포 보안 보강. `NODE_ENV=production`에서 `JOB_SECRET`이 없으면 `/jobs/news-collector`가 500으로 실패하도록 fail-closed 처리.
 - 로컬 Agent Server smoke 확인 완료. `/health` 정상 응답, production에서 `JOB_SECRET` 미설정 수집 endpoint 차단 확인.
 - Render Blueprint 추가. `render.yaml`로 web service와 5분 cron job을 정의하고, `npm run collector:scheduled`가 KST 평일 07:00~23:59 밖에서는 수집을 건너뛰도록 guard 추가.
+- `performance-lab.js`, `behavior-reviewer.js` 추가. 주간/월간 리뷰에서 전체 추천, 실제 매수로 연결된 추천, 매수하지 않은 추천의 성과를 분리하고, 추천과 연결되지 않은 매수/차단 후보 매수/최소 손익비 미달 매수 같은 행동 경고를 생성.
 
 ## 다음 작업
 
@@ -156,4 +157,4 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 2. Cloud Scheduler/Fly cron/Render cron으로 `POST /jobs/news-collector` 5분 호출 연결
 3. KRX/공공데이터 일별 종가 백필 provider 추가
 4. 추천 JSON schema 검증 추가: 근거, 기준 가격, 손절선, 손익비, 제안 비중 누락 시 저장 차단
-5. `performance-lab.js`, `behavior-reviewer.js` 추가: 추천/실거래/반복 행동 패턴 분리 분석
+5. 성과 리뷰를 로컬 대시보드에 시각화: 추천 품질, 미실행 추천 성과, 행동 경고 추세
