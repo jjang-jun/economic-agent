@@ -5,6 +5,7 @@ const {
   fetchCurrentPrice,
   fetchBenchmarkQuote,
   fetchDomesticDailyOhlcv,
+  fetchGlobalDailyOhlcv,
   normalizeYahooSymbol,
   isDomesticTicker,
 } = require('../sources/price-provider');
@@ -155,6 +156,16 @@ async function fetchEvaluationQuote(recommendation, day) {
         evaluationPriceMode: 'official_eod',
       };
     }
+  }
+
+  const globalRows = await fetchGlobalDailyOhlcv(symbol, recommendation.date, targetDate);
+  const globalQuote = buildEodEvaluationQuote(globalRows, symbol);
+  if (globalQuote) {
+    return {
+      ...globalQuote,
+      evaluationTargetDate: targetDate,
+      evaluationPriceMode: 'official_eod',
+    };
   }
 
   const quote = await fetchCurrentPrice(symbol);

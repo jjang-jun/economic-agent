@@ -3,7 +3,7 @@ const { fetchKisCurrentPrice, fetchKisDailyOhlcv, normalizeKisTicker } = require
 const { fetchNaverQuote } = require('./naver-finance');
 const { fetchDataGoKrEodPrice, fetchDataGoKrDailyOhlcv } = require('./data-go-kr-stocks');
 const { fetchAlpacaQuote } = require('./alpaca-api');
-const { fetchFmpQuote } = require('./fmp-api');
+const { fetchFmpQuote, fetchFmpDailyOhlcv } = require('./fmp-api');
 const { fetchAlphaVantageQuote } = require('./alpha-vantage-api');
 const { fetchTiingoQuote } = require('./tiingo-api');
 const {
@@ -133,6 +133,33 @@ async function fetchDomesticDailyOhlcv(ticker, from, to) {
   return [];
 }
 
+async function fetchGlobalDailyOhlcv(ticker, from, to) {
+  const sources = PRICE_SOURCE_POLICY.eodOfficial.global;
+
+  for (const source of sources) {
+    let rows = [];
+    if (source === 'fmp') rows = await fetchFmpDailyOhlcv(ticker, from, to);
+    if (source === 'tiingo-eod') {
+      const quote = await fetchTiingoQuote(ticker);
+      rows = quote ? [quote] : [];
+    }
+    if (source === 'alpha-vantage') {
+      const quote = await fetchAlphaVantageQuote(ticker);
+      rows = quote ? [{ ...quote, priceType: 'eod', isRealtime: false }] : [];
+    }
+    if (source === 'yahoo-finance') {
+      const quote = await fetchYahooQuote(ticker);
+      rows = quote ? [{ ...quote, priceType: 'eod', isRealtime: false }] : [];
+    }
+    if (rows.length > 0) {
+      const snapshots = rows.map(row => toPriceSnapshot({ ...row, sourcePriority: sources }, ticker)).filter(Boolean);
+      await persistPriceSnapshots(snapshots);
+      return rows;
+    }
+  }
+  return [];
+}
+
 async function fetchGlobalCurrentPrice(ticker) {
   const sources = PRICE_SOURCE_POLICY.currentPrice.global;
 
@@ -171,7 +198,10 @@ async function fetchOfficialEodPrice(ticker, date) {
     return fetchDomesticEodPrice(rawTicker, date);
   }
 
-  return null;
+  const rows = await fetchGlobalDailyOhlcv(rawTicker, date, date);
+  const quote = rows.at(-1) || null;
+  if (quote) await persistQuoteSnapshot(quote, rawTicker);
+  return quote;
 }
 
 async function fetchBenchmarkQuote() {
@@ -187,6 +217,7 @@ module.exports = {
   fetchGlobalCurrentPrice,
   fetchDomesticEodPrice,
   fetchDomesticDailyOhlcv,
+  fetchGlobalDailyOhlcv,
   fetchOfficialEodPrice,
   normalizeYahooSymbol,
   isDomesticTicker,

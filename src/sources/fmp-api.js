@@ -74,6 +74,62 @@ async function fetchFmpQuote(symbol) {
   }
 }
 
+function rowToFmpEodQuote(row, symbol) {
+  const ticker = normalizeFmpSymbol(symbol || row.symbol || '');
+  const price = parseNumber(row.adjClose ?? row.close);
+  if (!ticker || typeof price !== 'number') return null;
+
+  return {
+    symbol: ticker,
+    ticker,
+    name: '',
+    price,
+    open: parseNumber(row.open),
+    high: parseNumber(row.high),
+    low: parseNumber(row.low),
+    close: parseNumber(row.close) ?? price,
+    adjustedClose: parseNumber(row.adjClose),
+    previousClose: null,
+    changePercent: parseNumber(row.changePercent),
+    volume: parseNumber(row.volume),
+    currency: 'USD',
+    market: 'US',
+    exchange: '',
+    priceType: 'eod',
+    isRealtime: false,
+    isAdjusted: Boolean(row.adjClose),
+    marketTime: row.date ? `${row.date}T20:00:00-04:00` : new Date().toISOString(),
+    source: 'fmp-eod',
+    raw: row,
+  };
+}
+
+async function fetchFmpDailyOhlcv(symbol, from, to) {
+  const ticker = normalizeFmpSymbol(symbol);
+  if (!ticker || !isFmpConfigured()) return [];
+
+  try {
+    const url = buildFmpUrl('historical-price-eod/full');
+    url.searchParams.set('symbol', ticker);
+    if (from) url.searchParams.set('from', String(from).slice(0, 10));
+    if (to) url.searchParams.set('to', String(to).slice(0, 10));
+    url.searchParams.set('apikey', FMP_API_KEY);
+
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+
+    const data = await res.json();
+    const rows = Array.isArray(data) ? data : (data.historical || data.data || []);
+    return rows
+      .map(row => rowToFmpEodQuote(row, ticker))
+      .filter(Boolean)
+      .sort((a, b) => new Date(a.marketTime) - new Date(b.marketTime));
+  } catch (err) {
+    console.warn(`[FMP] ${ticker} EOD 조회 실패: ${err.message}`);
+    return [];
+  }
+}
+
 async function fetchFmpProfile(symbol) {
   const ticker = normalizeFmpSymbol(symbol);
   if (!ticker || !isFmpConfigured()) return null;
@@ -98,5 +154,7 @@ module.exports = {
   isFmpConfigured,
   normalizeFmpSymbol,
   fetchFmpQuote,
+  rowToFmpEodQuote,
+  fetchFmpDailyOhlcv,
   fetchFmpProfile,
 };

@@ -161,10 +161,11 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - Telegram `/help` 최신화. `/buy`, `/sell`, `/cash` 문법과 승인 버튼이 있어야 Supabase 포트폴리오에 반영된다는 운영 원칙을 명시.
 - 추천 성과 평가를 국내 EOD 가격 계층에 연결. 국내 종목 1일/5일/20일 평가는 가능한 경우 공공데이터/KIS 일봉의 평가 대상일 종가와 high/low history를 사용하고, source/priceType/targetDate를 evaluation payload에 남김.
 - `collector:ops-report`와 `collector-ops-report.yml` 추가. 평일 23:50 KST에 최근 1일 수집 성공률, 실패, lookback, 즉시 알림 실패, catch-up 대기 이상치를 private Telegram으로 전송.
+- 해외 추천 평가 EOD 계층 추가. FMP historical EOD를 우선 사용하고 Tiingo/Alpha/Yahoo를 fallback으로 두어 미국 주식 추천도 평가 대상일 종가와 high/low history 기반으로 평가 가능.
 
 ## 다음 작업
 
 1. KRX Open API 공식 일별/통계 검증 provider 추가
 2. Telegram `/buy`, `/sell`, `/cash` end-to-end 운영 검증
-3. 해외 주식 평가용 EOD provider(Tiingo/Alpha/FMP) 연결
-4. Cloud Run 수집기에서 pending digest/catch-up 정리 정책 추가
+3. Cloud Run 수집기에서 pending digest/catch-up 정리 정책 추가
+4. FMP 재무제표/실적 데이터를 종목 후보 스키마에 연결
