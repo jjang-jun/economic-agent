@@ -1,5 +1,10 @@
 const { fetchCurrentPrice, fetchBenchmarkQuote, normalizeYahooSymbol } = require('../sources/price-provider');
-const { fetchFmpProfile, fetchFmpFundamentalSummary, normalizeFmpSymbol } = require('../sources/fmp-api');
+const {
+  fetchFmpProfile,
+  fetchFmpFundamentalSummary,
+  fetchFmpEarningsSummary,
+  normalizeFmpSymbol,
+} = require('../sources/fmp-api');
 
 const MIN_AVG_TURNOVER_KRW = 5000000000;
 
@@ -47,7 +52,7 @@ function buildMarketProfile(quote, benchmark) {
   };
 }
 
-function buildFundamentalProfile(profile, summary = null) {
+function buildFundamentalProfile(profile, summary = null, earnings = null) {
   if (!profile) return null;
   const marketCap = Number.isFinite(Number(profile.marketCap)) ? Number(profile.marketCap) : null;
   const beta = Number.isFinite(Number(profile.beta)) ? Number(profile.beta) : null;
@@ -69,6 +74,7 @@ function buildFundamentalProfile(profile, summary = null) {
     isActivelyTrading: profile.isActivelyTrading ?? null,
     ipoDate: profile.ipoDate || '',
     statements: summary,
+    earnings,
     source: 'fmp-profile',
   };
 }
@@ -76,11 +82,12 @@ function buildFundamentalProfile(profile, summary = null) {
 async function fetchFundamentalProfile(stock) {
   const symbol = normalizeFmpSymbol(stock.ticker || stock.symbol || '');
   if (!symbol) return null;
-  const [profile, summary] = await Promise.all([
+  const [profile, summary, earnings] = await Promise.all([
     fetchFmpProfile(symbol),
     fetchFmpFundamentalSummary(symbol),
+    fetchFmpEarningsSummary(symbol),
   ]);
-  return buildFundamentalProfile(profile, summary);
+  return buildFundamentalProfile(profile, summary, earnings);
 }
 
 async function applyRecommendationMarketData(report) {

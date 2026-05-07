@@ -10,6 +10,7 @@ function reviewStock(stock, decision = {}) {
   const market = stock.market_profile || {};
   const fundamental = stock.fundamental_profile || stock.fundamentalProfile || {};
   const statements = fundamental.statements || {};
+  const earnings = fundamental.earnings || {};
   const marketRegime = decision.market?.regime || 'UNKNOWN';
   const marketTags = decision.market?.tags || [];
   const factors = [];
@@ -68,6 +69,12 @@ function reviewStock(stock, decision = {}) {
   }
   if (typeof statements.debtToEquity === 'number' && statements.debtToEquity > 2) {
     warnings.push(`부채비율 주의: D/E ${statements.debtToEquity}`);
+  }
+  if (typeof earnings.daysUntilNext === 'number' && earnings.daysUntilNext >= 0 && earnings.daysUntilNext <= 7) {
+    warnings.push(`실적발표 임박: ${earnings.nextDate} (${earnings.daysUntilNext}일 후)`);
+  }
+  if (typeof earnings.previousEpsSurprisePct === 'number' && earnings.previousEpsSurprisePct < -10) {
+    warnings.push(`직전 EPS 쇼크: ${earnings.previousEpsSurprisePct}%`);
   }
 
   const approved = blockers.length === 0 && profile.tradeable !== false;

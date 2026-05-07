@@ -16,12 +16,13 @@ test('buildFundamentalProfile normalizes FMP profile for risk review', () => {
     isEtf: false,
     isAdr: false,
     isActivelyTrading: true,
-  }, { revenueGrowthYoYPct: 12 });
+  }, { revenueGrowthYoYPct: 12 }, { nextDate: '2026-07-16' });
 
   assert.equal(profile.symbol, 'NFLX');
   assert.equal(profile.marketCapUsd, 375077010000);
   assert.equal(profile.beta, 1.548);
   assert.equal(profile.isActivelyTrading, true);
   assert.equal(profile.statements.revenueGrowthYoYPct, 12);
+  assert.equal(profile.earnings.nextDate, '2026-07-16');
   assert.equal(profile.source, 'fmp-profile');
 });

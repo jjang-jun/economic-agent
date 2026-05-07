@@ -70,3 +70,21 @@ test('reviewStock warns on weak financial statement trends', () => {
   assert.ok(review.warnings.some(item => item.includes('FCF 마진 음수')));
   assert.ok(review.warnings.some(item => item.includes('부채비율 주의')));
 });
+
+test('reviewStock warns on near earnings and prior EPS shock', () => {
+  const review = reviewStock({
+    ...baseStock,
+    fundamental_profile: {
+      source: 'fmp-profile',
+      isActivelyTrading: true,
+      earnings: {
+        nextDate: '2026-05-10',
+        daysUntilNext: 3,
+        previousEpsSurprisePct: -15,
+      },
+    },
+  }, { market: { regime: 'RISK_ON', tags: [] } });
+
+  assert.ok(review.warnings.some(item => item.includes('실적발표 임박')));
+  assert.ok(review.warnings.some(item => item.includes('직전 EPS 쇼크')));
+});

@@ -1,6 +1,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { rowToFmpEodQuote, buildFmpFundamentalSummary } = require('../src/sources/fmp-api');
+const {
+  rowToFmpEodQuote,
+  buildFmpFundamentalSummary,
+  buildFmpEarningsSummary,
+} = require('../src/sources/fmp-api');
 
 test('rowToFmpEodQuote converts FMP historical row to adjusted EOD quote', () => {
   const quote = rowToFmpEodQuote({
@@ -40,4 +44,16 @@ test('buildFmpFundamentalSummary derives growth and FCF margin', () => {
   assert.equal(summary.freeCashFlowMarginPct, 15);
   assert.equal(summary.grossProfitMarginPct, 50);
   assert.equal(summary.debtToEquity, 1.2);
+});
+
+test('buildFmpEarningsSummary finds next event and previous EPS surprise', () => {
+  const summary = buildFmpEarningsSummary([
+    { date: '2026-07-16', epsEstimated: 0.8, revenueEstimated: 1000 },
+    { date: '2026-04-16', epsActual: 1.2, epsEstimated: 1.0, revenueActual: 900, revenueEstimated: 880 },
+  ], new Date('2026-05-07T00:00:00Z'));
+
+  assert.equal(summary.nextDate, '2026-07-16');
+  assert.equal(summary.daysUntilNext, 70);
+  assert.equal(summary.previousDate, '2026-04-16');
+  assert.equal(summary.previousEpsSurprisePct, 20);
 });

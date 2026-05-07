@@ -234,6 +234,65 @@ async function fetchFmpFundamentalSummary(symbol, options = {}) {
   return buildFmpFundamentalSummary({ income, cashFlow, ratios });
 }
 
+function dateDiffDays(from, to) {
+  const left = new Date(`${String(from).slice(0, 10)}T00:00:00Z`);
+  const right = new Date(`${String(to).slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(left.getTime()) || Number.isNaN(right.getTime())) return null;
+  return Math.round((right.getTime() - left.getTime()) / 86400000);
+}
+
+function buildFmpEarningsSummary(rows = [], now = new Date()) {
+  const today = now.toISOString().slice(0, 10);
+  const sorted = [...rows]
+    .filter(row => row?.date)
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const next = sorted.find(row => String(row.date).slice(0, 10) >= today) || null;
+  const previous = [...sorted].reverse().find(row => (
+    String(row.date).slice(0, 10) < today && row.epsActual !== null && row.epsActual !== undefined
+  )) || null;
+  const epsActual = parseNumber(previous?.epsActual);
+  const epsEstimated = parseNumber(previous?.epsEstimated);
+  const epsSurprisePct = typeof epsActual === 'number' && typeof epsEstimated === 'number' && epsEstimated !== 0
+    ? round(((epsActual - epsEstimated) / Math.abs(epsEstimated)) * 100, 2)
+    : null;
+
+  return {
+    nextDate: next?.date || '',
+    daysUntilNext: next?.date ? dateDiffDays(today, next.date) : null,
+    nextEpsEstimated: parseNumber(next?.epsEstimated),
+    nextRevenueEstimated: parseNumber(next?.revenueEstimated),
+    previousDate: previous?.date || '',
+    previousEpsActual: epsActual,
+    previousEpsEstimated: epsEstimated,
+    previousEpsSurprisePct: epsSurprisePct,
+    previousRevenueActual: parseNumber(previous?.revenueActual),
+    previousRevenueEstimated: parseNumber(previous?.revenueEstimated),
+    source: 'fmp-earnings',
+  };
+}
+
+async function fetchFmpEarningsSummary(symbol, options = {}) {
+  const ticker = normalizeFmpSymbol(symbol);
+  if (!ticker || !isFmpConfigured()) return null;
+
+  try {
+    const url = buildFmpUrl('earnings');
+    url.searchParams.set('symbol', ticker);
+    url.searchParams.set('apikey', FMP_API_KEY);
+
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+
+    const data = await res.json();
+    const rows = Array.isArray(data) ? data : [];
+    if (rows.length === 0) return null;
+    return buildFmpEarningsSummary(rows, options.now || new Date());
+  } catch (err) {
+    console.warn(`[FMP] ${ticker} earnings 조회 실패: ${err.message}`);
+    return null;
+  }
+}
+
 module.exports = {
   isFmpConfigured,
   normalizeFmpSymbol,
@@ -244,4 +303,7 @@ module.exports = {
   fetchFmpStatement,
   buildFmpFundamentalSummary,
   fetchFmpFundamentalSummary,
+  dateDiffDays,
+  buildFmpEarningsSummary,
+  fetchFmpEarningsSummary,
 };

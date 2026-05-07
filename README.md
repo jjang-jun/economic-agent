@@ -499,7 +499,7 @@ module.exports = {
 
 해외 주식은 Alpaca Market Data, FMP, Alpha Vantage, Tiingo EOD, Yahoo fallback 순서로 조회합니다. 키가 없는 provider는 자동으로 건너뛰므로 초기에는 Yahoo fallback으로 계속 동작하고, `FMP_API_KEY`를 넣으면 미국 기업 재무/실적 분석까지 확장할 수 있습니다. 미국 장중 실시간 알림이 중요해지면 Alpaca WebSocket 또는 Massive를 별도 실시간 계층으로 추가합니다.
 
-FMP profile과 재무제표 요약은 해외 종목 후보의 `fundamental_profile`로 저장합니다. 리스크 리뷰는 `isActivelyTrading=false` 종목을 차단하고, 고베타, ADR, 미국 소형주, ETF, 매출/순이익 역성장, 음수 FCF 마진, 높은 D/E를 경고로 표시합니다.
+FMP profile, 재무제표 요약, earnings calendar는 해외 종목 후보의 `fundamental_profile`로 저장합니다. 리스크 리뷰는 `isActivelyTrading=false` 종목을 차단하고, 고베타, ADR, 미국 소형주, ETF, 매출/순이익 역성장, 음수 FCF 마진, 높은 D/E, 실적발표 임박, 직전 EPS 쇼크를 경고로 표시합니다.
 
 포트폴리오에 미국 주식과 한국 주식이 섞여 있으면 USD 종목은 USD/KRW로 KRW 환산해 총자산을 계산합니다.
 
