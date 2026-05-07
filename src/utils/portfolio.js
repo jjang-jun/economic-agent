@@ -46,6 +46,7 @@ function normalizePosition(position) {
     weight: position.weight ?? position.ratio ?? null,
     thesis: position.thesis || '',
     stopLossPct: position.stopLossPct ?? null,
+    manualPnlPct: position.manualPnlPct ?? null,
   };
 }
 
@@ -100,24 +101,32 @@ function getFxRate(currency, fxRates = {}) {
 function valuePosition(position, quote, fxRates = {}) {
   const quantity = typeof position.quantity === 'number' ? position.quantity : null;
   const avgPrice = typeof position.avgPrice === 'number' ? position.avgPrice : null;
+  const manualPnlPct = typeof position.manualPnlPct === 'number'
+    ? position.manualPnlPct
+    : null;
+  const manualCurrentPrice = manualPnlPct !== null && avgPrice !== null
+    ? avgPrice * (1 + manualPnlPct / 100)
+    : null;
   const currentPrice = typeof position.currentPrice === 'number'
     ? position.currentPrice
-    : (quote?.price ?? null);
+    : (manualCurrentPrice ?? quote?.price ?? null);
   const currency = position.currency || quote?.currency || '';
   const fxRate = getFxRate(currency, fxRates);
   const costBasis = quantity !== null && avgPrice !== null ? quantity * avgPrice * fxRate : null;
   const marketValue = quantity !== null && typeof currentPrice === 'number' ? quantity * currentPrice * fxRate : null;
   const unrealizedPnl = marketValue !== null && costBasis !== null ? marketValue - costBasis : null;
-  const unrealizedPnlPct = unrealizedPnl !== null && costBasis
+  const unrealizedPnlPct = manualPnlPct !== null
+    ? manualPnlPct
+    : (unrealizedPnl !== null && costBasis
     ? round((unrealizedPnl / costBasis) * 100)
-    : null;
+    : null);
 
   return {
     ...position,
     currentPrice,
     priceCurrency: quote?.currency || currency,
-    priceSource: typeof position.currentPrice === 'number' ? 'manual' : 'quote',
-    quoteSource: typeof position.currentPrice === 'number' ? 'manual' : (quote?.source || ''),
+    priceSource: typeof position.currentPrice === 'number' || manualPnlPct !== null ? 'manual' : 'quote',
+    quoteSource: typeof position.currentPrice === 'number' || manualPnlPct !== null ? 'manual' : (quote?.source || ''),
     fxRate,
     previousClose: quote?.previousClose ?? null,
     changePercent: quote?.changePercent ?? null,
@@ -129,6 +138,7 @@ function valuePosition(position, quote, fxRates = {}) {
     marketValue,
     unrealizedPnl,
     unrealizedPnlPct,
+    manualPnlPct,
   };
 }
 

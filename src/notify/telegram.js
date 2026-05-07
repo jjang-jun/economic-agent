@@ -203,9 +203,9 @@ function formatStockReport(report) {
     const profile = s.risk_profile || {};
     const market = s.market_profile || {};
     const review = s.risk_review || {};
-    const rr = profile.riskReward ? `손익비 ${profile.riskReward}:1` : '';
-    const stop = profile.expectedLossPct ? `손절폭 ${profile.expectedLossPct}%` : '';
-    const size = profile.suggestedAmount ? `제안 ${formatKRW(profile.suggestedAmount)} (${profile.suggestedWeightPct}%)` : '';
+    const rr = profile.riskReward ? `손익비 ${profile.riskReward}:1 (최소 2:1)` : '';
+    const stop = profile.expectedLossPct ? `예상 손실폭 ${profile.expectedLossPct}%` : '';
+    const size = profile.suggestedAmount ? `제안 매수 ${formatKRW(profile.suggestedAmount)} (계좌 ${profile.suggestedWeightPct}%)` : '';
     const rs = typeof market.relativeStrength20d === 'number' ? `RS20 ${market.relativeStrength20d}%p` : '';
     const volume = typeof market.volumeRatio20d === 'number' ? `거래량 ${market.volumeRatio20d}x` : '';
     const high = market.breakout20d
@@ -250,8 +250,9 @@ function formatStockReport(report) {
       const pnl = typeof position.unrealizedPnl === 'number'
         ? ` · 손익 ${formatKRW(position.unrealizedPnl)} (${position.unrealizedPnlPct}%)`
         : '';
+      const manual = position.quoteSource === 'manual' ? ' · 수동손익' : '';
       const weight = typeof position.weight === 'number' ? ` · 비중 ${Math.round(position.weight * 100)}%` : '';
-      return `▸ ${escapeHtml(position.name || position.ticker)} ${position.currentPrice?.toLocaleString('ko-KR') || ''}${pnl}${weight}`;
+      return `▸ ${escapeHtml(position.name || position.ticker)} ${position.currentPrice?.toLocaleString('ko-KR') || ''}${pnl}${manual}${weight}`;
     });
 
   const sections = [
