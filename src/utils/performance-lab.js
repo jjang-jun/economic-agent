@@ -64,6 +64,18 @@ function summarizeGroups(recommendations, getKey) {
   );
 }
 
+function topGroups(groupSummary = {}, limit = 5) {
+  return Object.entries(groupSummary)
+    .map(([key, summary]) => ({ key, ...summary }))
+    .filter(item => item.evaluated > 0)
+    .sort((a, b) => (
+      (b.avgSignalReturnPct ?? -Infinity) - (a.avgSignalReturnPct ?? -Infinity)
+      || (b.winRatePct ?? -Infinity) - (a.winRatePct ?? -Infinity)
+      || b.evaluated - a.evaluated
+    ))
+    .slice(0, limit);
+}
+
 function riskRewardBucket(recommendation) {
   const risk = recommendation.riskProfile || recommendation.risk_profile || {};
   const rr = risk.riskReward;
@@ -72,6 +84,99 @@ function riskRewardBucket(recommendation) {
   if (rr < 2) return '1.5-2.0';
   if (rr < 3) return '2.0-3.0';
   return '>=3.0';
+}
+
+function getRiskProfile(recommendation = {}) {
+  return recommendation.riskProfile || recommendation.risk_profile || {};
+}
+
+function getRiskReview(recommendation = {}) {
+  return recommendation.riskReview || recommendation.risk_review || {};
+}
+
+function getMarketProfile(recommendation = {}) {
+  return recommendation.marketProfile || recommendation.market_profile || {};
+}
+
+function getFundamentalProfile(recommendation = {}) {
+  return recommendation.fundamentalProfile || recommendation.fundamental_profile || {};
+}
+
+function sectorKey(recommendation = {}) {
+  const market = getMarketProfile(recommendation);
+  const fundamental = getFundamentalProfile(recommendation);
+  const risk = getRiskProfile(recommendation);
+  return recommendation.sector
+    || recommendation.primarySector
+    || recommendation.primary_sector
+    || market.sector
+    || fundamental.sector
+    || risk.sector
+    || 'unknown';
+}
+
+function riskFactorKeys(recommendation = {}) {
+  const risk = getRiskProfile(recommendation);
+  const review = getRiskReview(recommendation);
+  const keys = [];
+  if (typeof risk.riskReward !== 'number') keys.push('missing_rr');
+  else if (risk.riskReward < 2) keys.push('low_rr');
+  else keys.push('rr_ok');
+  if (!risk.expectedLossPct && !risk.stopLossPrice) keys.push('missing_stop');
+  if (typeof risk.expectedLossPct === 'number' && risk.expectedLossPct > 10) keys.push('wide_stop');
+  if (review.approved === false || review.action === 'watch_only') keys.push('blocked_or_watch');
+  for (const blocker of review.blockers || []) keys.push(`blocker:${String(blocker).split(':')[0]}`);
+  for (const warning of review.warnings || []) keys.push(`warning:${String(warning).split(':')[0]}`);
+  if (keys.length === 0) keys.push('no_flag');
+  return [...new Set(keys)];
+}
+
+function classifyFailure(recommendation = {}) {
+  const latest = latestEvaluation(recommendation);
+  if (!latest) return 'not_evaluated';
+  const evaluation = latest.evaluation;
+  if ((evaluation.signalReturnPct ?? 0) > 0) return 'not_failure';
+  const risk = getRiskProfile(recommendation);
+  const review = getRiskReview(recommendation);
+  if (evaluation.stopTouched === true) return 'stop_touched';
+  if (typeof risk.riskReward === 'number' && risk.riskReward < 2) return 'low_risk_reward';
+  if (typeof evaluation.alphaPct === 'number' && evaluation.alphaPct < 0) return 'underperformed_benchmark';
+  if (typeof evaluation.maxDrawdownPct === 'number' && evaluation.maxDrawdownPct < -7) return 'large_drawdown';
+  if (review.approved === false || review.action === 'watch_only') return 'blocked_candidate';
+  if (recommendation.conviction === 'low') return 'low_conviction';
+  if (!Array.isArray(recommendation.relatedNews) || recommendation.relatedNews.length === 0) return 'missing_evidence';
+  return 'direction_failed';
+}
+
+function summarizeFailures(recommendations = []) {
+  const failures = recommendations
+    .map(recommendation => ({ recommendation, latest: latestEvaluation(recommendation), reason: classifyFailure(recommendation) }))
+    .filter(item => item.latest && item.reason !== 'not_failure');
+  const byReason = groupBy(failures, item => item.reason);
+  return Object.entries(byReason)
+    .map(([reason, items]) => ({
+      reason,
+      count: items.length,
+      avgSignalReturnPct: summarizeEvaluated(items.map(item => item.recommendation)).avgSignalReturnPct,
+      examples: items
+        .slice(0, 3)
+        .map(item => item.recommendation.name || item.recommendation.ticker || item.recommendation.symbol)
+        .filter(Boolean),
+    }))
+    .sort((a, b) => b.count - a.count || (a.avgSignalReturnPct ?? 0) - (b.avgSignalReturnPct ?? 0));
+}
+
+function summarizeMultiKeyGroups(recommendations, getKeys) {
+  const pairs = [];
+  for (const recommendation of recommendations) {
+    for (const key of getKeys(recommendation)) {
+      pairs.push({ key, recommendation });
+    }
+  }
+  const groups = groupBy(pairs, item => item.key);
+  return Object.fromEntries(
+    Object.entries(groups).map(([key, items]) => [key, summarizeEvaluated(items.map(item => item.recommendation))])
+  );
 }
 
 function buildPerformanceLab({ recommendations = [], trades = [] } = {}) {
@@ -98,6 +203,13 @@ function buildPerformanceLab({ recommendations = [], trades = [] } = {}) {
     byConviction: summarizeGroups(recommendations, item => item.conviction || 'unknown'),
     bySignal: summarizeGroups(recommendations, item => item.signal || 'unknown'),
     byRiskReward: summarizeGroups(recommendations, riskRewardBucket),
+    bySector: summarizeGroups(recommendations, sectorKey),
+    byRiskFactor: summarizeMultiKeyGroups(recommendations, riskFactorKeys),
+    failureAnalysis: summarizeFailures(recommendations),
+    leaders: {
+      sectors: topGroups(summarizeGroups(recommendations, sectorKey), 5),
+      riskFactors: topGroups(summarizeMultiKeyGroups(recommendations, riskFactorKeys), 5),
+    },
   };
 }
 
@@ -106,4 +218,8 @@ module.exports = {
   summarizeEvaluated,
   buildPerformanceLab,
   riskRewardBucket,
+  sectorKey,
+  riskFactorKeys,
+  classifyFailure,
+  summarizeFailures,
 };

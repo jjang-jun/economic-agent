@@ -22,6 +22,17 @@ test('formatPerformanceReview explains recommendation and execution metrics in p
     performanceLab: {
       executedRecommendationQuality: { avgSignalReturnPct: 1.5 },
       missedRecommendationQuality: { avgSignalReturnPct: 3.2 },
+      failureAnalysis: [
+        { reason: 'low_risk_reward', count: 2, avgSignalReturnPct: -3.4, examples: ['A', 'B'] },
+      ],
+      leaders: {
+        sectors: [
+          { key: 'semiconductor', evaluated: 3, winRatePct: 66.7, avgSignalReturnPct: 2.1 },
+        ],
+        riskFactors: [
+          { key: 'rr_ok', evaluated: 4, winRatePct: 75, avgSignalReturnPct: 3.2 },
+        ],
+      },
     },
     behaviorReview: {
       tradeReview: {
@@ -68,6 +79,12 @@ test('formatPerformanceReview explains recommendation and execution metrics in p
   assert.match(message, /내 실행 품질/);
   assert.match(message, /추천을 실제로 산 경우 평균: 1.5%/);
   assert.match(message, /추천했지만 매수하지 않은 경우 평균: 3.2%/);
+  assert.match(message, /실패 원인/);
+  assert.match(message, /low_risk_reward: 2건/);
+  assert.match(message, /섹터별 성과/);
+  assert.match(message, /semiconductor: 평가 3건/);
+  assert.match(message, /리스크 요인별 성과/);
+  assert.match(message, /rr_ok: 평가 4건/);
   assert.match(message, /가격 데이터 품질/);
   assert.match(message, /KRX 3건 · 공공데이터 4건 · KIS fallback 1건/);
   assert.match(message, /추천 수익률은 실제 계좌 수익률이 아닙니다/);
