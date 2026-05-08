@@ -4,6 +4,7 @@ const { persistPerformanceReview } = require('../src/utils/persistence');
 
 async function main() {
   const period = process.argv[2] || 'weekly';
+  const noTelegram = process.argv.includes('--noTelegram') || process.argv.includes('--no-telegram');
   if (!['weekly', 'monthly'].includes(period)) {
     throw new Error('period must be weekly or monthly');
   }
@@ -13,7 +14,11 @@ async function main() {
   await persistPerformanceReview(review);
   console.log(`[성과리뷰] ${period} review saved: ${file}`);
   console.log(`[성과리뷰] 추천 ${review.recommendationSummary.total}건, 거래 ${review.tradeSummary.total}건`);
-  await sendPerformanceReview(review);
+  if (noTelegram) {
+    console.log('[성과리뷰] Telegram 전송 생략');
+  } else {
+    await sendPerformanceReview(review);
+  }
 }
 
 main().catch(err => {

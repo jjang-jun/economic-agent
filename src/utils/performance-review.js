@@ -9,6 +9,7 @@ const { persistFinancialFreedomGoal } = require('./persistence');
 const { buildPerformanceLab } = require('./performance-lab');
 const { buildBehaviorReview } = require('./behavior-reviewer');
 const { buildCollectorOpsSummary } = require('./collector-ops');
+const { buildPriceSourceQualitySummary } = require('./price-source-quality');
 
 const REVIEW_DIR = path.join(__dirname, '..', '..', 'data', 'performance-reviews');
 
@@ -106,7 +107,10 @@ async function buildPerformanceReview(period = 'weekly') {
     recommendations: periodRecommendations,
     trades: periodTrades,
   });
-  const collectorOps = await buildCollectorOpsSummary({ days });
+  const [collectorOps, priceSourceQuality] = await Promise.all([
+    buildCollectorOpsSummary({ days }),
+    buildPriceSourceQualitySummary({ days }),
+  ]);
   let freedomPortfolio = null;
   if (period === 'monthly') {
     const enriched = await enrichPortfolio(loadPortfolio());
@@ -134,12 +138,13 @@ async function buildPerformanceReview(period = 'weekly') {
     performanceLab,
     behaviorReview,
     collectorOps,
+    priceSourceQuality,
     freedomStatus,
-    notes: buildNotes(recommendationSummary, tradeSummary, behaviorReview, collectorOps),
+    notes: buildNotes(recommendationSummary, tradeSummary, behaviorReview, collectorOps, priceSourceQuality),
   };
 }
 
-function buildNotes(recommendationSummary, tradeSummary, behaviorReview = {}, collectorOps = {}) {
+function buildNotes(recommendationSummary, tradeSummary, behaviorReview = {}, collectorOps = {}, priceSourceQuality = {}) {
   const notes = [];
   if (recommendationSummary.evaluated === 0) {
     notes.push('평가 완료된 추천이 아직 부족합니다.');
@@ -163,6 +168,12 @@ function buildNotes(recommendationSummary, tradeSummary, behaviorReview = {}, co
   }
   if ((collectorOps.alertEvents?.pendingCatchUp || 0) > 0) {
     notes.push(`catch-up 중요 알림 ${collectorOps.alertEvents.pendingCatchUp}건이 다이제스트 대기 중입니다.`);
+  }
+  if (priceSourceQuality.healthLabel === 'empty') {
+    notes.push('최근 가격 스냅샷이 없어 가격 provider 동작 여부를 확인해야 합니다.');
+  }
+  if (priceSourceQuality.healthLabel === 'warn') {
+    notes.push('가격 source 품질이 주의 상태입니다. KRX/Data.go.kr/KIS와 fallback 사용 비율을 확인해야 합니다.');
   }
   return notes;
 }

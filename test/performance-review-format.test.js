@@ -41,6 +41,22 @@ test('formatPerformanceReview explains recommendation and execution metrics in p
         pendingCatchUp: 0,
       },
     },
+    priceSourceQuality: {
+      totalSnapshots: 20,
+      tickerCount: 7,
+      eodSnapshots: 8,
+      officialEod: {
+        krx: 3,
+        dataGoKr: 4,
+        ratePct: 87.5,
+      },
+      kisEodFallback: 1,
+      fallback: {
+        total: 2,
+        ratePct: 10,
+      },
+      staleSnapshots: 0,
+    },
     notes: ['실제 거래 중 추천과 연결되지 않은 비중이 높습니다.'],
   });
 
@@ -52,5 +68,7 @@ test('formatPerformanceReview explains recommendation and execution metrics in p
   assert.match(message, /내 실행 품질/);
   assert.match(message, /추천을 실제로 산 경우 평균: 1.5%/);
   assert.match(message, /추천했지만 매수하지 않은 경우 평균: 3.2%/);
+  assert.match(message, /가격 데이터 품질/);
+  assert.match(message, /KRX 3건 · 공공데이터 4건 · KIS fallback 1건/);
   assert.match(message, /추천 수익률은 실제 계좌 수익률이 아닙니다/);
 });

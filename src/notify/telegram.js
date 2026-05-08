@@ -746,6 +746,9 @@ function formatPerformanceReview(review) {
   const tradeBehavior = behavior.tradeReview || {};
   const collector = review.collectorOps || {};
   const alerts = collector.alertEvents || {};
+  const priceQuality = review.priceSourceQuality || {};
+  const officialEod = priceQuality.officialEod || {};
+  const priceFallback = priceQuality.fallback || {};
   const freedom = review.freedomStatus || {};
   const notes = (review.notes || []).map(item => `▸ ${escapeHtml(item)}`);
 
@@ -791,6 +794,13 @@ function formatPerformanceReview(review) {
     `▸ 즉시 알림: ${collector.totalImmediateAlerts ?? 0}건`,
     `▸ 다이제스트 대기: ${alerts.pendingDigest ?? 0}건 / catch-up ${alerts.pendingCatchUp ?? 0}건`,
   ] : [];
+  const priceLines = priceQuality.totalSnapshots ? [
+    `▸ 가격 스냅샷: ${priceQuality.totalSnapshots ?? 0}건 / 종목 ${priceQuality.tickerCount ?? 0}개`,
+    `▸ EOD 가격: ${priceQuality.eodSnapshots ?? 0}건, 공식 EOD 비중 ${officialEod.ratePct ?? 'n/a'}%`,
+    `▸ KRX ${officialEod.krx ?? 0}건 · 공공데이터 ${officialEod.dataGoKr ?? 0}건 · KIS fallback ${priceQuality.kisEodFallback ?? 0}건`,
+    `▸ Naver/Yahoo fallback: ${priceFallback.total ?? 0}건 (${priceFallback.ratePct ?? 'n/a'}%)`,
+    `▸ 오래된 가격 의심: ${priceQuality.staleSnapshots ?? 0}건`,
+  ] : [];
 
   return [
     `🧾 <b>${title}</b>`,
@@ -801,7 +811,8 @@ function formatPerformanceReview(review) {
     [`<b>1. AI 추천 성과</b>`, ...recommendationLines.map(escapeHtml)].join('\n'),
     [`<b>2. 내 실행 품질</b>`, ...executionLines.map(escapeHtml)].join('\n'),
     collectorLines.length > 0 ? [`<b>3. 수집/알림 운영</b>`, ...collectorLines.map(escapeHtml)].join('\n') : '',
-    notes.length > 0 ? [`<b>4. 이번 주 점검할 것</b>`, ...notes].join('\n') : '',
+    priceLines.length > 0 ? [`<b>4. 가격 데이터 품질</b>`, ...priceLines.map(escapeHtml)].join('\n') : '',
+    notes.length > 0 ? [`<b>5. 이번 주 점검할 것</b>`, ...notes].join('\n') : '',
     '<i>추천 수익률은 실제 계좌 수익률이 아닙니다. 추천 성과와 내 매매 성과를 분리해서 봅니다.</i>',
   ].filter(Boolean).join('\n');
 }
