@@ -10,7 +10,7 @@
     "start": "node --env-file=.env src/check-news.js",
     "collect:news": "node --env-file-if-exists=.env src/check-news.js",
     "collector:scheduled": "node --env-file-if-exists=.env scripts/run-scheduled-news-collector.js",
-    "collector:ops-report": "node --env-file=.env scripts/collector-ops-report.js",
+    "collector:ops-report": "node --env-file-if-exists=.env scripts/collector-ops-report.js",
     "digest": "node --env-file=.env src/digest.js",
     "report": "node --env-file=.env src/stock-report.js",
     "evaluate": "node --env-file=.env src/evaluate-recommendations.js",
