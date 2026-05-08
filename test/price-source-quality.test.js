@@ -1,6 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { summarizePriceSourceQuality } = require('../src/utils/price-source-quality');
+const {
+  summarizePriceSourceQuality,
+  buildPriceSourceQualityAnomalies,
+} = require('../src/utils/price-source-quality');
 
 test('summarizePriceSourceQuality separates official EOD and fallback sources', () => {
   const summary = summarizePriceSourceQuality([
@@ -32,4 +35,34 @@ test('summarizePriceSourceQuality separates official EOD and fallback sources', 
   assert.equal(summary.attempts.failed, 1);
   assert.equal(summary.attempts.failureRatePct, 33.33);
   assert.equal(summary.healthLabel, 'ok');
+});
+
+test('buildPriceSourceQualityAnomalies flags provider failures and fallback overuse', () => {
+  const anomalies = buildPriceSourceQualityAnomalies({
+    totalSnapshots: 10,
+    fallback: { ratePct: 60 },
+    staleSnapshots: 4,
+    attempts: {
+      total: 10,
+      failed: 4,
+      empty: 1,
+      failureRatePct: 40,
+      emptyRatePct: 10,
+      byProvider: [
+        { provider: 'kis-rest', count: 5, failed: 3, failureRatePct: 60 },
+      ],
+    },
+  }, {
+    minAttempts: 5,
+    maxFailureRatePct: 30,
+    maxFallbackRatePct: 50,
+    maxStaleSnapshots: 3,
+  });
+
+  assert.deepEqual(anomalies, [
+    '가격 provider 실패율 40% (4/10)',
+    'kis-rest 실패율 60% (3/5)',
+    'Naver/Yahoo fallback 비중 60%',
+    '오래된 가격 스냅샷 4건',
+  ]);
 });

@@ -1,0 +1,30 @@
+name: Price Provider Ops Report (가격 데이터 점검)
+
+on:
+  schedule:
+    # KST 23:55 = UTC 14:55
+    - cron: '55 14 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm run price-provider:ops-report
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_PRIVATE_CHAT_ID: ${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}
+          TELEGRAM_SECRET_CHAT_ID: ${{ secrets.TELEGRAM_SECRET_CHAT_ID }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PRICE_PROVIDER_MAX_FAILURE_RATE_PCT: '30'
+          PRICE_PROVIDER_MAX_EMPTY_RATE_PCT: '40'
+          PRICE_PROVIDER_MIN_ATTEMPTS: '5'
+          PRICE_PROVIDER_MAX_FALLBACK_RATE_PCT: '80'

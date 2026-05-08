@@ -161,8 +161,42 @@ async function buildPriceSourceQualitySummary({ days = 7 } = {}) {
   return summarizePriceSourceQuality(snapshotResult.rows || [], { attempts: attemptResult.rows || [] });
 }
 
+function buildPriceSourceQualityAnomalies(summary = {}, options = {}) {
+  const maxFailureRatePct = options.maxFailureRatePct ?? Number(process.env.PRICE_PROVIDER_MAX_FAILURE_RATE_PCT || 30);
+  const maxEmptyRatePct = options.maxEmptyRatePct ?? Number(process.env.PRICE_PROVIDER_MAX_EMPTY_RATE_PCT || 40);
+  const minAttempts = options.minAttempts ?? Number(process.env.PRICE_PROVIDER_MIN_ATTEMPTS || 5);
+  const maxFallbackRatePct = options.maxFallbackRatePct ?? Number(process.env.PRICE_PROVIDER_MAX_FALLBACK_RATE_PCT || 80);
+  const maxStaleSnapshots = options.maxStaleSnapshots ?? Number(process.env.PRICE_PROVIDER_MAX_STALE_SNAPSHOTS || 3);
+  const attempts = summary.attempts || {};
+  const anomalies = [];
+
+  if ((summary.totalSnapshots || 0) === 0) {
+    anomalies.push('최근 가격 스냅샷이 없습니다');
+  }
+  if ((attempts.total || 0) >= minAttempts && typeof attempts.failureRatePct === 'number' && attempts.failureRatePct > maxFailureRatePct) {
+    anomalies.push(`가격 provider 실패율 ${attempts.failureRatePct}% (${attempts.failed}/${attempts.total})`);
+  }
+  if ((attempts.total || 0) >= minAttempts && typeof attempts.emptyRatePct === 'number' && attempts.emptyRatePct > maxEmptyRatePct) {
+    anomalies.push(`가격 provider 빈 응답률 ${attempts.emptyRatePct}% (${attempts.empty}/${attempts.total})`);
+  }
+  for (const provider of attempts.byProvider || []) {
+    if (provider.count >= minAttempts && typeof provider.failureRatePct === 'number' && provider.failureRatePct > maxFailureRatePct) {
+      anomalies.push(`${provider.provider} 실패율 ${provider.failureRatePct}% (${provider.failed}/${provider.count})`);
+    }
+  }
+  if (typeof summary.fallback?.ratePct === 'number' && summary.fallback.ratePct > maxFallbackRatePct) {
+    anomalies.push(`Naver/Yahoo fallback 비중 ${summary.fallback.ratePct}%`);
+  }
+  if ((summary.staleSnapshots || 0) > maxStaleSnapshots) {
+    anomalies.push(`오래된 가격 스냅샷 ${summary.staleSnapshots}건`);
+  }
+
+  return anomalies;
+}
+
 module.exports = {
   summarizePriceSourceQuality,
   summarizeProviderAttempts,
   buildPriceSourceQualitySummary,
+  buildPriceSourceQualityAnomalies,
 };
