@@ -189,6 +189,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 가격 데이터 품질 요약을 주간/월간 성과 리뷰에 연결했다. `price_snapshots` 기준으로 KRX/Data.go.kr 공식 EOD, KIS EOD fallback, Naver/Yahoo fallback 비중과 오래된 가격 의심 건수를 계산하고 Telegram 성과 리뷰에 별도 섹션으로 표시한다.
 - 로컬 HTML 대시보드를 Freedom 중심으로 재구성했다. `npm run dashboard`는 `data/dashboard/index.html`을 생성하며, 첫 화면에서 목표 자산/현재 자산/달성률/필요 연수익률/예상 도달일/하락 스트레스 지연을 먼저 보여주고 가격 데이터 품질 섹션도 함께 표시한다.
 - 리포트 입력 데이터의 Supabase 우선순위를 높였다. 장 마감 종목 분석은 Supabase `articles`의 중요 기사와 로컬 아카이브를 병합해 사용하고, 일일 행동 리포트는 로컬 `portfolio.json`보다 Supabase `portfolio_accounts`/`positions` 원본을 먼저 사용한다.
+- 다이제스트 입력 버퍼를 Supabase 우선으로 전환했다. `digest`는 `alert_events`의 `digest`/`catch_up` 대기 항목과 로컬 `article-buffer.json`을 병합해 요약하고, Telegram 전송 성공 후 Supabase 대기 이벤트를 `sent`로 갱신한다.
 
 ## 다음 작업
 

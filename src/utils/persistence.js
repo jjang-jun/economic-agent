@@ -652,6 +652,32 @@ async function persistAlertEvents(events) {
   return upsert('alert_events', rows, 'article_id,alert_type');
 }
 
+async function loadBufferedDigestArticles(options = {}) {
+  const result = await selectRows('alert_events', {
+    select: 'id,article_id,alert_type,status,payload,created_at',
+    alert_type: postgrestIn(options.alertTypes || ['digest', 'catch_up']),
+    status: postgrestIn(options.statuses || ['buffered', 'pending']),
+    order: options.order || 'created_at.asc',
+    limit: String(options.limit || 100),
+  });
+  if (!result.rows) return result;
+
+  return {
+    rows: result.rows
+      .map(row => {
+        const article = { ...(row.payload || {}) };
+        if (!article.id && row.article_id) article.id = row.article_id;
+        return {
+          ...article,
+          alertEventId: row.id,
+          alertType: row.alert_type,
+          alertStatus: row.status,
+        };
+      })
+      .filter(article => article.id),
+  };
+}
+
 async function loadAlertEventsForArticles(articleIds = []) {
   const ids = [...new Set((articleIds || []).filter(Boolean).map(String))];
   if (ids.length === 0) return [];
@@ -702,5 +728,6 @@ module.exports = {
   tryAcquireJobLock,
   releaseJobLock,
   persistAlertEvents,
+  loadBufferedDigestArticles,
   loadAlertEventsForArticles,
 };

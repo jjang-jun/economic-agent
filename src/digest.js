@@ -1,11 +1,19 @@
 const { loadBuffer, clearBuffer } = require('./utils/article-buffer');
+const { dedupeArticles } = require('./utils/article-identity');
 const { fetchAllIndicators } = require('./utils/indicators');
 const { generateDigest } = require('./analysis/digest');
 const { sendDigest } = require('./notify/telegram');
 const { saveDailySummary } = require('./utils/daily-summary');
 const { archiveScoredArticles } = require('./utils/article-archive');
 const { fetchMarketSnapshot } = require('./utils/market-snapshot');
-const { persistArticles, persistDailySummary, persistMarketSnapshots, persistInvestorFlow } = require('./utils/persistence');
+const {
+  persistArticles,
+  persistDailySummary,
+  persistMarketSnapshots,
+  persistInvestorFlow,
+  loadBufferedDigestArticles,
+  persistAlertEvents,
+} = require('./utils/persistence');
 
 // 세션 자동 판별 (KST 기준)
 function detectSession() {
@@ -26,9 +34,13 @@ async function main() {
   const session = process.argv[2] || detectSession();
   console.log(`[${new Date().toISOString()}] 다이제스트 생성: ${session}`);
 
-  // 버퍼에 쌓인 기사 가져오기. 성공적으로 전송한 뒤에만 비운다.
-  const articles = loadBuffer();
-  console.log(`[버퍼] ${articles.length}건 수집됨`);
+  // 버퍼에 쌓인 기사 가져오기. Cloud Run/Actions 간 상태 공유를 위해
+  // Supabase alert_events를 우선하고 로컬 파일 버퍼는 보조로 병합한다.
+  const buffered = await loadBufferedDigestArticles({ limit: 100 });
+  const supabaseArticles = buffered.rows || [];
+  const localArticles = loadBuffer();
+  const articles = dedupeArticles([...supabaseArticles, ...localArticles]);
+  console.log(`[버퍼] Supabase ${supabaseArticles.length}건, 로컬 ${localArticles.length}건, 병합 ${articles.length}건`);
 
   if (articles.length === 0) {
     console.log('[완료] 요약할 기사가 없습니다.');
@@ -60,6 +72,15 @@ async function main() {
   // 일일 요약 저장
   const summary = saveDailySummary({ articles, indicators });
   await persistDailySummary(summary);
+  await persistAlertEvents(
+    supabaseArticles.map(article => ({
+      articleId: article.id,
+      alertType: article.alertType || 'digest',
+      status: 'sent',
+      sentAt: new Date().toISOString(),
+      payload: article,
+    }))
+  );
   clearBuffer();
 
   console.log(`[${new Date().toISOString()}] 완료`);
