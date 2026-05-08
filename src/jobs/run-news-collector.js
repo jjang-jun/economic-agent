@@ -190,6 +190,8 @@ async function runNewsCollector(options = {}) {
         rssFetchedCount: rssArticles.length,
         dartFetchedCount: dartArticles.length,
         newArticleCount: 0,
+        immediateAlertCount: 0,
+        digestBufferCount: 0,
       });
       await upsertSourceCursor(jobName, {
         lastSuccessAt: new Date().toISOString(),
@@ -216,6 +218,8 @@ async function runNewsCollector(options = {}) {
         rssFetchedCount: rssArticles.length,
         dartFetchedCount: dartArticles.length,
         newArticleCount: newArticles.length,
+        immediateAlertCount: 0,
+        digestBufferCount: 0,
       });
       await upsertSourceCursor(jobName, {
         lastSuccessAt: new Date().toISOString(),
