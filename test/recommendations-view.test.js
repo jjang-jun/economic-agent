@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const {
   getLatestRecommendations,
   formatRecommendationLine,
+  humanizeRiskReason,
 } = require('../src/agent/recommendations-view');
 
 test('getLatestRecommendations sorts by createdAt descending', () => {
@@ -63,6 +64,40 @@ test('formatRecommendationLine translates watch only neutral recommendations', (
   assert.match(line, /관찰/);
   assert.match(line, /신뢰도 낮음/);
   assert.match(line, /관찰만/);
-  assert.match(line, /제안금액 없음/);
-  assert.match(line, /차단: risk_reward/);
+  assert.match(line, /매수 제안 없음/);
+  assert.match(line, /차단: 손익비 부족/);
+  assert.match(line, /기대수익이 예상손실의 1.6배/);
+});
+
+test('formatRecommendationLine hides buy amount for watch-only candidates', () => {
+  const line = formatRecommendationLine({
+    id: 'r2',
+    name: '관찰종목',
+    ticker: '000002',
+    signal: 'neutral',
+    conviction: 'low',
+    riskReview: {
+      action: 'watch_only',
+      blockers: ['risk_reward: 1.6:1 < 2:1'],
+      warnings: ['risk_reward: 1.6:1 < 2:1'],
+    },
+    riskProfile: {
+      suggestedAmount: 1000000,
+    },
+  });
+
+  assert.match(line, /매수 제안 없음/);
+  assert.doesNotMatch(line, /제안 1,000,000원/);
+  assert.equal((line.match(/손익비 부족/g) || []).length, 1);
+});
+
+test('humanizeRiskReason explains common internal blockers', () => {
+  assert.equal(
+    humanizeRiskReason('position_size: no available amount'),
+    '매수 가능 금액 없음: 현금, 종목 비중, 섹터 비중 또는 1회 한도에 걸림'
+  );
+  assert.match(
+    humanizeRiskReason('risk_reward: 1.14:1 / min 2.5:1'),
+    /최소 기준 2.5배보다 낮음/
+  );
 });

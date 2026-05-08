@@ -66,16 +66,49 @@ function capSuggestedAmount(rawAmount) {
 function formatRiskReasons(review = {}, limit = 2) {
   const blockers = Array.isArray(review.blockers) ? review.blockers : [];
   const warnings = Array.isArray(review.warnings) ? review.warnings : [];
-  return [
-    ...blockers.map(item => `차단: ${item}`),
-    ...warnings.map(item => `주의: ${item}`),
-  ].slice(0, limit);
+  const blockerReasons = blockers.map(humanizeRiskReason);
+  const blockerSet = new Set(blockerReasons);
+  const warningReasons = warnings.map(humanizeRiskReason).filter(reason => !blockerSet.has(reason));
+  const reasons = [
+    ...blockerReasons.map(item => `차단: ${item}`),
+    ...warningReasons.map(item => `주의: ${item}`),
+  ];
+  return [...new Set(reasons)].slice(0, limit);
+}
+
+function humanizeRiskReason(reason = '') {
+  const text = String(reason || '');
+  const riskRewardMatch = text.match(/risk_reward:\s*([\d.]+):1\s*(?:<|\/)\s*(?:min\s*)?([\d.]+):1/i);
+  if (riskRewardMatch) {
+    return `손익비 부족: 기대수익이 예상손실의 ${riskRewardMatch[1]}배로, 최소 기준 ${riskRewardMatch[2]}배보다 낮음`;
+  }
+
+  if (/risk_reward/i.test(text)) {
+    return `손익비 기준 미달: ${text}`;
+  }
+  if (/position_size:\s*no available amount/i.test(text)) {
+    return '매수 가능 금액 없음: 현금, 종목 비중, 섹터 비중 또는 1회 한도에 걸림';
+  }
+  if (/position_size:\s*missing/i.test(text)) {
+    return '제안 비중/금액 없음';
+  }
+  if (/liquidity/i.test(text)) {
+    return `유동성 기준 미달: ${text}`;
+  }
+  if (/stop_loss/i.test(text)) {
+    return `손절 기준 문제: ${text}`;
+  }
+  if (/market_regime|regime/i.test(text)) {
+    return `시장 국면 제한: ${text}`;
+  }
+  return text;
 }
 
 function formatRecommendationLine(item = {}) {
   const review = item.riskReview || item.risk_review || {};
   const risk = item.riskProfile || item.risk_profile || {};
   const positionSize = risk.positionSize || risk.position_size || {};
+  const isBuyCandidate = !review.action || review.action === 'candidate';
   const rawSuggestedAmount = typeof risk.suggestedAmount === 'number' ? risk.suggestedAmount : null;
   const suggestedAmount = capSuggestedAmount(rawSuggestedAmount);
   const entry = risk.entryReferencePrice ? `진입 ${formatPrice(Number(risk.entryReferencePrice))}` : '';
@@ -83,7 +116,9 @@ function formatRecommendationLine(item = {}) {
   const limiter = rawSuggestedAmount !== null && suggestedAmount !== rawSuggestedAmount
     ? '1회 신규매수 상한'
     : getLimiterLabel(positionSize, suggestedAmount);
-  const size = suggestedAmount ? `제안 ${formatKRW(suggestedAmount)}${limiter ? ` (${limiter} 기준)` : ''}` : '제안금액 없음';
+  const size = isBuyCandidate && suggestedAmount
+    ? `제안 ${formatKRW(suggestedAmount)}${limiter ? ` (${limiter} 기준)` : ''}`
+    : '매수 제안 없음';
   const label = [
     labelValue(SIGNAL_LABELS, item.signal, '방향 미정'),
     labelValue(CONVICTION_LABELS, item.conviction, '신뢰도 미정'),
@@ -120,4 +155,5 @@ module.exports = {
   getLatestRecommendations,
   formatRecommendationLine,
   formatRecentRecommendations,
+  humanizeRiskReason,
 };

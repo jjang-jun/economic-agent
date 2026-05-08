@@ -672,6 +672,7 @@ function formatPerformanceReport(completed) {
     `📈 <b>추천 성과 평가</b>`,
     `⏰ ${now}`,
     `평균 방향 반영 수익률: <b>${avg.toFixed(2)}%</b>`,
+    `방향 반영 수익률은 상승 의견은 오른 만큼, 하락/축소 의견은 내린 만큼 맞춘 성과로 계산합니다.`,
     '',
     lines.join('\n\n'),
   ].join('\n');
