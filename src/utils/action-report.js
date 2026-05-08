@@ -71,34 +71,51 @@ function classifyPosition(position, portfolio) {
   const return5dPct = typeof position.return5dPct === 'number' ? position.return5dPct : null;
   const return20dPct = typeof position.return20dPct === 'number' ? position.return20dPct : null;
   const reasons = [];
+  const evidence = [];
 
   if (pnlPct !== null && pnlPct <= -Math.abs(stopLossPct)) {
     reasons.push(`손절 기준 ${stopLossPct}% 도달`);
-    return { action: 'sell', reasons };
+    evidence.push(`현재 손익 ${pnlPct}% <= 손절 기준 -${Math.abs(stopLossPct)}%`);
+    return { action: 'sell', reasons, evidence, stopLossPct };
   }
 
   if (weight !== null && weight > portfolio.maxPositionRatio) {
     reasons.push(`종목 비중 ${Math.round(weight * 100)}%로 한도 초과`);
+    evidence.push(`비중 ${Math.round(weight * 100)}% > 한도 ${Math.round(portfolio.maxPositionRatio * 100)}%`);
   }
   if (pnlPct !== null && pnlPct >= trimProfitPct) {
     reasons.push(`수익률 ${pnlPct}%로 일부 이익 잠금 후보`);
+    evidence.push(`수익률 ${pnlPct}% >= 이익잠금 기준 ${trimProfitPct}%`);
   }
   if (return5dPct !== null && return5dPct <= -5) {
     reasons.push(`5일 수익률 ${return5dPct}%로 단기 약세`);
+    evidence.push(`5일 수익률 ${return5dPct}%`);
   }
   if (return20dPct !== null && return20dPct <= -10) {
     reasons.push(`20일 수익률 ${return20dPct}%로 추세 약화`);
+    evidence.push(`20일 수익률 ${return20dPct}%`);
   }
 
-  if (reasons.length > 0) return { action: 'reduce', reasons };
-  return { action: 'hold', reasons: ['손절/비중/추세 경고 없음'] };
+  if (reasons.length > 0) return { action: 'reduce', reasons, evidence, stopLossPct };
+
+  if (pnlPct !== null) evidence.push(`현재 손익 ${pnlPct}%`);
+  if (weight !== null) evidence.push(`비중 ${Math.round(weight * 100)}%`);
+  if (return5dPct !== null) evidence.push(`5일 ${return5dPct}%`);
+  if (return20dPct !== null) evidence.push(`20일 ${return20dPct}%`);
+  evidence.push(`손절 기준 -${Math.abs(stopLossPct)}% 미도달`);
+  return { action: 'hold', reasons: ['손절/비중/추세 경고 없음'], evidence, stopLossPct };
 }
 
 function buildPositionActions(portfolio) {
   const groups = { hold: [], reduce: [], sell: [] };
   for (const position of portfolio.positions || []) {
     const result = classifyPosition(position, portfolio);
-    groups[result.action].push({ ...position, actionReasons: result.reasons });
+    groups[result.action].push({
+      ...position,
+      actionReasons: result.reasons,
+      actionEvidence: result.evidence,
+      actionStopLossPct: result.stopLossPct,
+    });
   }
   return groups;
 }
@@ -119,6 +136,7 @@ function buildActionReport({ recommendations, portfolio }) {
       positionCount: (portfolio.positions || []).length,
       maxNewBuyAmount: portfolio.maxNewBuyAmount,
       maxNewBuyRatio: portfolio.maxNewBuyRatio,
+      maxPositionRatio: portfolio.maxPositionRatio,
     },
     newBuyCandidates: buildNewBuyCandidates(recommendations, portfolio),
     watchOnlyCandidates: buildWatchOnlyCandidates(recommendations, portfolio),
