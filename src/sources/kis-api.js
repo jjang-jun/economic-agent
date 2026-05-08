@@ -150,6 +150,7 @@ function parseNumber(value) {
 async function getAccessToken() {
   const cached = loadTokenCache();
   if (cached.accessToken && cached.expiresAt > Date.now() + 60_000) {
+    await saveRemoteTokenCache(cached);
     return cached.accessToken;
   }
   const remoteCached = await loadRemoteTokenCache();
