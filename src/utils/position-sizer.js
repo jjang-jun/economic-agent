@@ -37,7 +37,7 @@ function getCurrentSectorValue(positions, sector) {
 function getRegimePolicy(market = {}, policy = STRATEGY_POLICY) {
   const regime = market.regime || 'NEUTRAL';
   const tags = market.tags || [];
-  if (regime === 'RISK_ON' && tags.includes('OVERHEATED')) {
+  if ((regime === 'RISK_ON' || regime === 'STRONG_RISK_ON') && tags.includes('OVERHEATED')) {
     return {
       name: 'FRAGILE_RISK_ON',
       ...policy.regimeRules.FRAGILE_RISK_ON,

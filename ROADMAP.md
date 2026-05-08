@@ -161,11 +161,11 @@ Telegram Bot
 - [x] 해외 현재가 우선순위: Alpaca -> FMP -> Alpha Vantage -> Tiingo EOD -> Yahoo fallback
 - [x] FMP provider 골격 추가: 미국 기업 profile/fundamental 확장 준비
 - [x] 사용 가격의 source/as_of/price_type 저장
-- [ ] KIS 계정 키 설정 후 국내 현재가 실호출 검증
+- [x] KIS 계정 키 설정 후 국내 현재가 실호출 검증
 - [x] FMP API key 설정 후 보유 미국 주식 quote/profile 실호출 검증
 - [x] Alpaca API key 설정 후 미국 보유 종목 현재가 검증
-- [ ] KIS 일봉 데이터를 추천 성과 평가에 연결
-- [ ] KRX Open API 또는 공공데이터포털로 공식 일별 종가 백필
+- [x] KIS 일봉 데이터를 추천 성과 평가 fallback에 연결
+- [x] KRX Open API 또는 공공데이터포털로 공식 일별 종가 백필
 - [ ] Massive는 미국 주식 고품질 히스토리/실시간이 필요해질 때 유료 계층으로 추가
 - [ ] pykrx/FinanceDataReader는 로컬 백테스트 worker로 분리
 - [ ] 가격 source별 품질/오류율 모니터링
@@ -173,7 +173,7 @@ Telegram Bot
 ## Phase 3: 포트폴리오 기반 의사결정
 - [x] 비공개 포트폴리오 파일/Secret 로딩 구조
 - [x] 실제 매매 실행 기록이 포트폴리오 현금/수량/평단을 갱신
-- [ ] 실제 첫 보유 종목 입력 후 운영 데이터 축적
+- [x] 실제 첫 보유 종목 입력 후 운영 데이터 축적
 - [x] 종목별 현재가와 평가손익 자동 계산
 - [x] 매수 후보, 관찰 후보, 보유, 축소, 매도 후보 분리
 - [x] 2,000만원 계좌 기준 신규 매수 상한/1회 손실 한도 계산
@@ -192,8 +192,8 @@ Telegram Bot
 - [x] 외국인/기관 수급 데이터 추가
 - [ ] 뉴스/공시 악재 비율과 가격 반응 결합
 - [x] RISK_OFF 시 신규 매수 제한 자동 적용
-- [ ] `STRONG_RISK_ON`, `FRAGILE_RISK_ON`, `PANIC` 세부 레짐 추가
-- [ ] 레짐별 `maxEquityExposure`, `maxNewBuyRatio`, `minRiskReward` 정책 도입
+- [x] `STRONG_RISK_ON`, `FRAGILE_RISK_ON`, `PANIC` 세부 레짐 추가
+- [x] 레짐별 `maxEquityExposure`, `maxNewBuyRatio`, `minRiskReward` 정책 도입
 
 ## Phase 5: 추천 품질 개선
 - [x] AI 추천과 룰 기반 리스크 필터 분리
@@ -205,7 +205,7 @@ Telegram Bot
 - [x] 추천 실패 원인 기록 필드 추가
 - [x] 추천 평가에 MFE/MAE, 손절선/목표구간 터치 여부 저장
 - [x] AI 종목 분석 프롬프트에 외부 기사 데이터 prompt injection 방어 문구 추가
-- [ ] 추천 JSON schema를 계약처럼 검증하고 필수 필드 누락 시 저장 차단
+- [x] 추천 JSON schema를 계약처럼 검증하고 필수 필드 누락 시 저장 차단
 - [ ] 추천 실패 원인 사후 분류 자동화
 - [ ] 섹터별/리스크팩터별/모델별 승률 리포트
 - [ ] 프롬프트 버전별 성과 비교
@@ -219,8 +219,8 @@ Telegram Bot
 - [x] 수동 매매 실행 기록 입력
 - [x] 실제 거래 현재가 기준 성과 리포트
 - [x] 5분 뉴스 수집 workflow concurrency 적용
-- [ ] `performance-lab.js`로 추천/실거래/미실행 추천 성과를 분리 분석
-- [ ] `behavior-reviewer.js`로 원칙 위반 거래와 반복 행동 패턴을 경고
+- [x] `performance-lab.js`로 추천/실거래/미실행 추천 성과를 분리 분석
+- [x] `behavior-reviewer.js`로 원칙 위반 거래와 반복 행동 패턴을 경고
 
 ## Phase 7: 경제적 자유 엔진
 - [x] `freedom-engine.js` 추가
@@ -247,12 +247,11 @@ Telegram Bot
 - [x] 뉴스 수집 endpoint 수동 검증 스크립트 추가
 
 ## 현재 가장 중요한 다음 작업
-1. Render Blueprint 또는 Cloud Run으로 실제 Agent Server를 배포한다.
-2. 배포 URL에 Telegram webhook을 등록하고 5분 수집 cron이 `collector_runs`를 쌓는지 확인한다.
-3. FMP profile/financial statement를 보유 미국 종목 분석 리포트에 연결한다.
-4. KRX/공공데이터 일별 종가 백필 provider를 추가한다.
-5. 추천 JSON schema 검증을 추가해 근거, 기준 가격, 손절선, 손익비, 제안 비중이 없는 추천 저장을 차단한다.
-6. `performance-lab.js`와 `behavior-reviewer.js`로 추천/실거래/행동 패턴을 분리 분석한다.
+1. Telegram `/buy`, `/sell`, `/cash` 실제 private 채팅 end-to-end 승인 흐름을 검증한다.
+2. KRX/Data.go.kr/KIS EOD 가격 품질과 오류율을 주간 운영 리포트에 추가한다.
+3. 브리핑/리포트 입력 데이터를 파일 아카이브가 아니라 Supabase 기준으로 조회 가능하게 바꾼다.
+4. 추천 실패 원인 사후 분류와 섹터별/리스크팩터별 승률 리포트를 자동화한다.
+5. 로컬 대시보드 첫 탭을 Freedom 중심으로 재구성한다.
 
 ## 운영 루프
 

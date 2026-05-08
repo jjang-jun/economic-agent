@@ -184,6 +184,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 포트폴리오 원본 동기화 보강. 평가 필드(`marketValue`, `costBasis`, `unrealizedPnlPct`, `quoteSource`, `fxRate`)를 정규화 과정에서 보존하고, `portfolio:snapshot`이 Supabase 원본을 우선 읽은 뒤 평가 결과를 `portfolio_snapshots`뿐 아니라 `portfolio_accounts`/`positions`에도 다시 저장한다.
 - Telegram 추천/성과 문구 추가 개선. `/recommendations`의 `risk_reward`, `position_size` 같은 내부 차단 코드를 손익비 부족/매수 가능 금액 없음처럼 설명형 한국어로 바꾸고, 추천 성과 평가의 “방향 반영 수익률” 계산 의미를 메시지 본문에 함께 표시한다.
 - 추천 후보 필터 강화. 손익비가 낮거나 리스크 리뷰를 통과하지 못한 종목은 `recommendations` 로그/성과평가 대상에 새로 저장하지 않고, Telegram `/recommendations` 기본 화면도 `risk_review.approved=true`, `action=candidate`, 손익비/진입가/손절가가 모두 있는 후보만 “매수 검토 후보”로 표시한다. 차단/관찰 후보는 기본 화면에서 숨기고 `/recommendations blocked`처럼 명시적으로 요청했을 때만 참고 섹션에 보여준다.
+- 시장 레짐 세분화 적용. 기존 `RISK_ON/NEUTRAL/RISK_OFF`에 더해 `STRONG_RISK_ON`, `FRAGILE_RISK_ON`, `PANIC`을 실제 `scoreMarketRegime` 결과로 반환하고, Telegram 설명과 행동 가드레일에 연결했다. 과열/대형주 쏠림 장은 `FRAGILE_RISK_ON`으로 분류되어 더 높은 손익비 기준과 제한적 매수 정책을 적용한다.
 
 ## 다음 작업
 

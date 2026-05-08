@@ -17,7 +17,7 @@ function reviewStock(stock, decision = {}) {
   const blockers = [];
   const warnings = [];
 
-  addFactor(factors, 'market_regime', marketRegime !== 'RISK_OFF', marketRegime);
+  addFactor(factors, 'market_regime', !['RISK_OFF', 'PANIC'].includes(marketRegime), marketRegime);
   const minRiskReward = positionSize.regimePolicy?.minRiskReward || STRATEGY_POLICY.recommendationRules.minRiskReward;
   addFactor(factors, 'risk_reward', typeof profile.riskReward === 'number' && profile.riskReward >= minRiskReward, profile.riskReward ? `${profile.riskReward}:1 / min ${minRiskReward}:1` : 'missing');
   addFactor(factors, 'stop_width', typeof profile.expectedLossPct === 'number' && profile.expectedLossPct <= STRATEGY_POLICY.recommendationRules.maxStopLossPct, profile.expectedLossPct ? `${profile.expectedLossPct}%` : 'missing');

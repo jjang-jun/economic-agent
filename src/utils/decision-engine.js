@@ -88,6 +88,15 @@ function scoreInvestorFlow(flow) {
   return { score, reasons };
 }
 
+function classifyMarketRegime({ score, tags = [], vixPrice = null }) {
+  if (score <= -4 || (typeof vixPrice === 'number' && vixPrice >= 35)) return 'PANIC';
+  if (score <= -2) return 'RISK_OFF';
+  if (score >= 3 && tags.includes('BROAD_RALLY') && !tags.includes('OVERHEATED')) return 'STRONG_RISK_ON';
+  if (score >= 2 && (tags.includes('OVERHEATED') || tags.includes('CONCENTRATED_LEADERSHIP'))) return 'FRAGILE_RISK_ON';
+  if (score >= 2) return 'RISK_ON';
+  return 'NEUTRAL';
+}
+
 function scoreMarketRegime({ articles, indicators }) {
   const sentiment = countBySentiment(articles);
   const snapshot = indicators.marketSnapshot || [];
@@ -191,9 +200,10 @@ function scoreMarketRegime({ articles, indicators }) {
   }
 
   const base = { score, reasons, sentiment, tags: uniqueTags, warnings };
-  if (score <= -2) return { regime: 'RISK_OFF', ...base };
-  if (score >= 2) return { regime: 'RISK_ON', ...base };
-  return { regime: 'NEUTRAL', ...base };
+  return {
+    regime: classifyMarketRegime({ score, tags: uniqueTags, vixPrice: vix?.price }),
+    ...base,
+  };
 }
 
 function summarizePortfolio(portfolio) {
@@ -267,11 +277,37 @@ function buildActions(market, portfolio) {
     '손절선 없는 신규 매수 금지',
   ].filter(Boolean);
 
+  if (regime === 'PANIC') {
+    return [
+      '신규 매수 금지',
+      '현금 확보와 손절 기준 점검 우선',
+      '레버리지/미수/추격매수 금지',
+      ...portfolioChecks,
+    ];
+  }
   if (regime === 'RISK_OFF') {
     return [
       '신규 매수 중단 또는 최소화',
       `보유 종목은 손절 기준(${portfolio.stopLossPct}%)과 악재 공시 여부 우선 점검`,
       '현금 비중 유지, 고변동 성장주는 비중 축소 후보로 분류',
+      ...portfolioChecks,
+    ];
+  }
+  if (regime === 'STRONG_RISK_ON') {
+    return [
+      `high 확신도 추천만 총 자산의 ${Math.round(portfolio.maxNewBuyRatio * 100)}% 이내 분할 매수 후보`,
+      '상승 폭이 넓은 장이므로 주도주 눌림목과 피라미딩 후보를 검토',
+      '단, 손절선과 종목/섹터 한도는 유지',
+      ...aggressiveChecks,
+      ...portfolioChecks,
+    ];
+  }
+  if (regime === 'FRAGILE_RISK_ON') {
+    return [
+      '제한적 신규 매수만 허용: 손익비 기준을 높이고 거래량 확인 필수',
+      '대형주 쏠림/과열 구간이므로 주변 테마 추격 금지',
+      '기존 보유 주도주 중심으로만 분할 접근',
+      ...aggressiveChecks,
       ...portfolioChecks,
     ];
   }
@@ -347,6 +383,7 @@ module.exports = {
   buildDecisionContext,
   buildDecisionContextWithQuotes,
   scoreMarketRegime,
+  classifyMarketRegime,
   summarizePortfolio,
   formatKRW,
   scoreInvestorFlow,

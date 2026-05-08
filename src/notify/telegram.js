@@ -70,14 +70,18 @@ function formatQuantity(value) {
 
 function formatRegime(regime, score) {
   const labels = {
+    STRONG_RISK_ON: '강한 공격 가능',
     RISK_ON: '공격 가능',
+    FRAGILE_RISK_ON: '제한적 공격',
     NEUTRAL: '중립',
     RISK_OFF: '방어 우선',
     PANIC: '위기',
     UNKNOWN: '판단 보류',
   };
   const descriptions = {
+    STRONG_RISK_ON: '상승 폭이 비교적 넓어 신규 매수를 검토할 수 있지만 손절선과 비중 제한은 유지해야 하는 상태',
     RISK_ON: '시장 점수가 좋아 신규 매수를 검토할 수 있는 상태',
+    FRAGILE_RISK_ON: '지수는 강하지만 과열이나 대형주 쏠림이 있어 손익비와 거래량 확인을 더 엄격히 해야 하는 상태',
     NEUTRAL: '상승/하락 신호가 뚜렷하지 않아 비중을 크게 늘리기보다 관찰과 분할 접근이 필요한 상태',
     RISK_OFF: '시장 위험이 커져 신규 매수를 줄이고 현금과 손절 기준을 우선해야 하는 상태',
     PANIC: '급격한 위험 회피 상태',
