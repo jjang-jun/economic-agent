@@ -169,10 +169,11 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - Telegram `/recommendations` 명령 추가. 최근 추천 ID, 진입가, 손절가, 제안금액을 확인하고 `/buy ... rec=추천ID` 형태로 실제 거래 기록과 추천을 연결 가능.
 - FMP 재무제표 요약 연결. 해외 후보의 `fundamental_profile.statements`에 매출/순이익 YoY, FCF 마진, 마진율, D/E, current ratio, P/E를 저장하고, 역성장/음수 FCF/높은 D/E를 리스크 리뷰 경고로 표시.
 - FMP earnings calendar 연결. 해외 후보의 `fundamental_profile.earnings`에 다음 실적일, 예상 EPS/매출, 직전 EPS surprise를 저장하고, 7일 이내 실적발표와 직전 EPS 쇼크를 리스크 경고로 표시.
+- 로컬 대시보드 추천 검증 화면 보강. `Latest Recommendations`에 진입가, 손절가, 제안금액, 차단/경고 요인을 표시하고, 최근 추천의 반복 리스크 이벤트를 별도 섹션으로 집계.
 
 ## 다음 작업
 
 1. KRX Open API 공식 일별/통계 검증 provider 추가
 2. Telegram `/buy`, `/sell`, `/cash` 실제 private 채팅 end-to-end 운영 검증
 3. Telegram 추천 ID 연결 거래의 실제 end-to-end 운영 검증
-4. 추천 후보별 이벤트 리스크를 대시보드에 표시
+4. Data.go.kr/KIS EOD 가격 품질 모니터링과 추천 성과 샘플 누적

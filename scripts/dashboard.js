@@ -50,12 +50,88 @@ function fmtKRW(value) {
   return typeof value === 'number' && Number.isFinite(value) ? `${value.toLocaleString('ko-KR')}원` : 'n/a';
 }
 
+function fmtPrice(value, currency = 'KRW') {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 'n/a';
+  if (currency === 'USD') return `$${value.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+  return `${value.toLocaleString('ko-KR')}원`;
+}
+
 function latestByDate(rows, fields = ['created_at', 'generated_at', 'end_date', 'date']) {
   return [...(rows || [])].sort((a, b) => {
     const left = fields.map(field => a?.[field]).find(Boolean) || '';
     const right = fields.map(field => b?.[field]).find(Boolean) || '';
     return String(right).localeCompare(String(left));
   })[0] || null;
+}
+
+function getRecommendationPayload(item = {}) {
+  return item.payload || item;
+}
+
+function getRiskProfile(item = {}) {
+  const payload = getRecommendationPayload(item);
+  return payload.riskProfile || payload.risk_profile || item.risk_profile || {};
+}
+
+function getRiskReview(item = {}) {
+  const payload = getRecommendationPayload(item);
+  return payload.riskReview || payload.risk_review || item.risk_review || {};
+}
+
+function getEntry(item = {}) {
+  const payload = getRecommendationPayload(item);
+  return payload.entry || item.entry || {};
+}
+
+function getCurrency(item = {}) {
+  const entry = getEntry(item);
+  const market = getRecommendationPayload(item).marketProfile || getRecommendationPayload(item).market_profile || item.market_profile || {};
+  return entry.currency || market.currency || 'KRW';
+}
+
+function getEntryPrice(item = {}) {
+  const risk = getRiskProfile(item);
+  const entry = getEntry(item);
+  return Number(risk.entryReferencePrice ?? risk.entry_reference_price ?? entry.price);
+}
+
+function getStopPrice(item = {}) {
+  const risk = getRiskProfile(item);
+  return Number(risk.stopLossPrice ?? risk.stop_loss_price);
+}
+
+function getSuggestedAmount(item = {}) {
+  const risk = getRiskProfile(item);
+  return Number(risk.suggestedAmount ?? risk.suggested_amount);
+}
+
+function compactRiskText(item = {}, limit = 3) {
+  const review = getRiskReview(item);
+  const blockers = Array.isArray(review.blockers) ? review.blockers : [];
+  const warnings = Array.isArray(review.warnings) ? review.warnings : [];
+  return [...blockers.map(value => `차단: ${value}`), ...warnings.map(value => `경고: ${value}`)]
+    .slice(0, limit)
+    .join(' / ');
+}
+
+function summarizeRiskEvents(recommendations = []) {
+  const events = new Map();
+  for (const item of recommendations) {
+    const review = getRiskReview(item);
+    const candidates = [
+      ...(Array.isArray(review.blockers) ? review.blockers.map(value => `차단: ${value}`) : []),
+      ...(Array.isArray(review.warnings) ? review.warnings.map(value => `경고: ${value}`) : []),
+    ];
+    for (const event of candidates) {
+      const normalized = String(event || '').trim();
+      if (!normalized) continue;
+      events.set(normalized, (events.get(normalized) || 0) + 1);
+    }
+  }
+  return [...events.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 8)
+    .map(([event, count]) => ({ event, count }));
 }
 
 function average(rows, field) {
@@ -91,6 +167,7 @@ function buildDashboard() {
   const latestPortfolio = portfolio[0] || {};
   const latestFlow = investorFlows[0] || {};
   const latestRecommendations = recommendations.slice(0, 12);
+  const riskEvents = summarizeRiskEvents(latestRecommendations);
   const latestReview = latestByDate(performanceReviews);
   const reviewPayload = latestReview?.payload || {};
   const behaviorWarnings = reviewPayload.behaviorReview?.warnings || [];
@@ -180,19 +257,32 @@ function buildDashboard() {
         ? `<ul class="list">${behaviorWarnings.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
         : '<p class="muted">최근 리뷰에 행동 경고가 없습니다.</p>'}
     </section>
+    <section class="panel">
+      <h2>Recommendation Risk Events</h2>
+      ${riskEvents.length > 0
+        ? `<ul class="list">${riskEvents.map(item => `<li>${escapeHtml(item.event)} <span class="badge">${escapeHtml(item.count)}건</span></li>`).join('')}</ul>`
+        : '<p class="muted">최근 추천에 누적된 차단/경고 이벤트가 없습니다.</p>'}
+    </section>
     <section>
       <h2>Latest Recommendations</h2>
       <table>
-        <thead><tr><th>Date</th><th>Name</th><th>Signal</th><th>Conviction</th><th>Risk Review</th><th>Reason</th></tr></thead>
+        <thead><tr><th>Date</th><th>Name</th><th>Signal</th><th>Conviction</th><th>Entry</th><th>Stop</th><th>Suggested</th><th>Risk Review</th><th>Risk Events</th><th>Reason</th></tr></thead>
         <tbody>
-          ${latestRecommendations.map(item => row([
-            item.date,
-            item.name,
-            item.signal,
-            item.conviction,
-            item.risk_review?.action || item.payload?.riskReview?.action || '',
-            item.reason,
-          ])).join('')}
+          ${latestRecommendations.map(item => {
+            const currency = getCurrency(item);
+            return row([
+              item.date,
+              item.name,
+              item.signal,
+              item.conviction,
+              fmtPrice(getEntryPrice(item), currency),
+              fmtPrice(getStopPrice(item), currency),
+              fmtKRW(getSuggestedAmount(item)),
+              getRiskReview(item).action || '',
+              compactRiskText(item),
+              item.reason,
+            ]);
+          }).join('')}
         </tbody>
       </table>
     </section>
