@@ -199,9 +199,13 @@ function scoreMarketRegime({ articles, indicators }) {
 function summarizePortfolio(portfolio) {
   const positionCount = portfolio.positions.length;
   const cashPct = Math.round((portfolio.cashRatio || 0) * 100);
-  const maxNewBuyAmount = portfolio.totalAssetValue
+  const ratioCap = portfolio.totalAssetValue
     ? Math.floor(portfolio.totalAssetValue * portfolio.maxNewBuyRatio)
     : null;
+  const absoluteCap = typeof portfolio.maxNewBuyAmount === 'number' ? portfolio.maxNewBuyAmount : null;
+  const maxNewBuyAmount = [ratioCap, absoluteCap]
+    .filter(value => typeof value === 'number' && Number.isFinite(value))
+    .reduce((min, value) => Math.min(min, value), Infinity);
   const overweight = portfolio.positions
     .filter(position => typeof position.weight === 'number' && position.weight > portfolio.maxPositionRatio)
     .map(position => `${position.name || position.ticker} 비중 ${Math.round(position.weight * 100)}%`);
@@ -220,7 +224,7 @@ function summarizePortfolio(portfolio) {
     cashPct,
     cashAmount: portfolio.cashAmount,
     totalAssetValue: portfolio.totalAssetValue,
-    maxNewBuyAmount,
+    maxNewBuyAmount: Number.isFinite(maxNewBuyAmount) ? maxNewBuyAmount : null,
     overweight,
     overweightSectors,
   };

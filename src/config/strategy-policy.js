@@ -8,6 +8,7 @@ module.exports = {
     maxSectorPct: 0.35,
     maxSpeculativeBucketPct: 0.1,
     defaultMaxNewBuyPct: 0.05,
+    defaultMaxNewBuyAmountKrw: 1000000,
   },
 
   recommendationRules: {

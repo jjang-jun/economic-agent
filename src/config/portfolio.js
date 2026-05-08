@@ -3,6 +3,7 @@ module.exports = {
   cashAmount: null,
   totalAssetValue: null,
   maxNewBuyRatio: 0.05,
+  maxNewBuyAmount: 1000000,
   maxPositionRatio: 0.2,
   maxSectorRatio: 0.35,
   stopLossPct: -7,

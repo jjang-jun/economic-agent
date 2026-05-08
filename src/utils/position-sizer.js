@@ -87,6 +87,9 @@ function calculatePositionSize({
     portfolio.maxNewBuyRatio || capitalRules.defaultMaxNewBuyPct,
     regimePolicy.maxNewBuyRatio ?? capitalRules.defaultMaxNewBuyPct
   );
+  const maxNewBuyAmountCap = positiveNumber(portfolio.maxNewBuyAmount)
+    || positiveNumber(portfolio.maxNewBuyAmountKrw)
+    || positiveNumber(capitalRules.defaultMaxNewBuyAmountKrw);
   const maxRiskAmount = totalAssetValue ? Math.floor(totalAssetValue * maxSingleTradeRiskPct) : null;
   const amountByRisk = maxRiskAmount && expectedLossPct
     ? Math.floor(maxRiskAmount / (expectedLossPct / 100))
@@ -104,6 +107,7 @@ function calculatePositionSize({
   const limits = [
     ['risk', amountByRisk],
     ['new_buy_cap', amountByNewBuyCap],
+    ['new_buy_amount_cap', maxNewBuyAmountCap],
     ['ticker_limit', amountByTickerLimit],
     ['sector_limit', amountBySectorLimit],
     ['cash', cashAmount],

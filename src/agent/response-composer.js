@@ -65,6 +65,15 @@ function formatRiskStatus({ portfolio, policy }) {
   const riskAmount = typeof portfolio.totalAssetValue === 'number'
     ? portfolio.totalAssetValue * (capital.maxSingleTradeRiskPct || 0.01)
     : null;
+  const ratioBuyCap = typeof portfolio.totalAssetValue === 'number'
+    ? portfolio.totalAssetValue * (portfolio.maxNewBuyRatio || capital.defaultMaxNewBuyPct || 0.05)
+    : null;
+  const absoluteBuyCap = typeof portfolio.maxNewBuyAmount === 'number'
+    ? portfolio.maxNewBuyAmount
+    : capital.defaultMaxNewBuyAmountKrw;
+  const maxNewBuyAmount = [ratioBuyCap, absoluteBuyCap]
+    .filter(value => typeof value === 'number' && Number.isFinite(value))
+    .reduce((min, value) => Math.min(min, value), Infinity);
   const overweight = (portfolio.positions || [])
     .filter(position => typeof position.weight === 'number' && position.weight > (portfolio.maxPositionRatio || capital.maxSinglePositionPct || 0.15))
     .map(position => `▸ ${escapeHtml(position.name || position.ticker)} 비중 ${pct(position.weight)} 초과`);
@@ -81,7 +90,7 @@ function formatRiskStatus({ portfolio, policy }) {
   return [
     '<b>리스크 상태</b>',
     `거래당 최대 손실: ${formatKRW(riskAmount)} (${((capital.maxSingleTradeRiskPct || 0.01) * 100).toFixed(1)}%)`,
-    `신규 매수 1회 상한: ${formatKRW(portfolio.totalAssetValue * (portfolio.maxNewBuyRatio || capital.defaultMaxNewBuyPct || 0.05))}`,
+    `신규 매수 1회 상한: ${formatKRW(Number.isFinite(maxNewBuyAmount) ? maxNewBuyAmount : null)}`,
     `현금 비중: ${pct(portfolio.cashRatio)}`,
     `레버리지/미수: ${policy.leverageRules?.allowMargin || policy.leverageRules?.allowMisu ? '주의 필요' : '금지'}`,
     '',

@@ -172,10 +172,12 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 로컬 대시보드 추천 검증 화면 보강. `Latest Recommendations`에 진입가, 손절가, 제안금액, 차단/경고 요인을 표시하고, 최근 추천의 반복 리스크 이벤트를 별도 섹션으로 집계.
 - KRX Open API 공식 EOD provider 추가. 국내 추천 성과 평가와 백필용 일별 종가는 KRX 일별매매정보를 우선 사용하고, 실패 시 Data.go.kr/KIS fallback으로 내려간다.
 - GitHub Actions `KRX_OPENAPI_KEY` Secret 등록 확인. 추천 성과 평가 workflow가 KRX 공식 EOD provider를 사용할 수 있도록 env 주입 추가.
+- Telegram `/recommendations` 문구 개선. `neutral/low/watch_only` 같은 내부 코드를 한국어 행동 문구로 번역하고, 제안금액에는 실제 제한 요인(`손실한도`, `1회 신규매수 상한`, `현금` 등)을 표시한다.
+- 1회 신규매수 절대 상한 추가. 총자산 5%가 커져도 기본 제안금액은 `maxNewBuyAmount=1000000`을 넘지 않도록 보수적으로 제한.
 
 ## 다음 작업
 
-1. Evaluate Recommendations workflow 수동 실행으로 KRX 운영 경로 검증
+1. Telegram `/recommendations` 실제 private 채팅 출력 확인
 2. Telegram `/buy`, `/sell`, `/cash` 실제 private 채팅 end-to-end 운영 검증
 3. Telegram 추천 ID 연결 거래의 실제 end-to-end 운영 검증
 4. KRX/Data.go.kr/KIS EOD 가격 품질 모니터링과 추천 성과 샘플 누적
