@@ -45,8 +45,7 @@ function getRows(data) {
 
 function rowToQuote(row = {}, options = {}) {
   const code = normalizeKisTicker(
-    options.ticker
-    || row.ISU_CD
+    row.ISU_CD
     || row.ISU_SRT_CD
     || row.SHRT_CODE
     || row.srtnCd
