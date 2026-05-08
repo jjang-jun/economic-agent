@@ -199,6 +199,10 @@ async function runNewsCollector(options = {}) {
       return { ok: true, newArticleCount: 0, immediateAlertCount: 0, digestBufferCount: 0 };
     }
 
+    // Cloud Run has ephemeral local files. Persist raw collected articles too so
+    // low-score/keyword-missed items are not counted as "new" every 5 minutes.
+    await persistArticles(newArticles);
+
     const keywordFiltered = filterByKeywords(newArticles);
     console.log(`[키워드] ${keywordFiltered.length}건 통과`);
 
