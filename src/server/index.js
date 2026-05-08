@@ -1,4 +1,5 @@
 const http = require('http');
+const pkg = require('../../package.json');
 const { handleTelegramWebhook } = require('./telegram-webhook');
 const { runNewsCollector } = require('../jobs/run-news-collector');
 
@@ -24,11 +25,29 @@ function sendJson(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
+function buildVersionPayload() {
+  return {
+    ok: true,
+    service: 'economic-agent',
+    version: pkg.version,
+    mode: 'agent-server',
+    nodeEnv: process.env.NODE_ENV || 'development',
+    revision: process.env.K_REVISION || '',
+    serviceName: process.env.K_SERVICE || '',
+    commitSha: process.env.COMMIT_SHA || process.env.GITHUB_SHA || '',
+  };
+}
+
 async function requestHandler(req, res) {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
 
   if (req.method === 'GET' && url.pathname === '/health') {
     sendJson(res, 200, { ok: true, service: 'economic-agent', mode: 'agent-server' });
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/version') {
+    sendJson(res, 200, buildVersionPayload());
     return;
   }
 
@@ -81,4 +100,5 @@ if (require.main === module) {
 module.exports = {
   startServer,
   requestHandler,
+  buildVersionPayload,
 };
