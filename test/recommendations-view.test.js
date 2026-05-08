@@ -2,17 +2,62 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   getLatestRecommendations,
+  getLatestBlockedRecommendations,
+  isBuyCandidateRecommendation,
   formatRecommendationLine,
+  formatRecentRecommendationsFromList,
   humanizeRiskReason,
 } = require('../src/agent/recommendations-view');
 
 test('getLatestRecommendations sorts by createdAt descending', () => {
   const latest = getLatestRecommendations([
-    { id: 'old', createdAt: '2026-05-06T00:00:00Z' },
-    { id: 'new', createdAt: '2026-05-07T00:00:00Z' },
+    {
+      id: 'old',
+      createdAt: '2026-05-06T00:00:00Z',
+      riskReview: { approved: true, action: 'candidate' },
+      riskProfile: { riskReward: 2.5, entryReferencePrice: 10000, stopLossPrice: 9500 },
+    },
+    {
+      id: 'new',
+      createdAt: '2026-05-07T00:00:00Z',
+      riskReview: { approved: true, action: 'candidate' },
+      riskProfile: { riskReward: 2.5, entryReferencePrice: 10000, stopLossPrice: 9500 },
+    },
   ], 1);
 
   assert.equal(latest[0].id, 'new');
+});
+
+test('getLatestRecommendations excludes watch-only recommendations by default', () => {
+  const recommendations = [
+    { id: 'blocked', createdAt: '2026-05-08T00:00:00Z', riskReview: { approved: false, action: 'watch_only' } },
+    {
+      id: 'candidate',
+      createdAt: '2026-05-07T00:00:00Z',
+      riskReview: { approved: true, action: 'candidate' },
+      riskProfile: { riskReward: 2.5, entryReferencePrice: 10000, stopLossPrice: 9500 },
+    },
+  ];
+
+  assert.equal(isBuyCandidateRecommendation(recommendations[0]), false);
+  assert.equal(isBuyCandidateRecommendation(recommendations[1]), true);
+  assert.deepEqual(getLatestRecommendations(recommendations).map(item => item.id), ['candidate']);
+  assert.deepEqual(getLatestBlockedRecommendations(recommendations).map(item => item.id), ['blocked']);
+});
+
+test('getLatestRecommendations excludes legacy items without risk contract', () => {
+  const recommendations = [
+    { id: 'legacy', createdAt: '2026-05-08T00:00:00Z' },
+    {
+      id: 'low-rr',
+      createdAt: '2026-05-07T00:00:00Z',
+      riskReview: { approved: true, action: 'candidate' },
+      riskProfile: { riskReward: 1.2, entryReferencePrice: 10000, stopLossPrice: 9500 },
+    },
+  ];
+
+  assert.deepEqual(getLatestRecommendations(recommendations).map(item => item.id), []);
+  assert.deepEqual(getLatestBlockedRecommendations(recommendations).map(item => item.id), ['legacy', 'low-rr']);
 });
 
 test('formatRecommendationLine includes id and entry/stop levels', () => {
@@ -45,6 +90,29 @@ test('formatRecommendationLine includes id and entry/stop levels', () => {
   assert.match(line, /신뢰도 높음/);
   assert.match(line, /매수 검토 가능/);
   assert.match(line, /1회 신규매수 상한 기준/);
+});
+
+test('formatRecentRecommendationsFromList separates sections and items with blank lines', () => {
+  const text = formatRecentRecommendationsFromList([
+    {
+      id: 'candidate-1',
+      name: '후보1',
+      createdAt: '2026-05-08T00:00:00Z',
+      riskReview: { approved: true, action: 'candidate' },
+      riskProfile: { riskReward: 2.5, entryReferencePrice: 10000, stopLossPrice: 9500 },
+    },
+    {
+      id: 'candidate-2',
+      name: '후보2',
+      createdAt: '2026-05-07T00:00:00Z',
+      riskReview: { approved: true, action: 'candidate' },
+      riskProfile: { riskReward: 2.5, entryReferencePrice: 10000, stopLossPrice: 9500 },
+    },
+    { id: 'blocked-1', name: '차단1', createdAt: '2026-05-09T00:00:00Z', riskReview: { approved: false, action: 'watch_only' } },
+  ], { limit: 5 });
+
+  assert.match(text, /후보1[\s\S]*\n\n▸ <b>후보2<\/b>/);
+  assert.doesNotMatch(text, /최근 차단\/관찰 후보/);
 });
 
 test('formatRecommendationLine translates watch only neutral recommendations', () => {

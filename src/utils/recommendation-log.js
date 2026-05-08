@@ -60,6 +60,12 @@ function getRelatedArticleIds(stock, articles) {
     .filter(Boolean);
 }
 
+function shouldLogRecommendation(stock = {}) {
+  if (stock.schema_validation?.passed === false) return false;
+  if (stock.risk_review?.approved === false || stock.risk_review?.action === 'watch_only') return false;
+  return stock.risk_review?.approved === true && stock.risk_review?.action === 'candidate';
+}
+
 async function buildRecommendation(stock, articles, indicators, date) {
   const symbol = normalizeYahooSymbol(stock.ticker);
   const [quote, benchmark] = await Promise.all([
@@ -190,7 +196,7 @@ async function logRecommendations(report, context = {}) {
   let skipped = 0;
 
   for (const stock of stocks) {
-    if (stock.schema_validation?.passed === false) {
+    if (!shouldLogRecommendation(stock)) {
       skipped++;
       continue;
     }
@@ -364,6 +370,7 @@ module.exports = {
   loadLocalRecommendations,
   saveRecommendations,
   logRecommendations,
+  shouldLogRecommendation,
   evaluateRecommendations,
   calculateReturn,
   calculateBenchmarkReturn,

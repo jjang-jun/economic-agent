@@ -23,10 +23,41 @@ const ACTION_LABELS = {
   avoid: '제외',
 };
 
+function getRiskProfile(item = {}) {
+  return item.riskProfile || item.risk_profile || {};
+}
+
+function getRiskReview(item = {}) {
+  return item.riskReview || item.risk_review || {};
+}
+
 function getLatestRecommendations(recommendations = [], limit = 5) {
   return [...recommendations]
+    .filter(isBuyCandidateRecommendation)
     .sort((a, b) => new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0))
     .slice(0, limit);
+}
+
+function getLatestBlockedRecommendations(recommendations = [], limit = 3) {
+  return [...recommendations]
+    .filter(item => !isBuyCandidateRecommendation(item))
+    .sort((a, b) => new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0))
+    .slice(0, limit);
+}
+
+function isBuyCandidateRecommendation(item = {}) {
+  const review = getRiskReview(item);
+  const risk = getRiskProfile(item);
+  const minRiskReward = risk.positionSize?.regimePolicy?.minRiskReward
+    || risk.position_size?.regimePolicy?.minRiskReward
+    || STRATEGY_POLICY.recommendationRules?.minRiskReward
+    || 2;
+  return review.approved === true
+    && review.action === 'candidate'
+    && typeof risk.riskReward === 'number'
+    && risk.riskReward >= minRiskReward
+    && typeof risk.entryReferencePrice === 'number'
+    && typeof risk.stopLossPrice === 'number';
 }
 
 function labelValue(map, value, fallback = '미정') {
@@ -105,8 +136,8 @@ function humanizeRiskReason(reason = '') {
 }
 
 function formatRecommendationLine(item = {}) {
-  const review = item.riskReview || item.risk_review || {};
-  const risk = item.riskProfile || item.risk_profile || {};
+  const review = getRiskReview(item);
+  const risk = getRiskProfile(item);
   const positionSize = risk.positionSize || risk.position_size || {};
   const isBuyCandidate = !review.action || review.action === 'candidate';
   const rawSuggestedAmount = typeof risk.suggestedAmount === 'number' ? risk.suggestedAmount : null;
@@ -138,22 +169,34 @@ function formatRecommendationLine(item = {}) {
 
 async function formatRecentRecommendations({ limit = 5 } = {}) {
   const recommendations = await loadRecommendations();
+  return formatRecentRecommendationsFromList(recommendations, { limit });
+}
+
+function formatRecentRecommendationsFromList(recommendations = [], { limit = 5 } = {}) {
   const latest = getLatestRecommendations(recommendations, limit);
+  const blocked = latest.length === 0 ? getLatestBlockedRecommendations(recommendations, 3) : [];
 
   return [
-    '<b>최근 추천</b>',
+    '<b>최근 매수 검토 후보</b>',
     latest.length > 0
-      ? latest.map(formatRecommendationLine).join('\n')
-      : '최근 추천이 없습니다.',
+      ? latest.map(formatRecommendationLine).join('\n\n')
+      : '현재 리스크 기준을 통과한 매수 후보가 없습니다.',
+    blocked.length > 0 ? '' : null,
+    blocked.length > 0 ? '<b>최근 차단/관찰 후보</b>' : null,
+    blocked.length > 0 ? blocked.map(formatRecommendationLine).join('\n\n') : null,
     '',
-    '관찰만/매수 차단은 바로 사라는 뜻이 아닙니다. 매수 후보도 진입가, 손절가, 제안금액을 다시 확인하세요.',
+    '손익비가 낮거나 리스크 기준을 통과하지 못한 종목은 매수 추천으로 보지 않습니다.',
+    '매수 후보도 진입가, 손절가, 제안금액을 다시 확인하세요.',
     '거래 기록 연결 예: /buy 005930 3 70000 삼성전자 rec=추천ID',
-  ].join('\n');
+  ].filter(line => line !== null).join('\n');
 }
 
 module.exports = {
   getLatestRecommendations,
+  getLatestBlockedRecommendations,
+  isBuyCandidateRecommendation,
   formatRecommendationLine,
   formatRecentRecommendations,
+  formatRecentRecommendationsFromList,
   humanizeRiskReason,
 };

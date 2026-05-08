@@ -4,6 +4,7 @@ const {
   addKstDays,
   historyFromEodRows,
   buildEodEvaluationQuote,
+  shouldLogRecommendation,
 } = require('../src/utils/recommendation-log');
 
 test('addKstDays returns KST calendar target date', () => {
@@ -43,4 +44,20 @@ test('buildEodEvaluationQuote uses latest EOD row with history', () => {
   assert.deepEqual(historyFromEodRows([quote]).map(row => row.close), [11000]);
   assert.equal(quote.history.length, 2);
   assert.equal(quote.history[0].high, 10300);
+});
+
+test('shouldLogRecommendation excludes watch-only risk review candidates', () => {
+  assert.equal(shouldLogRecommendation({
+    schema_validation: { passed: true },
+    risk_review: { approved: false, action: 'watch_only' },
+  }), false);
+
+  assert.equal(shouldLogRecommendation({
+    schema_validation: { passed: true },
+    risk_review: { approved: true, action: 'candidate' },
+  }), true);
+
+  assert.equal(shouldLogRecommendation({
+    schema_validation: { passed: true },
+  }), false);
 });
