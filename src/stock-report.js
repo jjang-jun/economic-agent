@@ -7,7 +7,7 @@ const { analyzeStocks } = require('./analysis/stock-analyzer');
 const { sendStockReport } = require('./notify/telegram');
 const { fetchAllIndicators } = require('./utils/indicators');
 const { saveDailySummary } = require('./utils/daily-summary');
-const { archiveScoredArticles, loadScoredArticles } = require('./utils/article-archive');
+const { archiveScoredArticles, loadScoredArticles, getKSTDate } = require('./utils/article-archive');
 const { logRecommendations } = require('./utils/recommendation-log');
 const { fetchMarketSnapshot } = require('./utils/market-snapshot');
 const { buildDecisionContextWithQuotes } = require('./utils/decision-engine');
@@ -24,6 +24,7 @@ const {
   persistInvestorFlow,
   persistPortfolioSnapshot,
   persistDecisionContext,
+  loadPersistedArticles,
 } = require('./utils/persistence');
 
 function mergeArticles(...groups) {
@@ -48,7 +49,10 @@ async function main() {
   await persistMarketSnapshots(indicators.marketSnapshot, 'close');
   await persistInvestorFlow(indicators.investorFlow);
 
+  const persisted = await loadPersistedArticles({ date: getKSTDate(), minScore: 4, limit: 200 });
+  const persistedArticles = persisted.rows || [];
   const archivedArticles = loadScoredArticles();
+  console.log(`[Supabase] 누적 중요 기사 ${persistedArticles.length}건`);
   console.log(`[아카이브] 오늘 누적 기사 ${archivedArticles.length}건`);
 
   // RSS + DART 수집. 아카이브 누락분 보강용이며 seen-articles에 의존하지 않는다.
@@ -62,7 +66,7 @@ async function main() {
   const keywordFiltered = filterByKeywords(allArticles);
   console.log(`[키워드] ${keywordFiltered.length}건 통과`);
 
-  if (keywordFiltered.length === 0 && archivedArticles.length === 0) {
+  if (keywordFiltered.length === 0 && archivedArticles.length === 0 && persistedArticles.length === 0) {
     console.log('[완료] 분석할 기사가 없습니다.');
     return;
   }
@@ -72,7 +76,7 @@ async function main() {
   await persistArticles(latestScored);
   console.log(`[스코어링] 최신 ${latestScored.length}건, 아카이브 신규 ${archived}건`);
 
-  const scored = mergeArticles(loadScoredArticles(), latestScored);
+  const scored = mergeArticles(persistedArticles, loadScoredArticles(), latestScored);
   console.log(`[분석대상] 오늘 누적 중요 기사 ${scored.length}건`);
 
   if (scored.length === 0) {

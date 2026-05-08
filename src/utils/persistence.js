@@ -170,6 +170,30 @@ async function loadPersistedArticleIds(articleIds = []) {
   return found;
 }
 
+async function loadPersistedArticles(options = {}) {
+  const params = {
+    select: 'id,payload,date,score,pub_date,updated_at',
+    order: options.order || 'score.desc,pub_date.desc,updated_at.desc',
+    limit: String(options.limit || 200),
+  };
+  if (options.date) params.date = `eq.${options.date}`;
+  if (typeof options.minScore === 'number') params.score = `gte.${options.minScore}`;
+  if (options.since) params.pub_date = `gte.${options.since}`;
+
+  const result = await selectRows('articles', params);
+  if (!result.rows) return result;
+
+  return {
+    rows: result.rows
+      .map(row => row.payload || {
+        id: row.id,
+        pubDate: row.pub_date,
+        score: row.score,
+      })
+      .filter(Boolean),
+  };
+}
+
 async function persistDailySummary(summary) {
   if (!summary?.date) return { saved: 0 };
   return upsert('daily_summaries', [{
@@ -651,6 +675,7 @@ module.exports = {
   deleteRows,
   persistArticles,
   loadPersistedArticleIds,
+  loadPersistedArticles,
   persistDailySummary,
   persistStockReport,
   persistRecommendations,
