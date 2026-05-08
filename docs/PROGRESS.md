@@ -191,6 +191,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 리포트 입력 데이터의 Supabase 우선순위를 높였다. 장 마감 종목 분석은 Supabase `articles`의 중요 기사와 로컬 아카이브를 병합해 사용하고, 일일 행동 리포트는 로컬 `portfolio.json`보다 Supabase `portfolio_accounts`/`positions` 원본을 먼저 사용한다.
 - 다이제스트 입력 버퍼를 Supabase 우선으로 전환했다. `digest`는 `alert_events`의 `digest`/`catch_up` 대기 항목과 로컬 `article-buffer.json`을 병합해 요약하고, Telegram 전송 성공 후 Supabase 대기 이벤트를 `sent`로 갱신한다.
 - 추천 성과 분석을 고도화했다. `performance-lab`이 실패 원인을 `stop_touched`, `low_risk_reward`, `underperformed_benchmark`, `large_drawdown` 등으로 자동 분류하고, 섹터별/리스크 요인별 승률·평균 신호수익률을 주간/월간 성과 리뷰에 표시한다.
+- Telegram 승인 흐름 smoke를 추가했다. `npm run telegram:smoke-actions`는 `/buy`, `/sell`, `/cash` 초안을 생성한 뒤 모두 취소해 Supabase `pending_actions`와 callback 경로를 검증하며, 실제 거래/현금 변경은 수행하지 않는다. GitHub Actions `telegram-smoke-actions.yml`로 평일 08:10 KST에 정기 점검한다.
 
 ## 다음 작업
 

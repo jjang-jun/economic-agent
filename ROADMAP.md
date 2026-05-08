@@ -246,13 +246,14 @@ Telegram Bot
 - [x] Cloud Run 또는 Fly.io/Render 배포 문서 추가
 - [x] Render Blueprint와 5분 cron guard 추가
 - [x] 뉴스 수집 endpoint 수동 검증 스크립트 추가
+- [x] Telegram 승인 흐름 smoke script와 정기 점검 workflow 추가
 
 ## 현재 가장 중요한 다음 작업
-1. Telegram 승인 흐름을 실제 앱에서 주기적으로 점검하는 smoke script를 추가한다.
-2. 가격 provider 실패 로그를 별도 테이블로 남겨 성공률뿐 아니라 실제 호출 실패율까지 계산한다.
-3. 대시보드를 정적 HTML 생성 방식에서 Agent Server의 인증된 `/dashboard` 화면으로 승격할지 검토한다.
-4. 다이제스트 전송 성공 후 `alert_events` 상태 전환 결과를 운영 리포트에서 별도 추적한다.
-5. 추천 성과를 프롬프트/모델 버전별로 분리해 비교한다.
+1. 가격 provider 실패 로그를 별도 테이블로 남겨 성공률뿐 아니라 실제 호출 실패율까지 계산한다.
+2. 대시보드를 정적 HTML 생성 방식에서 Agent Server의 인증된 `/dashboard` 화면으로 승격할지 검토한다.
+3. 다이제스트 전송 성공 후 `alert_events` 상태 전환 결과를 운영 리포트에서 별도 추적한다.
+4. 추천 성과를 프롬프트/모델 버전별로 분리해 비교한다.
+5. Telegram smoke workflow 실패 시 private 알림을 보내는 후속 경보를 추가한다.
 
 ## 운영 루프
 

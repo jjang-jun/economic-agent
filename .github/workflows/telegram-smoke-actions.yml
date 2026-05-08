@@ -1,0 +1,35 @@
+name: Telegram 승인 흐름 점검
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 08:10 KST, before regular market routines.
+    - cron: '10 23 * * 0-4'
+
+concurrency:
+  group: economic-agent-telegram-smoke-actions
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Smoke pending action flow
+        run: npm run telegram:smoke-actions
+        env:
+          TELEGRAM_SECRET_CHAT_ID: ${{ secrets.TELEGRAM_SECRET_CHAT_ID }}
+          TELEGRAM_SMOKE_CHAT_ID: ${{ secrets.TELEGRAM_SECRET_CHAT_ID }}
+          SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
