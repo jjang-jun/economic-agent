@@ -736,29 +736,68 @@ function formatPerformanceReview(review) {
   const trade = review.tradeSummary || {};
   const lab = review.performanceLab || {};
   const missed = lab.missedRecommendationQuality || {};
+  const executed = lab.executedRecommendationQuality || {};
   const behavior = review.behaviorReview || {};
   const tradeBehavior = behavior.tradeReview || {};
   const collector = review.collectorOps || {};
   const alerts = collector.alertEvents || {};
   const freedom = review.freedomStatus || {};
   const notes = (review.notes || []).map(item => `▸ ${escapeHtml(item)}`);
+
+  const fmtPct = value => (typeof value === 'number' ? `${value}%` : '데이터 부족');
+  const linkedRate = typeof trade.linkedRatePct === 'number' ? `${trade.linkedRatePct}%` : '데이터 부족';
+  const winRate = typeof rec.winRatePct === 'number' ? `${rec.winRatePct}%` : '데이터 부족';
+  const avgSignal = fmtPct(rec.avgSignalReturnPct);
+  const avgAlpha = fmtPct(rec.avgAlphaPct);
+  const missedAvg = fmtPct(missed.avgSignalReturnPct);
+  const executedAvg = fmtPct(executed.avgSignalReturnPct);
+  const verdict = (() => {
+    if (!rec.evaluated) return '추천 성과를 판단하기에는 아직 평가 완료 데이터가 부족합니다.';
+    if (typeof rec.avgAlphaPct === 'number' && rec.avgAlphaPct > 0 && typeof rec.winRatePct === 'number' && rec.winRatePct >= 50) {
+      return '이번 기간의 추천은 시장 대비 양호했습니다.';
+    }
+    if (typeof rec.avgAlphaPct === 'number' && rec.avgAlphaPct < 0) {
+      return '이번 기간의 추천은 시장 대비 약했습니다. 추천 조건을 더 엄격하게 볼 필요가 있습니다.';
+    }
+    return '이번 기간의 추천은 혼재되어 있습니다. 승률보다 손익비와 최대낙폭을 함께 봐야 합니다.';
+  })();
+
+  const recommendationLines = [
+    `▸ 추천 생성: ${rec.total ?? 0}건`,
+    `▸ 평가 완료: ${rec.evaluated ?? 0}건`,
+    `▸ 승률: ${winRate} - 평가 완료 추천 중 방향이 맞은 비율`,
+    `▸ 평균 추천 수익률: ${avgSignal} - 추천 방향 기준 평균 성과`,
+    `▸ 시장 대비 초과수익: ${avgAlpha} - KOSPI/Nasdaq 등 기준지수보다 더 잘했는지`,
+  ];
+
+  const executionLines = [
+    `▸ 실제 거래: ${trade.total ?? 0}건`,
+    `▸ 추천과 연결된 거래: ${trade.linked ?? 0}건 (${linkedRate})`,
+    `▸ 추천을 실제로 산 경우 평균: ${executedAvg}`,
+    `▸ 추천했지만 매수하지 않은 경우 평균: ${missedAvg}`,
+  ];
+  if (tradeBehavior.buyTrades) {
+    executionLines.push(`▸ 원칙 점검: 추천 미연결 매수 ${tradeBehavior.unlinkedBuys ?? 0}건, 관찰/차단 후보 매수 ${tradeBehavior.watchOnlyBuys ?? 0}건`);
+  }
+
+  const collectorLines = collector.totalRuns ? [
+    `▸ 수집 성공: ${collector.successfulRuns ?? 0}/${collector.completedRuns ?? collector.totalRuns}`,
+    `▸ 실패: ${collector.failedRuns ?? 0}건`,
+    `▸ 즉시 알림: ${collector.totalImmediateAlerts ?? 0}건`,
+    `▸ 다이제스트 대기: ${alerts.pendingDigest ?? 0}건 / catch-up ${alerts.pendingCatchUp ?? 0}건`,
+  ] : [];
+
   return [
     `🧾 <b>${title}</b>`,
     `${escapeHtml(review.startDate)} ~ ${escapeHtml(review.endDate)}`,
-    freedom.goal ? `경제적 자유: ${formatKRW(freedom.currentNetWorth)} / ${formatKRW(freedom.goal.targetNetWorth)} (${freedom.targetProgressPct ?? 'n/a'}%) · 예상 ${escapeHtml(freedom.estimatedTargetDate || 'n/a')}` : '',
-    `추천: ${rec.total ?? 0}건 · 평가완료 ${rec.evaluated ?? 0}건`,
-    `승률: ${rec.winRatePct ?? 'n/a'}% · 평균 신호수익률 ${rec.avgSignalReturnPct ?? 'n/a'}% · 평균 초과수익 ${rec.avgAlphaPct ?? 'n/a'}%`,
-    typeof missed.avgSignalReturnPct === 'number'
-      ? `미실행 추천: 평가 ${missed.evaluated ?? 0}건 · 평균 ${missed.avgSignalReturnPct}%`
-      : '',
-    `실제 거래: ${trade.total ?? 0}건 · 추천 연결 ${trade.linked ?? 0}건 (${trade.linkedRatePct ?? 'n/a'}%)`,
-    tradeBehavior.buyTrades
-      ? `행동 점검: 미연결 매수 ${tradeBehavior.unlinkedBuys ?? 0}건 · 차단후보 매수 ${tradeBehavior.watchOnlyBuys ?? 0}건`
-      : '',
-    collector.totalRuns
-      ? `수집 운영: 성공 ${collector.successfulRuns ?? 0}/${collector.completedRuns ?? collector.totalRuns} · 실패 ${collector.failedRuns ?? 0} · 즉시 ${collector.totalImmediateAlerts ?? 0} · 대기 digest ${alerts.pendingDigest ?? 0}/catch-up ${alerts.pendingCatchUp ?? 0}`
-      : '',
-    notes.length > 0 ? [`<b>점검</b>`, ...notes].join('\n') : '',
+    '',
+    `<b>한줄 판단</b>\n${escapeHtml(verdict)}`,
+    freedom.goal ? `<b>경제적 자유</b>\n▸ 현재 ${formatKRW(freedom.currentNetWorth)} / 목표 ${formatKRW(freedom.goal.targetNetWorth)} (${freedom.targetProgressPct ?? 'n/a'}%)\n▸ 현재 속도 기준 예상 도달: ${escapeHtml(freedom.estimatedTargetDate || 'n/a')}` : '',
+    [`<b>1. AI 추천 성과</b>`, ...recommendationLines.map(escapeHtml)].join('\n'),
+    [`<b>2. 내 실행 품질</b>`, ...executionLines.map(escapeHtml)].join('\n'),
+    collectorLines.length > 0 ? [`<b>3. 수집/알림 운영</b>`, ...collectorLines.map(escapeHtml)].join('\n') : '',
+    notes.length > 0 ? [`<b>4. 이번 주 점검할 것</b>`, ...notes].join('\n') : '',
+    '<i>추천 수익률은 실제 계좌 수익률이 아닙니다. 추천 성과와 내 매매 성과를 분리해서 봅니다.</i>',
   ].filter(Boolean).join('\n');
 }
 

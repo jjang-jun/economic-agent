@@ -152,6 +152,24 @@ async function persistArticles(articles, date = getKSTDate()) {
   return upsert('articles', rows, 'id');
 }
 
+async function loadPersistedArticleIds(articleIds = []) {
+  const ids = [...new Set((articleIds || []).filter(Boolean).map(String))];
+  if (ids.length === 0) return new Set();
+
+  const found = new Set();
+  for (let i = 0; i < ids.length; i += 100) {
+    const batch = ids.slice(i, i + 100);
+    const result = await selectRows('articles', {
+      select: 'id',
+      id: postgrestIn(batch),
+    });
+    for (const row of result.rows || []) {
+      if (row.id) found.add(row.id);
+    }
+  }
+  return found;
+}
+
 async function persistDailySummary(summary) {
   if (!summary?.date) return { saved: 0 };
   return upsert('daily_summaries', [{
@@ -632,6 +650,7 @@ module.exports = {
   upsertRows: upsert,
   deleteRows,
   persistArticles,
+  loadPersistedArticleIds,
   persistDailySummary,
   persistStockReport,
   persistRecommendations,

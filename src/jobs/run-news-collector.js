@@ -8,6 +8,7 @@ const { addToBuffer } = require('../utils/article-buffer');
 const { archiveScoredArticles } = require('../utils/article-archive');
 const {
   persistArticles,
+  loadPersistedArticleIds,
   createCollectorRun,
   updateCollectorRun,
   getLastSuccessfulCollectorRun,
@@ -176,7 +177,9 @@ async function runNewsCollector(options = {}) {
     console.log(`[수집] RSS ${rssArticles.length}건, DART ${dartArticles.length}건, lookback ${lookbackMinutes}분`);
 
     const seen = loadSeenArticles();
-    const newArticles = allArticles.filter(a => !isSeenArticle(a, seen));
+    const locallyNewArticles = allArticles.filter(a => !isSeenArticle(a, seen));
+    const persistedArticleIds = await loadPersistedArticleIds(locallyNewArticles.map(article => article.id));
+    const newArticles = locallyNewArticles.filter(article => !persistedArticleIds.has(article.id));
     console.log(`[중복제거] 신규 기사 ${newArticles.length}건`);
 
     if (newArticles.length === 0) {
