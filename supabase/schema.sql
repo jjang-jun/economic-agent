@@ -328,6 +328,17 @@ create table if not exists job_locks (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists api_token_cache (
+  provider text primary key,
+  access_token text not null,
+  token_type text,
+  expires_at timestamptz not null,
+  issued_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table api_token_cache enable row level security;
+
 create index if not exists articles_date_idx on articles(date);
 create index if not exists recommendations_date_idx on recommendations(date);
 create index if not exists trade_executions_date_idx on trade_executions(date);

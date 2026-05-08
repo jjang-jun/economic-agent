@@ -366,6 +366,7 @@ DART_API_KEY=...
 # Supabase 히스토리 저장소 (선택)
 SUPABASE_PROJECT_URL=https://your-project-ref.supabase.co
 SUPABASE_PUBLISHABLE_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=... # 선택: KIS 토큰 공유 캐시와 서버 전용 작업에 사용
 SUPABASE_DB_PASSWORD=...
 # SUPABASE_DB_URL=postgresql://postgres.your-project-ref:password@aws-0-region.pooler.supabase.com:6543/postgres
 # SUPABASE_DNS_RESOLVER=https
@@ -494,7 +495,7 @@ module.exports = {
 
 ### 가격 데이터
 
-가격 조회는 `src/sources/price-provider.js`를 통해 호출합니다. 국내 6자리 종목코드는 장중/현재가에서는 한국투자증권 Open API REST를 1차로 사용하고, 키가 없거나 실패하면 Naver Finance, 마지막으로 Yahoo Finance fallback을 사용합니다. 국내 현재가가 KIS 또는 Naver에서 확인된 경우 Yahoo의 국내 history 기반 5일/20일 수익률은 사용하지 않습니다.
+가격 조회는 `src/sources/price-provider.js`를 통해 호출합니다. 국내 6자리 종목코드는 장중/현재가에서는 한국투자증권 Open API REST를 우선 사용하고, 실패하면 Naver Finance, 마지막으로 Yahoo Finance fallback을 사용합니다. KIS 접근토큰은 24시간/1일 1회 발급 원칙을 전제로 운용하므로, 같은 토큰을 재사용하기 위해 로컬 파일 캐시와 Supabase service role 전용 원격 캐시를 함께 사용합니다. 국내 현재가가 KIS 또는 Naver에서 확인된 경우 Yahoo의 국내 history 기반 5일/20일 수익률은 사용하지 않습니다.
 
 추천 성과 평가와 백테스트용 일별 종가는 현재가와 분리합니다. 국내 EOD 가격은 KRX Open API 공식 일별매매정보(`krx-openapi`)를 우선 사용하고, 없으면 공공데이터포털 주식시세정보(`data-go-kr`), KIS 일봉 순서로 fallback합니다. 해외 EOD 가격은 FMP historical EOD를 우선 사용하고, Tiingo/Alpha/Yahoo fallback을 사용합니다. 추천 1일/5일/20일 평가는 가능한 경우 평가 대상일의 EOD 가격과 EOD high/low history로 수익률, MFE/MAE, 손절/목표 터치 여부를 계산합니다.
 
@@ -532,8 +533,8 @@ DATA_GO_KR_API_KEY=...
 
 KRX Open API는 키 발급 외에 사용할 API 서비스별 이용 권한이 필요할 수 있습니다. `401 Unauthorized API Call`이 나오면 KRX 포털에서 유가증권 일별매매정보와 코스닥 일별매매정보 이용신청/승인 상태를 확인하세요. KRX가 실패해도 시스템은 Data.go.kr, KIS 순서로 자동 fallback합니다.
 
-KIS 접근토큰은 발급 제한이 있으므로 런타임에서 `data/kis-token.json`에 캐시합니다. 현재가 조회는 기본 1.1초 간격으로 직렬화합니다.
-KIS 접근토큰은 원칙적으로 24시간 유효하고 1일 1회 발급을 전제로 운용합니다. 같은 런타임/로컬 파일시스템에서는 캐시를 재사용하지만, GitHub Actions처럼 실행 환경이 매번 새로 만들어지면 캐시가 사라져 토큰 발급 알림이 더 자주 올 수 있습니다. 운영에서는 KIS 현재가가 꼭 필요한 작업을 Cloud Run 쪽으로 모으고, 추천 성과 평가/EOD는 KRX를 우선 사용해 토큰 발급을 줄입니다.
+KIS 접근토큰은 발급 제한이 있으므로 런타임에서 `data/kis-token.json`에 캐시합니다. `SUPABASE_SERVICE_ROLE_KEY`가 설정되어 있으면 `api_token_cache` 테이블에도 저장해 Cloud Run, GitHub Actions, 로컬 실행이 같은 토큰을 재사용합니다. 이 테이블은 RLS가 활성화되어 있고 일반 publishable key로 접근하지 않습니다. 현재가 조회는 기본 1.1초 간격으로 직렬화합니다.
+KIS 접근토큰은 원칙적으로 24시간 유효하고 1일 1회 발급을 전제로 운용합니다. service role 기반 원격 캐시가 없으면 GitHub Actions처럼 실행 환경이 매번 새로 만들어지는 곳에서는 캐시가 사라져 토큰 발급 알림이 더 자주 올 수 있습니다. 추천 성과 평가/EOD는 KRX를 우선 사용해 불필요한 KIS 일봉 호출을 줄입니다.
 
 국내 일별 종가를 Supabase `price_snapshots`에 백필하려면:
 

@@ -177,7 +177,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - GitHub Actions `.env` 강제 로딩 제거. `action:report` 등 운영 npm script는 `.env`가 있으면 읽고, 없으면 Actions/Cloud 환경변수만으로 실행된다.
 - DART 즉시 알림 정책 조정. DART 목록 API는 접수 시각이 없으므로 일반 중요 공시는 즉시 알림 대신 다이제스트로 이월하고, 거래정지/상장폐지/불성실공시/감사의견/횡령·배임 같은 치명 공시만 즉시 알림 후보로 유지.
 - 장 마감 의사결정 리포트 문구 개선. `NEUTRAL`, VIX, USD/KRW, `risk_reward` 차단 사유를 사람이 이해하기 쉬운 한국어 설명으로 표시하고, 후보 종목 제안금액도 1회 신규매수 상한을 적용해 보여준다.
-- KIS 접근토큰 운영 메모 추가. 토큰은 24시간 유효/1일 1회 발급 원칙이므로 GitHub Actions처럼 휘발 환경에서는 발급 알림이 반복될 수 있고, EOD 평가는 KRX 우선으로 토큰 사용을 줄인다.
+- KIS 접근토큰 공유 캐시 추가. 국내 현재가는 정확도 기준으로 KIS를 다시 우선 사용하되, `data/kis-token.json` 로컬 캐시와 Supabase service role 전용 `api_token_cache` 원격 캐시를 함께 사용해 Cloud Run/GitHub Actions/로컬이 같은 24시간 토큰을 재사용하도록 한다. EOD 평가는 KRX 우선으로 불필요한 KIS 일봉 호출을 줄인다.
 
 ## 다음 작업
 

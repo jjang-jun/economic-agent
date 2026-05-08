@@ -10,6 +10,9 @@ function normalizeKisBaseUrl(url) {
 const KIS_BASE_URL = normalizeKisBaseUrl(process.env.KIS_BASE_URL);
 const KIS_APP_KEY = process.env.KIS_APP_KEY || process.env.KIS_APPKEY || '';
 const KIS_APP_SECRET = process.env.KIS_APP_SECRET || process.env.KIS_APPSECRET || '';
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.SUPABASE_PROJECT_URL || '';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const REMOTE_TOKEN_PROVIDER = 'kis-rest';
 
 let tokenCache = {
   accessToken: process.env.KIS_ACCESS_TOKEN || '',
@@ -39,6 +42,74 @@ function saveTokenCache(cache) {
     fs.writeFileSync(TOKEN_CACHE_FILE, JSON.stringify(cache, null, 2));
   } catch {
     // Token cache only reduces API calls; failures should not block quotes.
+  }
+}
+
+function canUseRemoteTokenCache() {
+  return Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
+}
+
+function remoteTokenHeaders(prefer = '') {
+  const headers = {
+    apikey: SUPABASE_SERVICE_ROLE_KEY,
+    Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+    'Content-Type': 'application/json',
+  };
+  if (prefer) headers.Prefer = prefer;
+  return headers;
+}
+
+async function loadRemoteTokenCache() {
+  if (!canUseRemoteTokenCache()) return null;
+
+  try {
+    const url = new URL('/rest/v1/api_token_cache', SUPABASE_URL);
+    url.searchParams.set('provider', `eq.${REMOTE_TOKEN_PROVIDER}`);
+    url.searchParams.set('select', 'access_token,expires_at');
+    url.searchParams.set('limit', '1');
+
+    const res = await fetch(url, { headers: remoteTokenHeaders() });
+    if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+
+    const [row] = await res.json();
+    const expiresAt = row?.expires_at ? new Date(row.expires_at).getTime() : 0;
+    if (row?.access_token && expiresAt > Date.now() + 60_000) {
+      tokenCache = {
+        accessToken: row.access_token,
+        expiresAt,
+      };
+      saveTokenCache(tokenCache);
+      return tokenCache;
+    }
+  } catch (err) {
+    console.warn(`[KIS] remote token cache 조회 실패: ${err.message}`);
+  }
+
+  return null;
+}
+
+async function saveRemoteTokenCache(cache) {
+  if (!canUseRemoteTokenCache() || !cache?.accessToken || !cache?.expiresAt) return;
+
+  try {
+    const url = new URL('/rest/v1/api_token_cache', SUPABASE_URL);
+    url.searchParams.set('on_conflict', 'provider');
+    const payload = [{
+      provider: REMOTE_TOKEN_PROVIDER,
+      access_token: cache.accessToken,
+      expires_at: new Date(cache.expiresAt).toISOString(),
+      token_type: 'Bearer',
+      updated_at: new Date().toISOString(),
+    }];
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: remoteTokenHeaders('resolution=merge-duplicates'),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+  } catch (err) {
+    console.warn(`[KIS] remote token cache 저장 실패: ${err.message}`);
   }
 }
 
@@ -81,6 +152,10 @@ async function getAccessToken() {
   if (cached.accessToken && cached.expiresAt > Date.now() + 60_000) {
     return cached.accessToken;
   }
+  const remoteCached = await loadRemoteTokenCache();
+  if (remoteCached?.accessToken && remoteCached.expiresAt > Date.now() + 60_000) {
+    return remoteCached.accessToken;
+  }
   if (process.env.KIS_ACCESS_TOKEN && !KIS_APP_KEY && !KIS_APP_SECRET) {
     return process.env.KIS_ACCESS_TOKEN;
   }
@@ -107,6 +182,7 @@ async function getAccessToken() {
       expiresAt: expiresIn ? Date.now() + (expiresIn * 1000) : Date.now() + (23 * 60 * 60 * 1000),
     };
     saveTokenCache(tokenCache);
+    await saveRemoteTokenCache(tokenCache);
     return tokenCache.accessToken;
   })();
 
