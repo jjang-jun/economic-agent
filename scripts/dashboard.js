@@ -6,6 +6,7 @@ const FREEDOM_FILE = path.join(__dirname, '..', 'data', 'freedom', 'freedom-stat
 const OUT_DIR = path.join(__dirname, '..', 'data', 'dashboard');
 const OUT_FILE = path.join(OUT_DIR, 'index.html');
 const { summarizeCollectorOps } = require('../src/utils/collector-ops');
+const { summarizePriceSourceQuality } = require('../src/utils/price-source-quality');
 
 function readTable(name) {
   try {
@@ -48,6 +49,15 @@ function fmtNumber(value) {
 
 function fmtKRW(value) {
   return typeof value === 'number' && Number.isFinite(value) ? `${value.toLocaleString('ko-KR')}원` : 'n/a';
+}
+
+function fmtMonths(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 'n/a';
+  const years = Math.floor(value / 12);
+  const months = value % 12;
+  if (years <= 0) return `${months}개월`;
+  if (months === 0) return `${years}년`;
+  return `${years}년 ${months}개월`;
 }
 
 function fmtPrice(value, currency = 'KRW') {
@@ -164,6 +174,7 @@ function buildDashboard() {
   const evaluations = readTable('recommendation_evaluations');
   const collectorRuns = readTable('collector_runs');
   const alertEvents = readTable('alert_events');
+  const priceSnapshots = readTable('price_snapshots');
   const latestPortfolio = portfolio[0] || {};
   const latestFlow = investorFlows[0] || {};
   const latestRecommendations = recommendations.slice(0, 12);
@@ -175,7 +186,15 @@ function buildDashboard() {
   const missed = lab.missedRecommendationQuality || {};
   const evalSummary = buildEvaluationSummary(evaluations);
   const collectorOps = summarizeCollectorOps(collectorRuns, alertEvents);
+  const priceQuality = summarizePriceSourceQuality(priceSnapshots);
   const freedom = readJson(FREEDOM_FILE) || {};
+  const freedomGoal = freedom.goal || {};
+  const progress = typeof freedom.targetProgressPct === 'number' ? Math.max(0, Math.min(100, freedom.targetProgressPct)) : 0;
+  const requiredReturn = typeof freedom.requiredAnnualReturnPct === 'number' ? `${freedom.requiredAnnualReturnPct}%` : 'n/a';
+  const expectedReturn = typeof freedom.expectedAnnualReturnPct === 'number' ? `${freedom.expectedAnnualReturnPct}%` : 'n/a';
+  const targetDateGap = freedom.targetMonths && freedom.monthsToTarget
+    ? freedom.monthsToTarget - freedom.targetMonths
+    : null;
 
   return `<!doctype html>
 <html lang="ko">
@@ -193,6 +212,15 @@ function buildDashboard() {
     .metric, .panel { background: #fff; border: 1px solid #d9e0e7; border-radius: 8px; padding: 16px; }
     .metric span { display: block; font-size: 12px; color: #697887; margin-bottom: 8px; }
     .metric strong { font-size: 22px; }
+    .hero { background: #fff; border: 1px solid #d9e0e7; border-radius: 8px; padding: 20px; display: grid; gap: 18px; }
+    .hero-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+    .hero-title { margin: 0; font-size: 20px; }
+    .hero-sub { margin: 6px 0 0; color: #697887; }
+    .progress { height: 14px; border-radius: 999px; background: #e8eef4; overflow: hidden; }
+    .progress > div { height: 100%; background: #167a4a; width: ${progress}%; }
+    .status { padding: 4px 10px; border-radius: 999px; background: #e8eef4; font-size: 12px; }
+    .status.warn { background: #fff3d6; color: #765000; }
+    .status.ok { background: #daf3e3; color: #155c31; }
     table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e0e7; border-radius: 8px; overflow: hidden; }
     th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #edf1f5; font-size: 13px; vertical-align: top; }
     th { background: #eef3f7; color: #384858; }
@@ -212,10 +240,32 @@ function buildDashboard() {
     <div>Generated ${escapeHtml(new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }))}</div>
   </header>
   <main>
+    <section class="hero">
+      <div class="hero-head">
+        <div>
+          <h2 class="hero-title">Freedom Operating View</h2>
+          <p class="hero-sub">경제적 자유 목표, 현재 자산, 필요한 수익률, 하락 스트레스를 먼저 봅니다.</p>
+        </div>
+        <span class="status ${targetDateGap !== null && targetDateGap > 0 ? 'warn' : 'ok'}">
+          ${targetDateGap !== null && targetDateGap > 0 ? `목표보다 ${escapeHtml(fmtMonths(targetDateGap))} 지연` : '목표 속도 정상'}
+        </span>
+      </div>
+      <div>
+        <div class="progress" aria-label="Freedom progress"><div></div></div>
+        <p class="muted">달성률 ${escapeHtml(freedom.targetProgressPct ?? 'n/a')}% · 현재 ${escapeHtml(fmtKRW(Number(freedom.currentNetWorth)))} / 목표 ${escapeHtml(fmtKRW(Number(freedomGoal.targetNetWorth)))}</p>
+      </div>
+      <div class="grid">
+        ${metric('월 생활비', fmtKRW(Number(freedomGoal.monthlyLivingCost)))}
+        ${metric('월 저축액', fmtKRW(Number(freedom.monthlySavingAmount)))}
+        ${metric('목표 인출률', freedomGoal.targetWithdrawalRate ? `${Math.round(Number(freedomGoal.targetWithdrawalRate) * 1000) / 10}%` : 'n/a')}
+        ${metric('예상 도달', freedom.estimatedTargetDate || 'n/a')}
+        ${metric('목표일', freedom.targetDate || freedomGoal.targetDate || 'n/a')}
+        ${metric('필요 연수익률', requiredReturn)}
+        ${metric('가정 연수익률', expectedReturn)}
+        ${metric('20% 하락 시 지연', freedom.stress ? fmtMonths(freedom.stress.delayMonths) : 'n/a')}
+      </div>
+    </section>
     <div class="grid">
-      ${metric('Freedom Progress', freedom.targetProgressPct !== undefined ? `${freedom.targetProgressPct}%` : 'n/a')}
-      ${metric('Target Net Worth', freedom.goal?.targetNetWorth ? fmtKRW(Number(freedom.goal.targetNetWorth)) : 'n/a')}
-      ${metric('Estimated Freedom Date', freedom.estimatedTargetDate || 'n/a')}
       ${metric('Articles', articles.length)}
       ${metric('Recommendations', recommendations.length)}
       ${metric('Trade Executions', trades.length)}
@@ -250,6 +300,19 @@ function buildDashboard() {
           ${metric('Pending Catch-up', collectorOps.alertEvents.pendingCatchUp)}
         </div>
       </div>
+    </section>
+    <section class="panel">
+      <h2>Price Source Quality</h2>
+      <div class="grid">
+        ${metric('Snapshots', `${priceQuality.totalSnapshots}건 / ${priceQuality.tickerCount}종목`)}
+        ${metric('EOD Official', priceQuality.officialEod.ratePct !== null ? `${priceQuality.officialEod.ratePct}%` : 'n/a')}
+        ${metric('KRX', `${priceQuality.officialEod.krx}건`)}
+        ${metric('Data.go.kr', `${priceQuality.officialEod.dataGoKr}건`)}
+        ${metric('KIS EOD fallback', `${priceQuality.kisEodFallback}건`)}
+        ${metric('Naver/Yahoo fallback', priceQuality.fallback.ratePct !== null ? `${priceQuality.fallback.ratePct}%` : 'n/a')}
+        ${metric('Stale Suspect', `${priceQuality.staleSnapshots}건`)}
+      </div>
+      <p class="muted">가격 품질은 Supabase 미러의 price_snapshots 기준입니다. 최신 상태는 npm run db:pull 이후 다시 생성해야 합니다.</p>
     </section>
     <section class="panel">
       <h2>Behavior Warnings</h2>
