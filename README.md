@@ -211,7 +211,7 @@ npm run review:monthly
 
 `trade:record`는 기본적으로 `data/portfolio.json`의 현금, 보유수량, 평균단가를 함께 갱신합니다. 거래만 기록하고 포트폴리오를 건드리지 않으려면 `--noPortfolio`를 붙입니다.
 
-대화형 Agent 배포 후에는 `portfolio:seed-store`로 현재 로컬 포트폴리오를 Supabase `portfolio_accounts`, `positions`에 올립니다. 이후 Telegram `/portfolio`는 Supabase 원본을 우선 읽고, `/cash`, `/buy`, `/sell` 승인도 Supabase 포트폴리오를 갱신합니다. `PORTFOLIO_JSON_BASE64`는 bootstrap/fallback 용도입니다. `portfolio:snapshot`은 Supabase 원본을 우선 읽어 현재가·환율로 평가한 뒤 `portfolio_snapshots`와 `portfolio_accounts`/`positions`를 함께 갱신합니다. 실제 매수/매도를 추천과 연결하려면 `/recommendations`로 최근 추천 ID를 확인한 뒤 `/buy 005930 3 70000 삼성전자 rec=추천ID`처럼 기록합니다.
+대화형 Agent 배포 후에는 `portfolio:seed-store`로 현재 로컬 포트폴리오를 Supabase `portfolio_accounts`, `positions`에 올립니다. 이후 Telegram `/portfolio`는 Supabase 원본을 우선 읽고, `/cash`, `/buy`, `/sell` 승인도 Supabase 포트폴리오를 갱신합니다. `PORTFOLIO_JSON_BASE64`는 bootstrap/fallback 용도입니다. `portfolio:snapshot`은 Supabase 원본을 우선 읽어 현재가·환율로 평가한 뒤 `portfolio_snapshots`와 `portfolio_accounts`/`positions`를 함께 갱신합니다. 실제 매수/매도를 추천과 연결하려면 `/recommendations`로 리스크 기준을 통과한 최근 추천 ID를 확인한 뒤 `/buy 005930 3 70000 삼성전자 rec=추천ID`처럼 기록합니다. 손익비가 낮거나 리스크 리뷰를 통과하지 못한 종목은 기본 추천 목록에 나오지 않으며, 필요할 때만 `/recommendations blocked`로 차단/관찰 후보를 참고합니다.
 
 ## 추천 생성 원칙
 
@@ -578,7 +578,7 @@ npm run freedom:report
 
 기본 목표 순자산은 `월 생활비 * 12 / 목표 인출률`로 계산합니다. 현재 순자산은 로컬 포트폴리오의 `totalAssetValue`를 우선 사용합니다.
 
-초기에는 `maxNewBuyRatio=0.05`와 `maxNewBuyAmount=1000000` 중 더 작은 값을 1회 신규 매수 상한으로 씁니다. 예를 들어 총자산이 커져 5%가 300만원이어도 기본 제안금액은 1회 100만원을 넘지 않습니다. `/recommendations`는 제안금액 옆에 `손실한도`, `1회 신규매수 상한`, `현금`처럼 어떤 한도가 실제 금액을 제한했는지 표시합니다.
+초기에는 `maxNewBuyRatio=0.05`와 `maxNewBuyAmount=1000000` 중 더 작은 값을 1회 신규 매수 상한으로 씁니다. 예를 들어 총자산이 커져 5%가 300만원이어도 기본 제안금액은 1회 100만원을 넘지 않습니다. `/recommendations`는 리스크 기준을 통과한 매수 검토 후보만 보여주고, 제안금액 옆에 `손실한도`, `1회 신규매수 상한`, `현금`처럼 어떤 한도가 실제 금액을 제한했는지 표시합니다. 차단/관찰 후보는 `/recommendations blocked`에서만 참고용으로 확인합니다.
 
 ## 월간 비용 (추정)
 
