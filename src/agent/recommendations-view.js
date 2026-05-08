@@ -167,14 +167,14 @@ function formatRecommendationLine(item = {}) {
   ].join('\n');
 }
 
-async function formatRecentRecommendations({ limit = 5 } = {}) {
+async function formatRecentRecommendations({ limit = 5, includeBlocked = false } = {}) {
   const recommendations = await loadRecommendations();
-  return formatRecentRecommendationsFromList(recommendations, { limit });
+  return formatRecentRecommendationsFromList(recommendations, { limit, includeBlocked });
 }
 
-function formatRecentRecommendationsFromList(recommendations = [], { limit = 5 } = {}) {
+function formatRecentRecommendationsFromList(recommendations = [], { limit = 5, includeBlocked = false } = {}) {
   const latest = getLatestRecommendations(recommendations, limit);
-  const blocked = latest.length === 0 ? getLatestBlockedRecommendations(recommendations, 3) : [];
+  const blocked = includeBlocked ? getLatestBlockedRecommendations(recommendations, 3) : [];
 
   return [
     '<b>최근 매수 검토 후보</b>',
@@ -186,6 +186,7 @@ function formatRecentRecommendationsFromList(recommendations = [], { limit = 5 }
     blocked.length > 0 ? blocked.map(formatRecommendationLine).join('\n\n') : null,
     '',
     '손익비가 낮거나 리스크 기준을 통과하지 못한 종목은 매수 추천으로 보지 않습니다.',
+    includeBlocked ? null : '차단/관찰 후보 확인: /recommendations blocked',
     '매수 후보도 진입가, 손절가, 제안금액을 다시 확인하세요.',
     '거래 기록 연결 예: /buy 005930 3 70000 삼성전자 rec=추천ID',
   ].filter(line => line !== null).join('\n');

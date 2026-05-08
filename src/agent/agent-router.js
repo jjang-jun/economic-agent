@@ -166,9 +166,10 @@ async function routeTelegramMessage(message = {}) {
       response: await formatPendingActions(chatId),
     };
   } else if (command === '/recommendations' || command === '/recs') {
+    const includeBlocked = /\b(blocked|watch|all|차단|관찰|전체)\b/i.test(text);
     result = {
       intent: 'recent_recommendations',
-      response: await formatRecentRecommendations({ limit: 5 }),
+      response: await formatRecentRecommendations({ limit: 5, includeBlocked }),
     };
   } else if (isPendingActionCommand(command)) {
     try {

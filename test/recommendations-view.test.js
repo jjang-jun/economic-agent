@@ -113,6 +113,21 @@ test('formatRecentRecommendationsFromList separates sections and items with blan
 
   assert.match(text, /후보1[\s\S]*\n\n▸ <b>후보2<\/b>/);
   assert.doesNotMatch(text, /최근 차단\/관찰 후보/);
+  assert.match(text, /차단\/관찰 후보 확인/);
+});
+
+test('formatRecentRecommendationsFromList only shows blocked items when requested', () => {
+  const recommendations = [
+    { id: 'blocked-1', name: '차단1', createdAt: '2026-05-09T00:00:00Z', riskReview: { approved: false, action: 'watch_only' } },
+  ];
+
+  const defaultText = formatRecentRecommendationsFromList(recommendations, { limit: 5 });
+  assert.doesNotMatch(defaultText, /최근 차단\/관찰 후보/);
+  assert.doesNotMatch(defaultText, /차단1/);
+
+  const blockedText = formatRecentRecommendationsFromList(recommendations, { limit: 5, includeBlocked: true });
+  assert.match(blockedText, /최근 차단\/관찰 후보/);
+  assert.match(blockedText, /차단1/);
 });
 
 test('formatRecommendationLine translates watch only neutral recommendations', () => {
