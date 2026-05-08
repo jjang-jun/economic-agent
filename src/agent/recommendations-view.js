@@ -1,5 +1,6 @@
 const { loadRecommendations } = require('../utils/recommendation-log');
 const { formatKRW } = require('../utils/decision-engine');
+const STRATEGY_POLICY = require('../config/strategy-policy');
 const { escapeHtml } = require('./response-composer');
 
 const SIGNAL_LABELS = {
@@ -54,6 +55,14 @@ function getLimiterLabel(positionSize = {}, suggestedAmount) {
   return matched ? labels[matched[0]] || matched[0] : '';
 }
 
+function capSuggestedAmount(rawAmount) {
+  if (typeof rawAmount !== 'number' || !Number.isFinite(rawAmount)) return null;
+  const cap = STRATEGY_POLICY.capitalRules?.defaultMaxNewBuyAmountKrw;
+  return typeof cap === 'number' && Number.isFinite(cap)
+    ? Math.min(rawAmount, cap)
+    : rawAmount;
+}
+
 function formatRiskReasons(review = {}, limit = 2) {
   const blockers = Array.isArray(review.blockers) ? review.blockers : [];
   const warnings = Array.isArray(review.warnings) ? review.warnings : [];
@@ -67,10 +76,13 @@ function formatRecommendationLine(item = {}) {
   const review = item.riskReview || item.risk_review || {};
   const risk = item.riskProfile || item.risk_profile || {};
   const positionSize = risk.positionSize || risk.position_size || {};
-  const suggestedAmount = typeof risk.suggestedAmount === 'number' ? risk.suggestedAmount : null;
+  const rawSuggestedAmount = typeof risk.suggestedAmount === 'number' ? risk.suggestedAmount : null;
+  const suggestedAmount = capSuggestedAmount(rawSuggestedAmount);
   const entry = risk.entryReferencePrice ? `진입 ${formatPrice(Number(risk.entryReferencePrice))}` : '';
   const stop = risk.stopLossPrice ? `손절 ${formatPrice(Number(risk.stopLossPrice))}` : '';
-  const limiter = getLimiterLabel(positionSize, suggestedAmount);
+  const limiter = rawSuggestedAmount !== null && suggestedAmount !== rawSuggestedAmount
+    ? '1회 신규매수 상한'
+    : getLimiterLabel(positionSize, suggestedAmount);
   const size = suggestedAmount ? `제안 ${formatKRW(suggestedAmount)}${limiter ? ` (${limiter} 기준)` : ''}` : '제안금액 없음';
   const label = [
     labelValue(SIGNAL_LABELS, item.signal, '방향 미정'),

@@ -51,6 +51,37 @@ test('splitAlerts treats date-only articles as catch-up in catch-up runs', () =>
   assert.deepEqual(result.catchUp.map(article => article.id), ['dart-date-only']);
 });
 
+test('splitAlerts buffers non-critical date-only DART disclosures instead of immediate alerts', () => {
+  const now = new Date('2026-05-08T17:40:00+09:00');
+  const result = splitAlerts([
+    {
+      id: 'dart-contract',
+      score: 5,
+      pubDate: '2026-05-08T00:00:00+09:00',
+      pubDatePrecision: 'date',
+      disclosure: { reportName: '단일판매ㆍ공급계약체결' },
+    },
+  ], { now, isCatchUpRun: false });
+
+  assert.equal(result.immediate.length, 0);
+  assert.deepEqual(result.overflow.map(article => `${article.id}:${article.alertType}`), ['dart-contract:digest']);
+});
+
+test('splitAlerts keeps critical date-only DART disclosures as immediate candidates', () => {
+  const now = new Date('2026-05-08T17:40:00+09:00');
+  const result = splitAlerts([
+    {
+      id: 'dart-halt',
+      score: 5,
+      pubDate: '2026-05-08T00:00:00+09:00',
+      pubDatePrecision: 'date',
+      disclosure: { reportName: '거래정지' },
+    },
+  ], { now, isCatchUpRun: false });
+
+  assert.deepEqual(result.immediate.map(article => article.id), ['dart-halt']);
+});
+
 test('isWithinLookback keeps same-day DART date-only disclosures', () => {
   const since = new Date('2026-05-07T09:50:00+09:00');
   const article = {

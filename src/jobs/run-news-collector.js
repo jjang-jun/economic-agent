@@ -25,6 +25,17 @@ const DEFAULT_LOOKBACK_MINUTES = Number(process.env.NEWS_COLLECTOR_LOOKBACK_MINU
 const MAX_LOOKBACK_MINUTES = Number(process.env.NEWS_COLLECTOR_MAX_LOOKBACK_MINUTES || 240);
 const LOOKBACK_BUFFER_MINUTES = Number(process.env.NEWS_COLLECTOR_LOOKBACK_BUFFER_MINUTES || 10);
 const STALE_IMMEDIATE_ALERT_MINUTES = Number(process.env.STALE_IMMEDIATE_ALERT_MINUTES || 30);
+const CRITICAL_DISCLOSURE_IMMEDIATE_KEYWORDS = [
+  '거래정지',
+  '상장폐지',
+  '불성실공시',
+  '감사의견',
+  '횡령',
+  '배임',
+  '파산',
+  '부도',
+  '회생절차',
+];
 
 function minutesBetween(later, earlier) {
   return Math.ceil((later.getTime() - earlier.getTime()) / 60000);
@@ -46,6 +57,12 @@ function getArticleAgeMinutes(article, now) {
   return minutesBetween(now, publishedAt);
 }
 
+function isCriticalDateOnlyDisclosure(article) {
+  if (!article?.disclosure || article.pubDatePrecision !== 'date') return false;
+  const text = `${article.title || ''} ${article.summary || ''} ${article.disclosure.reportName || ''}`;
+  return CRITICAL_DISCLOSURE_IMMEDIATE_KEYWORDS.some(keyword => text.includes(keyword));
+}
+
 function isWithinLookback(article, since) {
   if (!article?.pubDate) return true;
   if (article.pubDatePrecision === 'date') {
@@ -64,6 +81,12 @@ function splitAlerts(urgent, { now, isCatchUpRun }) {
 
   for (const article of urgent) {
     const ageMinutes = getArticleAgeMinutes(article, now);
+    const isDateOnlyDisclosure = article.disclosure && article.pubDatePrecision === 'date';
+    if (isDateOnlyDisclosure && !isCriticalDateOnlyDisclosure(article)) {
+      catchUp.push({ ...article, alertType: 'digest' });
+      continue;
+    }
+
     const isStale = ageMinutes !== null
       ? ageMinutes > STALE_IMMEDIATE_ALERT_MINUTES
       : isCatchUpRun;

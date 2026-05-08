@@ -34,6 +34,48 @@ function formatPrice(value) {
   return `${Math.round(value).toLocaleString('ko-KR')}원`;
 }
 
+function formatRegime(regime, score) {
+  const labels = {
+    RISK_ON: '공격 가능',
+    NEUTRAL: '중립',
+    RISK_OFF: '방어 우선',
+    PANIC: '위기',
+    UNKNOWN: '판단 보류',
+  };
+  const descriptions = {
+    RISK_ON: '시장 점수가 좋아 신규 매수를 검토할 수 있는 상태',
+    NEUTRAL: '상승/하락 신호가 뚜렷하지 않아 비중을 크게 늘리기보다 관찰과 분할 접근이 필요한 상태',
+    RISK_OFF: '시장 위험이 커져 신규 매수를 줄이고 현금과 손절 기준을 우선해야 하는 상태',
+    PANIC: '급격한 위험 회피 상태',
+    UNKNOWN: '판단 데이터 부족',
+  };
+  const scoreText = typeof score === 'number' ? `점수 ${score}` : '점수 없음';
+  return `${labels[regime] || regime} (${scoreText}) - ${descriptions[regime] || ''}`;
+}
+
+function explainDecisionReason(reason) {
+  if (reason.startsWith('VIX ')) {
+    return `${reason} - VIX는 미국 주식시장 공포/변동성 지표입니다. 18 이하는 대체로 시장이 크게 겁먹지 않은 구간으로 봅니다.`;
+  }
+  if (reason.startsWith('USD/KRW ') && reason.includes('상승')) {
+    return `${reason} - 달러/원 환율이 올랐다는 뜻입니다. 원화 기준으로 달러가 비싸졌고, 국내 증시에는 부담이 될 수 있습니다.`;
+  }
+  return reason;
+}
+
+function explainRiskBlocker(blocker) {
+  const text = String(blocker || '');
+  const match = text.match(/risk_reward:\s*([0-9.]+):1\s*(?:\/|<)\s*min\s*([0-9.]+):1/i)
+    || text.match(/risk_reward:\s*([0-9.]+):1\s*<\s*([0-9.]+):1/i);
+  if (match) {
+    return `손익비 부족: 기대수익이 예상손실의 ${match[1]}배라서, 최소 기준 ${match[2]}배에 못 미칩니다.`;
+  }
+  if (text.startsWith('stop_loss:')) return `손절 기준 문제: ${text.replace('stop_loss:', '').trim()}`;
+  if (text.startsWith('position_size:')) return `매수 가능 금액 없음: ${text.replace('position_size:', '').trim()}`;
+  if (text.startsWith('market_regime:')) return `시장 상태 차단: ${text.replace('market_regime:', '').trim()}`;
+  return text;
+}
+
 // FinBERT confidence 기반 강도 표시
 function getSentimentDisplay(article) {
   const base = SENTIMENT[article.sentiment] || SENTIMENT.neutral;
@@ -223,13 +265,19 @@ function formatStockReport(report) {
     const review = s.risk_review || {};
     const entry = profile.entryReferencePrice ? `기준매수가 ${formatPrice(profile.entryReferencePrice)}` : '';
     const stopPrice = profile.stopLossPrice ? `손절가 ${formatPrice(profile.stopLossPrice)}` : '';
-    const rr = profile.riskReward ? `손익비 ${profile.riskReward}:1 (최소 2:1)` : '';
+    const rr = profile.riskReward ? `손익비 ${profile.riskReward}:1` : '';
     const stop = profile.expectedLossPct ? `예상 손실폭 ${profile.expectedLossPct}%` : '';
     const suggestedCashPct = profile.suggestedAmount && portfolioSummary.cashAmount
       ? round((profile.suggestedAmount / portfolioSummary.cashAmount) * 100, 1)
       : null;
-    const size = profile.suggestedAmount
-      ? `제안 매수 ${formatKRW(profile.suggestedAmount)} (총자산 ${profile.suggestedWeightPct}%, 현금 ${suggestedCashPct ?? '?'}%)`
+    const suggestedAmount = typeof profile.suggestedAmount === 'number' && typeof portfolio.maxNewBuyAmount === 'number'
+      ? Math.min(profile.suggestedAmount, portfolio.maxNewBuyAmount)
+      : profile.suggestedAmount;
+    const wasCapped = typeof profile.suggestedAmount === 'number'
+      && typeof suggestedAmount === 'number'
+      && suggestedAmount < profile.suggestedAmount;
+    const size = suggestedAmount
+      ? `제안 매수 ${formatKRW(suggestedAmount)}${wasCapped ? ' (1회 상한)' : ''} (총자산 ${profile.suggestedWeightPct}%, 현금 ${suggestedCashPct ?? '?'}%)`
       : '';
     const rs = typeof market.relativeStrength20d === 'number' ? `RS20 ${market.relativeStrength20d}%p` : '';
     const volume = typeof market.volumeRatio20d === 'number' ? `거래량 ${market.volumeRatio20d}x` : '';
@@ -246,7 +294,7 @@ function formatStockReport(report) {
     const nextEarnings = earnings.nextDate ? `실적 ${earnings.nextDate}` : '';
     const tradeable = review.action === 'watch_only' || profile.tradeable === false ? '거래불가/관찰' : '';
     const invalidation = profile.invalidation ? `\n무효화: ${escapeHtml(profile.invalidation)}` : '';
-    const blockers = (review.blockers || []).slice(0, 2).map(item => `\n차단: ${escapeHtml(item)}`).join('');
+    const blockers = (review.blockers || []).slice(0, 2).map(item => `\n차단: ${escapeHtml(explainRiskBlocker(item))}`).join('');
     const warnings = (review.warnings || []).slice(0, 1).map(item => `\n주의: ${escapeHtml(item)}`).join('');
     const riskProfile = [entry, stopPrice, rr, stop, size, rs, volume, high, sector, marketCap, beta, revenueGrowth, fcfMargin, nextEarnings, tradeable].filter(Boolean).join(' · ');
     return `${icon.bar} <b>${escapeHtml(s.name)}</b>${ticker}  [${icon.label}${conviction}]\n└ ${escapeHtml(s.reason)}${riskProfile ? `\n└ ${escapeHtml(riskProfile)}` : ''}${invalidation}${blockers}${warnings}${risk}`;
@@ -259,9 +307,9 @@ function formatStockReport(report) {
     `▸ ${escapeHtml(item)}`
   );
   const regime = decision.market?.regime || 'UNKNOWN';
-  const regimeScore = typeof decision.market?.score === 'number' ? ` (${decision.market.score})` : '';
+  const regimeText = formatRegime(regime, decision.market?.score);
   const regimeTags = (decision.market?.tags || []).map(tag => `#${escapeHtml(tag)}`).join(' ');
-  const decisionReasons = (decision.market?.reasons || []).map(item => `└ ${escapeHtml(item)}`);
+  const decisionReasons = (decision.market?.reasons || []).map(item => `└ ${escapeHtml(explainDecisionReason(item))}`);
   const decisionWarnings = (decision.market?.warnings || []).map(item => `▸ ${escapeHtml(item)}`);
   const decisionActions = (decision.actions || []).map(item => `▸ ${escapeHtml(item)}`);
   const riskBudget = portfolio.riskBudget || {};
@@ -295,7 +343,7 @@ function formatStockReport(report) {
 
     [
       `<b>1. 시장 레짐</b>`,
-      `${escapeHtml(regime)}${regimeScore}`,
+      `${escapeHtml(regimeText)}`,
       regimeTags,
       decisionReasons.join('\n'),
       decisionWarnings.length > 0 ? `<b>경고</b>\n${decisionWarnings.join('\n')}` : '',
@@ -364,9 +412,15 @@ function formatActionReport(report) {
   const formatRecommendation = item => {
     const risk = item.riskProfile || item.risk_profile || {};
     const review = item.riskReview || item.risk_review || {};
-    const size = risk.suggestedAmount ? ` · 제안 ${formatKRW(risk.suggestedAmount)}` : '';
+    const suggestedAmount = typeof risk.suggestedAmount === 'number' && typeof portfolio.maxNewBuyAmount === 'number'
+      ? Math.min(risk.suggestedAmount, portfolio.maxNewBuyAmount)
+      : risk.suggestedAmount;
+    const wasCapped = typeof risk.suggestedAmount === 'number'
+      && typeof suggestedAmount === 'number'
+      && suggestedAmount < risk.suggestedAmount;
+    const size = suggestedAmount ? ` · 제안 ${formatKRW(suggestedAmount)}${wasCapped ? ' (1회 상한)' : ''}` : '';
     const rr = risk.riskReward ? ` · 손익비 ${risk.riskReward}:1` : '';
-    const blockers = (review.blockers || []).slice(0, 1).join(', ');
+    const blockers = (review.blockers || []).slice(0, 1).map(explainRiskBlocker).join(', ');
     return `▸ ${escapeHtml(item.name || item.ticker)} ${escapeHtml(item.ticker || '')}${size}${rr}${blockers ? ` · 차단 ${escapeHtml(blockers)}` : ''}`;
   };
 

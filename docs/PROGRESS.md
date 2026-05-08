@@ -174,10 +174,14 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - GitHub Actions `KRX_OPENAPI_KEY` Secret 등록 확인. 추천 성과 평가 workflow가 KRX 공식 EOD provider를 사용할 수 있도록 env 주입 추가.
 - Telegram `/recommendations` 문구 개선. `neutral/low/watch_only` 같은 내부 코드를 한국어 행동 문구로 번역하고, 제안금액에는 실제 제한 요인(`손실한도`, `1회 신규매수 상한`, `현금` 등)을 표시한다.
 - 1회 신규매수 절대 상한 추가. 총자산 5%가 커져도 기본 제안금액은 `maxNewBuyAmount=1000000`을 넘지 않도록 보수적으로 제한.
+- GitHub Actions `.env` 강제 로딩 제거. `action:report` 등 운영 npm script는 `.env`가 있으면 읽고, 없으면 Actions/Cloud 환경변수만으로 실행된다.
+- DART 즉시 알림 정책 조정. DART 목록 API는 접수 시각이 없으므로 일반 중요 공시는 즉시 알림 대신 다이제스트로 이월하고, 거래정지/상장폐지/불성실공시/감사의견/횡령·배임 같은 치명 공시만 즉시 알림 후보로 유지.
+- 장 마감 의사결정 리포트 문구 개선. `NEUTRAL`, VIX, USD/KRW, `risk_reward` 차단 사유를 사람이 이해하기 쉬운 한국어 설명으로 표시하고, 후보 종목 제안금액도 1회 신규매수 상한을 적용해 보여준다.
+- KIS 접근토큰 운영 메모 추가. 토큰은 24시간 유효/1일 1회 발급 원칙이므로 GitHub Actions처럼 휘발 환경에서는 발급 알림이 반복될 수 있고, EOD 평가는 KRX 우선으로 토큰 사용을 줄인다.
 
 ## 다음 작업
 
-1. Telegram `/recommendations` 실제 private 채팅 출력 확인
-2. Telegram `/buy`, `/sell`, `/cash` 실제 private 채팅 end-to-end 운영 검증
-3. Telegram 추천 ID 연결 거래의 실제 end-to-end 운영 검증
+1. Action Report workflow 수동 실행으로 GitHub Actions 운영 경로 검증
+2. Telegram `/recommendations` 실제 private 채팅 출력 확인
+3. Telegram `/buy`, `/sell`, `/cash` 실제 private 채팅 end-to-end 운영 검증
 4. KRX/Data.go.kr/KIS EOD 가격 품질 모니터링과 추천 성과 샘플 누적

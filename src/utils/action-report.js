@@ -117,6 +117,8 @@ function buildActionReport({ recommendations, portfolio }) {
       unrealizedPnl: portfolio.unrealizedPnl,
       unrealizedPnlPct: portfolio.unrealizedPnlPct,
       positionCount: (portfolio.positions || []).length,
+      maxNewBuyAmount: portfolio.maxNewBuyAmount,
+      maxNewBuyRatio: portfolio.maxNewBuyRatio,
     },
     newBuyCandidates: buildNewBuyCandidates(recommendations, portfolio),
     watchOnlyCandidates: buildWatchOnlyCandidates(recommendations, portfolio),
