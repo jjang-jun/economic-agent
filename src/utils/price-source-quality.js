@@ -46,6 +46,7 @@ function isStaleSnapshot(row, now = new Date()) {
 }
 
 function summarizePriceSourceQuality(rows = [], options = {}) {
+  const attempts = options.attempts || [];
   const now = options.now || new Date();
   const bySource = countBy(rows, row => row.source);
   const byPriceType = countBy(rows, row => row.price_type);
@@ -72,6 +73,9 @@ function summarizePriceSourceQuality(rows = [], options = {}) {
   const officialEodRatePct = eodRows.length ? round((officialEodRows.length / eodRows.length) * 100) : null;
   const healthLabel = (() => {
     if (rows.length === 0) return 'empty';
+    const failedAttempts = attempts.filter(row => row.status === 'failed');
+    const completedAttempts = attempts.filter(row => ['success', 'empty', 'failed'].includes(row.status));
+    if (completedAttempts.length >= 5 && failedAttempts.length / completedAttempts.length > 0.3) return 'warn';
     if (fallbackRatePct !== null && fallbackRatePct > 50) return 'warn';
     if (eodRows.length > 0 && officialEodRatePct !== null && officialEodRatePct < 50) return 'warn';
     if (staleRows.length > Math.max(3, rows.length * 0.2)) return 'warn';
@@ -101,22 +105,64 @@ function summarizePriceSourceQuality(rows = [], options = {}) {
     staleSnapshots: staleRows.length,
     latestAsOf: latestIso(rows.map(row => row.as_of)),
     sourceRows,
+    attempts: summarizeProviderAttempts(attempts),
     healthLabel,
+  };
+}
+
+function summarizeProviderAttempts(attempts = []) {
+  const completed = attempts.filter(row => ['success', 'empty', 'failed'].includes(row.status));
+  const failed = completed.filter(row => row.status === 'failed');
+  const empty = completed.filter(row => row.status === 'empty');
+  const success = completed.filter(row => row.status === 'success');
+  const byProvider = Object.entries(countBy(completed, row => row.provider))
+    .map(([provider, count]) => {
+      const providerRows = completed.filter(row => row.provider === provider);
+      const providerFailures = providerRows.filter(row => row.status === 'failed').length;
+      return {
+        provider,
+        count,
+        success: providerRows.filter(row => row.status === 'success').length,
+        empty: providerRows.filter(row => row.status === 'empty').length,
+        failed: providerFailures,
+        failureRatePct: count ? round((providerFailures / count) * 100) : null,
+      };
+    })
+    .sort((a, b) => b.count - a.count || b.failed - a.failed)
+    .slice(0, 8);
+
+  return {
+    total: completed.length,
+    success: success.length,
+    empty: empty.length,
+    failed: failed.length,
+    failureRatePct: completed.length ? round((failed.length / completed.length) * 100) : null,
+    emptyRatePct: completed.length ? round((empty.length / completed.length) * 100) : null,
+    byProvider,
   };
 }
 
 async function buildPriceSourceQualitySummary({ days = 7 } = {}) {
   const since = startIso(days);
-  const result = await selectRows('price_snapshots', {
+  const [snapshotResult, attemptResult] = await Promise.all([
+    selectRows('price_snapshots', {
     select: 'ticker,source,price_type,as_of,collected_at',
     collected_at: `gte.${since}`,
     order: 'collected_at.desc',
     limit: '2000',
-  });
-  return summarizePriceSourceQuality(result.rows || []);
+    }),
+    selectRows('price_provider_attempts', {
+      select: 'provider,ticker,price_type,status,attempted_at,latency_ms,error_message',
+      attempted_at: `gte.${since}`,
+      order: 'attempted_at.desc',
+      limit: '2000',
+    }),
+  ]);
+  return summarizePriceSourceQuality(snapshotResult.rows || [], { attempts: attemptResult.rows || [] });
 }
 
 module.exports = {
   summarizePriceSourceQuality,
+  summarizeProviderAttempts,
   buildPriceSourceQualitySummary,
 };

@@ -154,6 +154,18 @@ create table if not exists price_snapshots (
   unique (ticker, source, price_type, as_of)
 );
 
+create table if not exists price_provider_attempts (
+  id text primary key,
+  provider text not null,
+  ticker text not null,
+  price_type text not null,
+  status text not null,
+  attempted_at timestamptz not null default now(),
+  latency_ms integer,
+  error_message text,
+  payload jsonb not null default '{}'::jsonb
+);
+
 create table if not exists investor_flows (
   id text primary key,
   date date not null,
@@ -346,6 +358,8 @@ create index if not exists portfolio_snapshots_date_idx on portfolio_snapshots(d
 create index if not exists market_snapshots_captured_at_idx on market_snapshots(captured_at);
 create index if not exists price_snapshots_ticker_as_of_idx on price_snapshots(ticker, as_of desc);
 create index if not exists price_snapshots_source_type_idx on price_snapshots(source, price_type);
+create index if not exists price_provider_attempts_provider_time_idx on price_provider_attempts(provider, attempted_at desc);
+create index if not exists price_provider_attempts_status_time_idx on price_provider_attempts(status, attempted_at desc);
 create index if not exists investor_flows_date_idx on investor_flows(date);
 create index if not exists performance_reviews_period_idx on performance_reviews(period, end_date);
 create index if not exists financial_freedom_goals_user_date_idx on financial_freedom_goals(user_key, date);

@@ -66,6 +66,12 @@ test('formatPerformanceReview explains recommendation and execution metrics in p
         total: 2,
         ratePct: 10,
       },
+      attempts: {
+        total: 30,
+        failed: 2,
+        failureRatePct: 6.67,
+        empty: 1,
+      },
       staleSnapshots: 0,
     },
     notes: ['실제 거래 중 추천과 연결되지 않은 비중이 높습니다.'],
@@ -86,6 +92,7 @@ test('formatPerformanceReview explains recommendation and execution metrics in p
   assert.match(message, /리스크 요인별 성과/);
   assert.match(message, /rr_ok: 평가 4건/);
   assert.match(message, /가격 데이터 품질/);
+  assert.match(message, /Provider 호출: 30건 · 실패 2건 \(6.67%\) · 빈 응답 1건/);
   assert.match(message, /KRX 3건 · 공공데이터 4건 · KIS fallback 1건/);
   assert.match(message, /추천 수익률은 실제 계좌 수익률이 아닙니다/);
 });

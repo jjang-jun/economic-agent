@@ -249,11 +249,11 @@ Telegram Bot
 - [x] Telegram 승인 흐름 smoke script와 정기 점검 workflow 추가
 
 ## 현재 가장 중요한 다음 작업
-1. 가격 provider 실패 로그를 별도 테이블로 남겨 성공률뿐 아니라 실제 호출 실패율까지 계산한다.
-2. 대시보드를 정적 HTML 생성 방식에서 Agent Server의 인증된 `/dashboard` 화면으로 승격할지 검토한다.
-3. 다이제스트 전송 성공 후 `alert_events` 상태 전환 결과를 운영 리포트에서 별도 추적한다.
-4. 추천 성과를 프롬프트/모델 버전별로 분리해 비교한다.
-5. Telegram smoke workflow 실패 시 private 알림을 보내는 후속 경보를 추가한다.
+1. 대시보드를 정적 HTML 생성 방식에서 Agent Server의 인증된 `/dashboard` 화면으로 승격할지 검토한다.
+2. 다이제스트 전송 성공 후 `alert_events` 상태 전환 결과를 운영 리포트에서 별도 추적한다.
+3. 추천 성과를 프롬프트/모델 버전별로 분리해 비교한다.
+4. Telegram smoke workflow 실패 시 private 알림을 보내는 후속 경보를 추가한다.
+5. 가격 provider 실패율이 일정 기준을 넘으면 private 알림을 보내는 경보를 추가한다.
 
 ## 운영 루프
 

@@ -4,3 +4,4 @@ data/
 .cache/
 supabase/.temp/
 .claude/
+current-portfolio.md

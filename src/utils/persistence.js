@@ -420,6 +420,32 @@ async function persistPriceSnapshots(snapshots) {
   return upsert('price_snapshots', rows, 'ticker,source,price_type,as_of');
 }
 
+async function persistPriceProviderAttempt(attempt) {
+  if (!attempt?.provider || !attempt?.ticker || !attempt?.priceType || !attempt?.status) {
+    return { saved: 0 };
+  }
+  const attemptedAt = attempt.attemptedAt || new Date().toISOString();
+  const id = attempt.id || [
+    'price-attempt',
+    attempt.provider,
+    attempt.ticker,
+    attempt.priceType,
+    attemptedAt,
+    Math.random().toString(36).slice(2, 8),
+  ].join(':');
+  return upsert('price_provider_attempts', [{
+    id,
+    provider: attempt.provider,
+    ticker: attempt.ticker,
+    price_type: attempt.priceType,
+    status: attempt.status,
+    attempted_at: attemptedAt,
+    latency_ms: attempt.latencyMs ?? null,
+    error_message: attempt.errorMessage || null,
+    payload: attempt.payload || {},
+  }], 'id');
+}
+
 async function persistInvestorFlow(flow) {
   if (!flow?.latest?.date) return { saved: 0 };
   const latest = flow.latest;
@@ -713,6 +739,7 @@ module.exports = {
   loadLatestPersistedPortfolioSnapshot,
   persistMarketSnapshots,
   persistPriceSnapshots,
+  persistPriceProviderAttempt,
   persistInvestorFlow,
   persistDecisionContext,
   persistPerformanceReview,

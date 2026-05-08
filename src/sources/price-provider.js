@@ -12,7 +12,7 @@ const {
   fetchBenchmarkQuote: fetchYahooBenchmarkQuote,
   normalizeYahooSymbol,
 } = require('./yahoo-finance');
-const { persistPriceSnapshots } = require('../utils/persistence');
+const { persistPriceSnapshots, persistPriceProviderAttempt } = require('../utils/persistence');
 
 function isDomesticTicker(ticker) {
   return Boolean(normalizeKisTicker(ticker));
@@ -49,6 +49,35 @@ async function persistQuoteSnapshot(quote, requestedSymbol) {
   await persistPriceSnapshots([snapshot]);
 }
 
+async function attemptProvider({ source, ticker, priceType, fetcher }) {
+  const startedAt = Date.now();
+  const attemptedAt = new Date().toISOString();
+  try {
+    const result = await fetcher();
+    await persistPriceProviderAttempt({
+      provider: source,
+      ticker,
+      priceType,
+      status: result ? 'success' : 'empty',
+      attemptedAt,
+      latencyMs: Date.now() - startedAt,
+    });
+    return result;
+  } catch (err) {
+    await persistPriceProviderAttempt({
+      provider: source,
+      ticker,
+      priceType,
+      status: 'failed',
+      attemptedAt,
+      latencyMs: Date.now() - startedAt,
+      errorMessage: err.message,
+    });
+    console.warn(`[PriceProvider] ${source} ${ticker} ${priceType} 실패: ${err.message}`);
+    return null;
+  }
+}
+
 function kisDailyRowToQuote(row, ticker) {
   const code = normalizeKisTicker(ticker);
   if (!code || typeof row?.close !== 'number') return null;
@@ -83,10 +112,17 @@ async function fetchDomesticCurrentPrice(ticker) {
   const sources = PRICE_SOURCE_POLICY.currentPrice.domestic;
 
   for (const source of sources) {
-    let quote = null;
-    if (source === 'kis-rest') quote = await fetchKisCurrentPrice(ticker);
-    if (source === 'naver-finance') quote = await fetchNaverQuote(ticker);
-    if (source === 'yahoo-finance') quote = await fetchYahooQuote(ticker);
+    const quote = await attemptProvider({
+      source,
+      ticker,
+      priceType: 'current',
+      fetcher: async () => {
+        if (source === 'kis-rest') return fetchKisCurrentPrice(ticker);
+        if (source === 'naver-finance') return fetchNaverQuote(ticker);
+        if (source === 'yahoo-finance') return fetchYahooQuote(ticker);
+        return null;
+      },
+    });
     if (quote) {
       quote.sourcePriority = sources;
       await persistQuoteSnapshot(quote, ticker);
@@ -100,13 +136,20 @@ async function fetchDomesticEodPrice(ticker, date) {
   const sources = PRICE_SOURCE_POLICY.eodOfficial.domestic;
 
   for (const source of sources) {
-    let quote = null;
-    if (source === 'krx-openapi') quote = await fetchKrxEodPrice(ticker, date);
-    if (source === 'data-go-kr') quote = await fetchDataGoKrEodPrice(ticker, date);
-    if (source === 'kis-rest') {
-      const rows = await fetchKisDailyOhlcv(ticker, date, date);
-      quote = kisDailyRowToQuote(rows.at(-1), ticker);
-    }
+    const quote = await attemptProvider({
+      source,
+      ticker,
+      priceType: 'eod',
+      fetcher: async () => {
+        if (source === 'krx-openapi') return fetchKrxEodPrice(ticker, date);
+        if (source === 'data-go-kr') return fetchDataGoKrEodPrice(ticker, date);
+        if (source === 'kis-rest') {
+          const rows = await fetchKisDailyOhlcv(ticker, date, date);
+          return kisDailyRowToQuote(rows.at(-1), ticker);
+        }
+        return null;
+      },
+    });
     if (quote) {
       quote.sourcePriority = sources;
       await persistQuoteSnapshot(quote, ticker);
@@ -120,13 +163,20 @@ async function fetchDomesticDailyOhlcv(ticker, from, to) {
   const sources = PRICE_SOURCE_POLICY.eodOfficial.domestic;
 
   for (const source of sources) {
-    let rows = [];
-    if (source === 'krx-openapi') rows = await fetchKrxDailyOhlcv(ticker, from, to);
-    if (source === 'data-go-kr') rows = await fetchDataGoKrDailyOhlcv(ticker, from, to);
-    if (source === 'kis-rest') {
-      const kisRows = await fetchKisDailyOhlcv(ticker, from, to);
-      rows = kisRows.map(row => kisDailyRowToQuote(row, ticker)).filter(Boolean);
-    }
+    const rows = await attemptProvider({
+      source,
+      ticker,
+      priceType: 'eod',
+      fetcher: async () => {
+        if (source === 'krx-openapi') return fetchKrxDailyOhlcv(ticker, from, to);
+        if (source === 'data-go-kr') return fetchDataGoKrDailyOhlcv(ticker, from, to);
+        if (source === 'kis-rest') {
+          const kisRows = await fetchKisDailyOhlcv(ticker, from, to);
+          return kisRows.map(row => kisDailyRowToQuote(row, ticker)).filter(Boolean);
+        }
+        return [];
+      },
+    }) || [];
     if (rows.length > 0) {
       const snapshots = rows.map(row => toPriceSnapshot({ ...row, sourcePriority: sources }, ticker)).filter(Boolean);
       await persistPriceSnapshots(snapshots);
@@ -140,20 +190,27 @@ async function fetchGlobalDailyOhlcv(ticker, from, to) {
   const sources = PRICE_SOURCE_POLICY.eodOfficial.global;
 
   for (const source of sources) {
-    let rows = [];
-    if (source === 'fmp') rows = await fetchFmpDailyOhlcv(ticker, from, to);
-    if (source === 'tiingo-eod') {
-      const quote = await fetchTiingoQuote(ticker);
-      rows = quote ? [quote] : [];
-    }
-    if (source === 'alpha-vantage') {
-      const quote = await fetchAlphaVantageQuote(ticker);
-      rows = quote ? [{ ...quote, priceType: 'eod', isRealtime: false }] : [];
-    }
-    if (source === 'yahoo-finance') {
-      const quote = await fetchYahooQuote(ticker);
-      rows = quote ? [{ ...quote, priceType: 'eod', isRealtime: false }] : [];
-    }
+    const rows = await attemptProvider({
+      source,
+      ticker,
+      priceType: 'eod',
+      fetcher: async () => {
+        if (source === 'fmp') return fetchFmpDailyOhlcv(ticker, from, to);
+        if (source === 'tiingo-eod') {
+          const quote = await fetchTiingoQuote(ticker);
+          return quote ? [quote] : [];
+        }
+        if (source === 'alpha-vantage') {
+          const quote = await fetchAlphaVantageQuote(ticker);
+          return quote ? [{ ...quote, priceType: 'eod', isRealtime: false }] : [];
+        }
+        if (source === 'yahoo-finance') {
+          const quote = await fetchYahooQuote(ticker);
+          return quote ? [{ ...quote, priceType: 'eod', isRealtime: false }] : [];
+        }
+        return [];
+      },
+    }) || [];
     if (rows.length > 0) {
       const snapshots = rows.map(row => toPriceSnapshot({ ...row, sourcePriority: sources }, ticker)).filter(Boolean);
       await persistPriceSnapshots(snapshots);
@@ -167,12 +224,19 @@ async function fetchGlobalCurrentPrice(ticker) {
   const sources = PRICE_SOURCE_POLICY.currentPrice.global;
 
   for (const source of sources) {
-    let quote = null;
-    if (source === 'alpaca-market-data') quote = await fetchAlpacaQuote(ticker);
-    if (source === 'fmp') quote = await fetchFmpQuote(ticker);
-    if (source === 'alpha-vantage') quote = await fetchAlphaVantageQuote(ticker);
-    if (source === 'tiingo-eod') quote = await fetchTiingoQuote(ticker);
-    if (source === 'yahoo-finance') quote = await fetchYahooQuote(ticker);
+    const quote = await attemptProvider({
+      source,
+      ticker,
+      priceType: 'current',
+      fetcher: async () => {
+        if (source === 'alpaca-market-data') return fetchAlpacaQuote(ticker);
+        if (source === 'fmp') return fetchFmpQuote(ticker);
+        if (source === 'alpha-vantage') return fetchAlphaVantageQuote(ticker);
+        if (source === 'tiingo-eod') return fetchTiingoQuote(ticker);
+        if (source === 'yahoo-finance') return fetchYahooQuote(ticker);
+        return null;
+      },
+    });
     if (quote) {
       quote.sourcePriority = sources;
       await persistQuoteSnapshot(quote, ticker);

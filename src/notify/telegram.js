@@ -751,6 +751,7 @@ function formatPerformanceReview(review) {
   const priceQuality = review.priceSourceQuality || {};
   const officialEod = priceQuality.officialEod || {};
   const priceFallback = priceQuality.fallback || {};
+  const priceAttempts = priceQuality.attempts || {};
   const freedom = review.freedomStatus || {};
   const notes = (review.notes || []).map(item => `▸ ${escapeHtml(item)}`);
 
@@ -808,6 +809,7 @@ function formatPerformanceReview(review) {
   ] : [];
   const priceLines = priceQuality.totalSnapshots ? [
     `▸ 가격 스냅샷: ${priceQuality.totalSnapshots ?? 0}건 / 종목 ${priceQuality.tickerCount ?? 0}개`,
+    `▸ Provider 호출: ${priceAttempts.total ?? 0}건 · 실패 ${priceAttempts.failed ?? 0}건 (${priceAttempts.failureRatePct ?? 'n/a'}%) · 빈 응답 ${priceAttempts.empty ?? 0}건`,
     `▸ EOD 가격: ${priceQuality.eodSnapshots ?? 0}건, 공식 EOD 비중 ${officialEod.ratePct ?? 'n/a'}%`,
     `▸ KRX ${officialEod.krx ?? 0}건 · 공공데이터 ${officialEod.dataGoKr ?? 0}건 · KIS fallback ${priceQuality.kisEodFallback ?? 0}건`,
     `▸ Naver/Yahoo fallback: ${priceFallback.total ?? 0}건 (${priceFallback.ratePct ?? 'n/a'}%)`,
