@@ -29,6 +29,7 @@
     "agent:server": "node --env-file-if-exists=.env src/server/index.js",
     "telegram:set-webhook": "node --env-file-if-exists=.env scripts/set-telegram-webhook.js",
     "telegram:smoke-actions": "node --env-file-if-exists=.env scripts/smoke-telegram-actions.js",
+    "notify:workflow-failure": "node --env-file-if-exists=.env scripts/notify-workflow-failure.js",
     "collector:call": "node --env-file-if-exists=.env scripts/call-news-collector.js",
     "db:push": "node --env-file-if-exists=.env scripts/push-supabase.js",
     "db:pull": "node --env-file-if-exists=.env scripts/pull-supabase.js",

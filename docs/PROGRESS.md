@@ -195,10 +195,11 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 가격 provider 호출 시도 로그를 추가했다. `price_provider_attempts`에 provider/ticker/price_type/status/latency/error를 저장하고, 주간/월간 성과 리뷰의 가격 데이터 품질 섹션에서 provider 호출 수, 실패율, 빈 응답률을 함께 표시한다.
 - 다이제스트 전송 후 상태 추적을 운영 리포트에 보강했다. 주간/월간 성과 리뷰의 수집/알림 운영 섹션이 `digest`와 `catch_up` 각각의 전송완료/대기/실패 건수를 따로 보여주고, 상태 전환 실패가 있으면 이상치로 표시한다.
 - 추천 생성 AI 버전 추적을 추가했다. 종목 분석 리포트와 추천 로그에 `aiMetadata`를 저장하고, Supabase `recommendations`에 `ai_provider`, `ai_model`, `prompt_version`, `ai_metadata`를 별도 컬럼으로 남긴다. 주간/월간 성과 리뷰는 프롬프트/모델 조합별 승률과 평균 추천 수익률을 분리 표시한다.
+- Telegram 승인 흐름 smoke 실패 알림을 추가했다. `telegram-smoke-actions.yml`에서 smoke 단계가 실패하면 `notify:workflow-failure`가 private Telegram으로 워크플로우명, 작업명, 브랜치, 커밋, GitHub Actions 로그 링크를 보낸다.
 
 ## 다음 작업
 
-1. Telegram smoke workflow 실패 시 private 알림 추가
-2. 가격 provider 실패율 기준 private 알림 추가
-3. Action Report workflow 수동 실행으로 GitHub Actions 운영 경로 검증
+1. 가격 provider 실패율 기준 private 알림 추가
+2. Action Report workflow 수동 실행으로 GitHub Actions 운영 경로 검증
+3. Telegram smoke workflow 실패 알림 end-to-end 확인
 4. 프롬프트/모델별 추천 성과 샘플 누적 후 Claude Sonnet 전환 효과 평가
