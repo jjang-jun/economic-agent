@@ -83,6 +83,7 @@ src/
 │   ├── fred-api.js            # FRED 미국 경제지표 API
 │   ├── price-provider.js      # 가격 소스 우선순위 라우터
 │   ├── kis-api.js             # 한국투자증권 Open API REST 가격 조회
+│   ├── krx-openapi.js         # KRX Open API 공식 일별매매정보
 │   ├── alpaca-api.js          # 미국 주식 실시간/히스토리 provider 후보
 │   ├── fmp-api.js             # 해외 주식 가격/재무/실적 provider 후보
 │   ├── alpha-vantage-api.js   # 해외 주식 fallback 가격 provider
@@ -495,7 +496,7 @@ module.exports = {
 
 가격 조회는 `src/sources/price-provider.js`를 통해 호출합니다. 국내 6자리 종목코드는 장중/현재가에서는 한국투자증권 Open API REST를 1차로 사용하고, 키가 없거나 실패하면 Naver Finance, 마지막으로 Yahoo Finance fallback을 사용합니다. 국내 현재가가 KIS 또는 Naver에서 확인된 경우 Yahoo의 국내 history 기반 5일/20일 수익률은 사용하지 않습니다.
 
-추천 성과 평가와 백테스트용 일별 종가는 현재가와 분리합니다. 국내 EOD 가격은 공공데이터포털 주식시세정보(`data-go-kr`)를 우선 사용하고, 없으면 KIS 일봉으로 fallback합니다. 해외 EOD 가격은 FMP historical EOD를 우선 사용하고, Tiingo/Alpha/Yahoo fallback을 사용합니다. 추천 1일/5일/20일 평가는 가능한 경우 평가 대상일의 EOD 가격과 EOD high/low history로 수익률, MFE/MAE, 손절/목표 터치 여부를 계산합니다. KRX Open API는 공식 일별/통계 검증 계층으로 추가할 예정입니다.
+추천 성과 평가와 백테스트용 일별 종가는 현재가와 분리합니다. 국내 EOD 가격은 KRX Open API 공식 일별매매정보(`krx-openapi`)를 우선 사용하고, 없으면 공공데이터포털 주식시세정보(`data-go-kr`), KIS 일봉 순서로 fallback합니다. 해외 EOD 가격은 FMP historical EOD를 우선 사용하고, Tiingo/Alpha/Yahoo fallback을 사용합니다. 추천 1일/5일/20일 평가는 가능한 경우 평가 대상일의 EOD 가격과 EOD high/low history로 수익률, MFE/MAE, 손절/목표 터치 여부를 계산합니다.
 
 해외 주식은 Alpaca Market Data, FMP, Alpha Vantage, Tiingo EOD, Yahoo fallback 순서로 조회합니다. 키가 없는 provider는 자동으로 건너뛰므로 초기에는 Yahoo fallback으로 계속 동작하고, `FMP_API_KEY`를 넣으면 미국 기업 재무/실적 분석까지 확장할 수 있습니다. 미국 장중 실시간 알림이 중요해지면 Alpaca WebSocket 또는 Massive를 별도 실시간 계층으로 추가합니다.
 
@@ -523,8 +524,13 @@ ALPHA_VANTAGE_API_KEY=...
 TIINGO_API_TOKEN=...
 
 # 국내 EOD 백필 선택 provider
+KRX_OPENAPI_KEY=...
+# 선택: 기본값은 KRX Open API endpoint
+KRX_OPENAPI_BASE_URL=https://data-dbg.krx.co.kr/svc/apis
 DATA_GO_KR_API_KEY=...
 ```
+
+KRX Open API는 키 발급 외에 사용할 API 서비스별 이용 권한이 필요할 수 있습니다. `401 Unauthorized API Call`이 나오면 KRX 포털에서 유가증권 일별매매정보와 코스닥 일별매매정보 이용신청/승인 상태를 확인하세요. KRX가 실패해도 시스템은 Data.go.kr, KIS 순서로 자동 fallback합니다.
 
 KIS 접근토큰은 발급 제한이 있으므로 런타임에서 `data/kis-token.json`에 캐시합니다. 현재가 조회는 기본 1.1초 간격으로 직렬화합니다.
 

@@ -1,6 +1,7 @@
 const { PRICE_SOURCE_POLICY } = require('../config/price-source-policy');
 const { fetchKisCurrentPrice, fetchKisDailyOhlcv, normalizeKisTicker } = require('./kis-api');
 const { fetchNaverQuote } = require('./naver-finance');
+const { fetchKrxEodPrice, fetchKrxDailyOhlcv } = require('./krx-openapi');
 const { fetchDataGoKrEodPrice, fetchDataGoKrDailyOhlcv } = require('./data-go-kr-stocks');
 const { fetchAlpacaQuote } = require('./alpaca-api');
 const { fetchFmpQuote, fetchFmpDailyOhlcv } = require('./fmp-api');
@@ -100,6 +101,7 @@ async function fetchDomesticEodPrice(ticker, date) {
 
   for (const source of sources) {
     let quote = null;
+    if (source === 'krx-openapi') quote = await fetchKrxEodPrice(ticker, date);
     if (source === 'data-go-kr') quote = await fetchDataGoKrEodPrice(ticker, date);
     if (source === 'kis-rest') {
       const rows = await fetchKisDailyOhlcv(ticker, date, date);
@@ -119,6 +121,7 @@ async function fetchDomesticDailyOhlcv(ticker, from, to) {
 
   for (const source of sources) {
     let rows = [];
+    if (source === 'krx-openapi') rows = await fetchKrxDailyOhlcv(ticker, from, to);
     if (source === 'data-go-kr') rows = await fetchDataGoKrDailyOhlcv(ticker, from, to);
     if (source === 'kis-rest') {
       const kisRows = await fetchKisDailyOhlcv(ticker, from, to);
