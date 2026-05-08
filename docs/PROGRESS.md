@@ -181,6 +181,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 일일 행동 리포트 문구 개선. 한국 주식 후보는 기준매수가/손절가/정수 주식 수/실제 투자금으로 표시하고, 1주 가격이 1회 상한보다 크면 매수 보류로 표시한다. 보유 유지에는 손익·비중·손절 기준 미도달 근거를, 축소 후보에는 매도 수량/비율 제안을 표시한다.
 - 주간 성과 리뷰 문구 개선. AI 추천 성과, 내 실행 품질, 수집/알림 운영, 이번 주 점검 항목으로 분리하고 평균 추천 수익률/시장 대비 초과수익/추천 연결 거래의 의미를 한국어로 설명한다.
 - Cloud Run 수집기 중복 카운트 보강. 휘발 로컬 캐시만 믿지 않고 Supabase `articles`를 기준으로 이미 저장된 원문을 제외하며, 낮은 점수/키워드 탈락 원문도 저장해 다음 실행에서 신규 카운트가 부풀지 않도록 조정했다.
+- 포트폴리오 원본 동기화 보강. 평가 필드(`marketValue`, `costBasis`, `unrealizedPnlPct`, `quoteSource`, `fxRate`)를 정규화 과정에서 보존하고, `portfolio:snapshot`이 Supabase 원본을 우선 읽은 뒤 평가 결과를 `portfolio_snapshots`뿐 아니라 `portfolio_accounts`/`positions`에도 다시 저장한다.
 
 ## 다음 작업
 
