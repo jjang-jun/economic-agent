@@ -50,6 +50,15 @@ npm run portfolio:seed-store
 
 Cloud Run 수집기는 컨테이너 메모리와 콜드스타트 안정성을 위해 `DISABLE_FINBERT=1`을 기본으로 둔다. 영문 기사는 키워드/사전 감성으로 fallback하고, FinBERT가 필요한 정밀 스코어링은 GitHub Actions 백업 수집기나 로컬 실행에서 사용할 수 있다.
 
+배포 후에는 아래 endpoint로 배포 상태를 확인한다.
+
+```bash
+curl https://YOUR_AGENT_URL/health
+curl https://YOUR_AGENT_URL/version
+```
+
+`/health`는 서버 생존 여부만 확인한다. `/version`은 Cloud Run revision, service name, 선택적으로 `COMMIT_SHA`를 반환하므로 최신 코드가 배포됐는지 확인할 때 사용한다. `/version`이 404라면 아직 2026-05-08 이후 Agent Server 코드가 Cloud Run에 반영되지 않은 상태다.
+
 ## 2. 배포
 
 컨테이너 기반 플랫폼에 배포한다.
