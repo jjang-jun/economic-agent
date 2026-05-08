@@ -56,7 +56,13 @@ function summarizeCollectorOps(runs = [], alerts = []) {
       total: alerts.length,
       sentImmediate: alertByTypeStatus['immediate:sent'] || 0,
       failedImmediate: alertByTypeStatus['immediate:failed'] || 0,
+      sentDigest: alertByTypeStatus['digest:sent'] || 0,
+      failedDigest: alertByTypeStatus['digest:failed'] || 0,
+      bufferedDigest: alertByTypeStatus['digest:buffered'] || 0,
       pendingDigest: (alertByTypeStatus['digest:pending'] || 0) + (alertByTypeStatus['digest:buffered'] || 0),
+      sentCatchUp: alertByTypeStatus['catch_up:sent'] || 0,
+      failedCatchUp: alertByTypeStatus['catch_up:failed'] || 0,
+      bufferedCatchUp: alertByTypeStatus['catch_up:buffered'] || 0,
       pendingCatchUp: (alertByTypeStatus['catch_up:pending'] || 0) + (alertByTypeStatus['catch_up:buffered'] || 0),
     },
     recentFailures: failed.slice(0, 3).map(run => ({
@@ -88,6 +94,12 @@ function buildCollectorOpsAnomalies(summary = {}, options = {}) {
   }
   if ((summary.alertEvents?.failedImmediate || 0) > maxFailedImmediate) {
     anomalies.push(`즉시 알림 실패 ${summary.alertEvents.failedImmediate}건`);
+  }
+  if ((summary.alertEvents?.failedDigest || 0) > 0) {
+    anomalies.push(`다이제스트 상태 전환 실패 ${summary.alertEvents.failedDigest}건`);
+  }
+  if ((summary.alertEvents?.failedCatchUp || 0) > 0) {
+    anomalies.push(`catch-up 상태 전환 실패 ${summary.alertEvents.failedCatchUp}건`);
   }
   if ((summary.alertEvents?.pendingCatchUp || 0) > maxPendingCatchUp) {
     anomalies.push(`catch-up 대기 ${summary.alertEvents.pendingCatchUp}건`);

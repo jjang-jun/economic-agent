@@ -48,7 +48,11 @@ test('formatPerformanceReview explains recommendation and execution metrics in p
       failedRuns: 1,
       totalImmediateAlerts: 0,
       alertEvents: {
+        sentDigest: 3,
+        failedDigest: 0,
         pendingDigest: 4,
+        sentCatchUp: 1,
+        failedCatchUp: 0,
         pendingCatchUp: 0,
       },
     },
@@ -95,4 +99,6 @@ test('formatPerformanceReview explains recommendation and execution metrics in p
   assert.match(message, /Provider 호출: 30건 · 실패 2건 \(6.67%\) · 빈 응답 1건/);
   assert.match(message, /KRX 3건 · 공공데이터 4건 · KIS fallback 1건/);
   assert.match(message, /추천 수익률은 실제 계좌 수익률이 아닙니다/);
+  assert.match(message, /다이제스트 처리: 전송완료 3건 · 대기 4건 · 실패 0건/);
+  assert.match(message, /catch-up 처리: 전송완료 1건 · 대기 0건 · 실패 0건/);
 });

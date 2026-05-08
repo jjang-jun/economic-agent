@@ -193,10 +193,11 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 추천 성과 분석을 고도화했다. `performance-lab`이 실패 원인을 `stop_touched`, `low_risk_reward`, `underperformed_benchmark`, `large_drawdown` 등으로 자동 분류하고, 섹터별/리스크 요인별 승률·평균 신호수익률을 주간/월간 성과 리뷰에 표시한다.
 - Telegram 승인 흐름 smoke를 추가했다. `npm run telegram:smoke-actions`는 `/buy`, `/sell`, `/cash` 초안을 생성한 뒤 모두 취소해 Supabase `pending_actions`와 callback 경로를 검증하며, 실제 거래/현금 변경은 수행하지 않는다. GitHub Actions `telegram-smoke-actions.yml`로 평일 08:10 KST에 정기 점검한다.
 - 가격 provider 호출 시도 로그를 추가했다. `price_provider_attempts`에 provider/ticker/price_type/status/latency/error를 저장하고, 주간/월간 성과 리뷰의 가격 데이터 품질 섹션에서 provider 호출 수, 실패율, 빈 응답률을 함께 표시한다.
+- 다이제스트 전송 후 상태 추적을 운영 리포트에 보강했다. 주간/월간 성과 리뷰의 수집/알림 운영 섹션이 `digest`와 `catch_up` 각각의 전송완료/대기/실패 건수를 따로 보여주고, 상태 전환 실패가 있으면 이상치로 표시한다.
 
 ## 다음 작업
 
-1. Action Report workflow 수동 실행으로 GitHub Actions 운영 경로 검증
-2. Telegram `/recommendations` 실제 private 채팅 출력 확인
-3. Telegram `/buy`, `/sell`, `/cash` 실제 private 채팅 end-to-end 운영 검증
-4. KRX/Data.go.kr/KIS EOD 가격 품질 모니터링과 추천 성과 샘플 누적
+1. 추천 성과를 프롬프트/모델 버전별로 분리해 비교
+2. Telegram smoke workflow 실패 시 private 알림 추가
+3. 가격 provider 실패율 기준 private 알림 추가
+4. Action Report workflow 수동 실행으로 GitHub Actions 운영 경로 검증

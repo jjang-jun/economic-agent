@@ -805,7 +805,8 @@ function formatPerformanceReview(review) {
     `▸ 수집 성공: ${collector.successfulRuns ?? 0}/${collector.completedRuns ?? collector.totalRuns}`,
     `▸ 실패: ${collector.failedRuns ?? 0}건`,
     `▸ 즉시 알림: ${collector.totalImmediateAlerts ?? 0}건`,
-    `▸ 다이제스트 대기: ${alerts.pendingDigest ?? 0}건 / catch-up ${alerts.pendingCatchUp ?? 0}건`,
+    `▸ 다이제스트 처리: 전송완료 ${alerts.sentDigest ?? 0}건 · 대기 ${alerts.pendingDigest ?? 0}건 · 실패 ${alerts.failedDigest ?? 0}건`,
+    `▸ catch-up 처리: 전송완료 ${alerts.sentCatchUp ?? 0}건 · 대기 ${alerts.pendingCatchUp ?? 0}건 · 실패 ${alerts.failedCatchUp ?? 0}건`,
   ] : [];
   const priceLines = priceQuality.totalSnapshots ? [
     `▸ 가격 스냅샷: ${priceQuality.totalSnapshots ?? 0}건 / 종목 ${priceQuality.tickerCount ?? 0}개`,
