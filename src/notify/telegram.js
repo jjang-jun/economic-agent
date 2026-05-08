@@ -800,6 +800,9 @@ function formatPerformanceReview(review) {
   const riskFactorLines = (leaders.riskFactors || []).slice(0, 4).map(item => (
     `▸ ${item.key}: 평가 ${item.evaluated}건 · 승률 ${fmtPct(item.winRatePct)} · 평균 ${fmtPct(item.avgSignalReturnPct)}`
   ));
+  const aiVersionLines = (leaders.aiVersions || []).slice(0, 4).map(item => (
+    `▸ ${item.key}: 평가 ${item.evaluated}건 · 승률 ${fmtPct(item.winRatePct)} · 평균 ${fmtPct(item.avgSignalReturnPct)}`
+  ));
 
   const collectorLines = collector.totalRuns ? [
     `▸ 수집 성공: ${collector.successfulRuns ?? 0}/${collector.completedRuns ?? collector.totalRuns}`,
@@ -828,9 +831,10 @@ function formatPerformanceReview(review) {
     failureLines.length > 0 ? [`<b>3. 실패 원인</b>`, ...failureLines.map(escapeHtml)].join('\n') : '',
     sectorLines.length > 0 ? [`<b>4. 섹터별 성과</b>`, ...sectorLines.map(escapeHtml)].join('\n') : '',
     riskFactorLines.length > 0 ? [`<b>5. 리스크 요인별 성과</b>`, ...riskFactorLines.map(escapeHtml)].join('\n') : '',
-    collectorLines.length > 0 ? [`<b>6. 수집/알림 운영</b>`, ...collectorLines.map(escapeHtml)].join('\n') : '',
-    priceLines.length > 0 ? [`<b>7. 가격 데이터 품질</b>`, ...priceLines.map(escapeHtml)].join('\n') : '',
-    notes.length > 0 ? [`<b>8. 이번 주 점검할 것</b>`, ...notes].join('\n') : '',
+    aiVersionLines.length > 0 ? [`<b>6. 프롬프트/모델별 성과</b>`, ...aiVersionLines.map(escapeHtml)].join('\n') : '',
+    collectorLines.length > 0 ? [`<b>7. 수집/알림 운영</b>`, ...collectorLines.map(escapeHtml)].join('\n') : '',
+    priceLines.length > 0 ? [`<b>8. 가격 데이터 품질</b>`, ...priceLines.map(escapeHtml)].join('\n') : '',
+    notes.length > 0 ? [`<b>9. 이번 주 점검할 것</b>`, ...notes].join('\n') : '',
     '<i>추천 수익률은 실제 계좌 수익률이 아닙니다. 추천 성과와 내 매매 성과를 분리해서 봅니다.</i>',
   ].filter(Boolean).join('\n');
 }

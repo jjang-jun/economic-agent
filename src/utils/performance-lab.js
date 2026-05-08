@@ -102,6 +102,18 @@ function getFundamentalProfile(recommendation = {}) {
   return recommendation.fundamentalProfile || recommendation.fundamental_profile || {};
 }
 
+function getAiMetadata(recommendation = {}) {
+  return recommendation.aiMetadata || recommendation.ai_metadata || {};
+}
+
+function aiVersionKey(recommendation = {}) {
+  const metadata = getAiMetadata(recommendation);
+  const promptVersion = metadata.promptVersion || metadata.prompt_version || recommendation.promptVersion || recommendation.prompt_version || 'legacy_prompt';
+  const provider = metadata.provider || recommendation.aiProvider || recommendation.ai_provider || 'unknown_provider';
+  const model = metadata.model || recommendation.aiModel || recommendation.ai_model || 'unknown_model';
+  return `${promptVersion} / ${provider}:${model}`;
+}
+
 function sectorKey(recommendation = {}) {
   const market = getMarketProfile(recommendation);
   const fundamental = getFundamentalProfile(recommendation);
@@ -204,10 +216,12 @@ function buildPerformanceLab({ recommendations = [], trades = [] } = {}) {
     bySignal: summarizeGroups(recommendations, item => item.signal || 'unknown'),
     byRiskReward: summarizeGroups(recommendations, riskRewardBucket),
     bySector: summarizeGroups(recommendations, sectorKey),
+    byAiVersion: summarizeGroups(recommendations, aiVersionKey),
     byRiskFactor: summarizeMultiKeyGroups(recommendations, riskFactorKeys),
     failureAnalysis: summarizeFailures(recommendations),
     leaders: {
       sectors: topGroups(summarizeGroups(recommendations, sectorKey), 5),
+      aiVersions: topGroups(summarizeGroups(recommendations, aiVersionKey), 5),
       riskFactors: topGroups(summarizeMultiKeyGroups(recommendations, riskFactorKeys), 5),
     },
   };
@@ -218,6 +232,7 @@ module.exports = {
   summarizeEvaluated,
   buildPerformanceLab,
   riskRewardBucket,
+  aiVersionKey,
   sectorKey,
   riskFactorKeys,
   classifyFailure,

@@ -66,7 +66,7 @@ function shouldLogRecommendation(stock = {}) {
   return stock.risk_review?.approved === true && stock.risk_review?.action === 'candidate';
 }
 
-async function buildRecommendation(stock, articles, indicators, date) {
+async function buildRecommendation(stock, articles, indicators, date, aiMetadata = {}) {
   const symbol = normalizeYahooSymbol(stock.ticker);
   const [quote, benchmark] = await Promise.all([
     symbol ? fetchCurrentPrice(symbol) : null,
@@ -92,6 +92,7 @@ async function buildRecommendation(stock, articles, indicators, date) {
     marketProfile: stock.market_profile || null,
     fundamentalProfile: stock.fundamental_profile || null,
     riskReview: stock.risk_review || null,
+    aiMetadata: stock.ai_metadata || stock.aiMetadata || aiMetadata || null,
     relatedNews: getRelatedArticleIds(stock, articles),
     indicators,
     entry: quote
@@ -209,7 +210,8 @@ async function logRecommendations(report, context = {}) {
       stock,
       context.articles || [],
       context.indicators || {},
-      date
+      date,
+      report.aiMetadata || report.ai_metadata || context.aiMetadata || context.ai_metadata || null
     );
     byId.set(id, recommendation);
     added++;

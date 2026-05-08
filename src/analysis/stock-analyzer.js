@@ -1,4 +1,4 @@
-const { chat, extractJSON } = require('../utils/ai-client');
+const { chat, extractJSON, getConfig } = require('../utils/ai-client');
 const MY_INTERESTS = require('../config/interests');
 const {
   AI_BUDGET,
@@ -6,6 +6,8 @@ const {
   formatStockReportArticle,
   formatMarketSnapshot,
 } = require('../utils/ai-budget');
+
+const STOCK_ANALYSIS_PROMPT_VERSION = 'stock-analysis-v2.1';
 
 async function analyzeStocks(articles, indicators) {
   if (articles.length === 0) return null;
@@ -111,14 +113,25 @@ Rules:
 - This is for informational purposes, not investment advice`;
 
   try {
+    const aiConfig = getConfig();
     const responseText = await chat(prompt);
     if (!responseText) throw new Error('AI 응답이 비어있습니다');
 
-    return extractJSON(responseText, 'object');
+    const report = extractJSON(responseText, 'object');
+    report.aiMetadata = {
+      task: 'stock_analysis',
+      promptVersion: STOCK_ANALYSIS_PROMPT_VERSION,
+      provider: aiConfig.provider,
+      model: aiConfig.model,
+      generatedAt: new Date().toISOString(),
+      inputArticleCount: articles.length,
+      selectedArticleCount: selectedArticles.length,
+    };
+    return report;
   } catch (err) {
     console.error(`[종목분석] AI 분석 실패: ${err.message}`);
     return null;
   }
 }
 
-module.exports = { analyzeStocks };
+module.exports = { analyzeStocks, STOCK_ANALYSIS_PROMPT_VERSION };

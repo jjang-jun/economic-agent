@@ -220,6 +220,7 @@ async function persistStockReport(report, date = getKSTDate()) {
 }
 
 function recommendationRow(recommendation) {
+  const aiMetadata = recommendation.aiMetadata || recommendation.ai_metadata || null;
   return {
     id: recommendation.id,
     date: recommendation.date,
@@ -237,6 +238,10 @@ function recommendationRow(recommendation) {
     risk_profile: recommendation.riskProfile || recommendation.risk_profile || null,
     market_profile: recommendation.marketProfile || recommendation.market_profile || null,
     risk_review: recommendation.riskReview || recommendation.risk_review || null,
+    ai_provider: aiMetadata?.provider || null,
+    ai_model: aiMetadata?.model || null,
+    prompt_version: aiMetadata?.promptVersion || aiMetadata?.prompt_version || null,
+    ai_metadata: aiMetadata,
     entry: recommendation.entry || null,
     benchmark: recommendation.benchmark || null,
     status: recommendation.status || '',
