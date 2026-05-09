@@ -40,6 +40,7 @@ async function main() {
   }
 
   await sendTelegramMessage(formatSummary(summary, anomalies), { channel: 'private' });
+  console.log('[price-provider-ops] Telegram 전송 완료');
 }
 
 if (require.main === module) {
