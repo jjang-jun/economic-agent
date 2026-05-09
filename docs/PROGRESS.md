@@ -205,6 +205,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 브리핑/리포트 입력 데이터의 DB 조회 경로를 보강했다. Supabase `daily_summaries`, `stock_reports` 로더를 추가하고 다이제스트/장마감 종목 분석 프롬프트에 최근 저장 요약과 최근 종목 리포트의 압축 컨텍스트를 함께 넣어 시장 레짐과 이전 후보 맥락을 이어간다.
 - 시장 레짐 점수에 원자재와 가격 반응을 추가했다. WTI 유가 급등/급락, 구리 20일 약세, 금 상승과 VIX 동반 상승을 위험 태그로 반영하고, 호재성 뉴스가 많은데 KOSPI가 하락하는 `NEGATIVE_PRICE_REACTION`과 악재에도 시장이 오르는 `RESILIENT_PRICE_REACTION`을 구분한다.
 - 추천 품질 리포트를 모델별, 프롬프트 버전별, 프롬프트+모델 조합별로 분리했다. 주간/월간 성과 리뷰는 각 그룹의 평가 건수, 승률, 평균 추천 수익률, 표본 부족 여부를 따로 표시하고, 추천을 실제로 산 경우와 추천했지만 매수하지 않은 경우의 평균 성과 차이를 계속 보여준다.
+- 로컬 백테스트용 선택형 worker를 추가했다. `npm run backtest:worker -- providers`로 pykrx/FinanceDataReader 설치 여부를 확인하고, 설치된 로컬 환경에서는 `ohlcv` 명령으로 국내 종목 일봉을 JSON으로 가져올 수 있다. 운영 수집은 계속 KRX/Data.go.kr/KIS 등 공식 API 경로를 사용한다.
 
 ## 다음 작업
 

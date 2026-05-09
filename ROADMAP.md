@@ -167,7 +167,7 @@ Telegram Bot
 - [x] KIS 일봉 데이터를 추천 성과 평가 fallback에 연결
 - [x] KRX Open API 또는 공공데이터포털로 공식 일별 종가 백필
 - [ ] Massive는 미국 주식 고품질 히스토리/실시간이 필요해질 때 유료 계층으로 추가
-- [ ] pykrx/FinanceDataReader는 로컬 백테스트 worker로 분리
+- [x] pykrx/FinanceDataReader는 로컬 백테스트 worker로 분리
 - [x] 가격 source별 품질/오류율 모니터링
 
 ## Phase 3: 포트폴리오 기반 의사결정
