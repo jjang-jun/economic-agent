@@ -208,6 +208,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 로컬 백테스트용 선택형 worker를 추가했다. `npm run backtest:worker -- providers`로 pykrx/FinanceDataReader 설치 여부를 확인하고, 설치된 로컬 환경에서는 `ohlcv` 명령으로 국내 종목 일봉을 JSON으로 가져올 수 있다. 운영 수집은 계속 KRX/Data.go.kr/KIS 등 공식 API 경로를 사용한다.
 - Agent Server에 인증된 `/dashboard`를 추가했다. Cloud Run 서버가 Supabase를 직접 조회해 경제적 자유 진행률, 포트폴리오 요약, 추천 평가, 수집기 상태, 최근 추천의 진입가/손절가를 보여준다. 인증은 `DASHBOARD_SECRET`을 우선 사용하고 없으면 `JOB_SECRET`을 대체값으로 쓴다.
 - 전체 점검에서 운영 설정 불일치를 정리했다. `.env.example`과 `render.yaml`에 `DASHBOARD_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `KRX_OPENAPI_KEY`, `DATA_GO_KR_API_KEY`, `DISABLE_FINBERT` 등 최근 운영 변수를 반영하고, 서버 `/dashboard`도 Telegram `/recommendations`와 동일하게 리스크 기준을 통과한 매수 후보만 기본 표시하도록 맞췄다. 대시보드 포트폴리오 요약은 `portfolio_snapshots`가 없으면 Supabase 원본 `portfolio_accounts`를 fallback으로 사용한다. Anthropic 기본 모델은 공식 안정 ID인 `claude-sonnet-4-20250514`로 정리했다.
+- 런타임 언어 원칙을 로드맵에 반영했다. 운영 서버는 Node.js 1대를 기본으로 유지하고, Python은 pykrx/FinanceDataReader, 백테스트, 대량 OHLCV 처리 같은 분석 worker로만 사용한다. 별도 Python 서버는 장시간/대량 분석을 API로 자주 호출해야 할 때만 검토한다.
 
 ## 다음 작업
 
@@ -216,3 +217,4 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 3. 가격 provider의 `해외/글로벌 가격 API 보강 검토` 판단이 반복되는지 모니터링
 4. 다음 실제 workflow 실패 시 private 알림 도착 여부 재확인
 5. `/dashboard` 실제 사용 빈도에 따라 탭 분리와 상세 차트 추가 여부 결정
+6. Python worker를 주간/월간 리서치 리포트에 선택적으로 연결할지 검토

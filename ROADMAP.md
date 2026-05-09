@@ -30,6 +30,20 @@ Economic Agent의 최종 목적은 오늘 살 종목을 찍는 것이 아니라,
 
 ## 4개 엔진 구조
 
+## 런타임 언어 원칙
+
+Node.js를 운영 런타임의 중심으로 둔다. Telegram webhook, Cloud Run HTTP 서버, GitHub Actions CLI, Supabase REST, 뉴스/공시/가격 API 호출은 대부분 I/O 중심이므로 Node.js가 적합하다.
+
+Python은 별도 서버가 아니라 데이터 분석 worker로 둔다. pykrx/FinanceDataReader, 백테스트, 대량 OHLCV 처리, 통계/퀀트 리서치처럼 Python 생태계가 유리한 작업만 Python 스크립트로 분리하고, Node.js가 필요 시 호출하거나 로컬/배치에서 실행한다.
+
+서버 분리 기준:
+- 기본 운영: Cloud Run Node.js Agent Server 1대
+- Python worker: 로컬/배치/수동 리서치용. 상시 서버 불필요
+- 별도 Python 서비스: 백테스트가 장시간 실행되거나, 대량 데이터 분석을 API로 자주 호출해야 할 때만 검토
+- 자동매매/실시간 WebSocket: 검증 전까지 별도 상시 서비스로 분리하지 않음
+
+즉 현재 목표 구조는 `Node.js 운영 서버 1대 + 선택형 Python worker`다.
+
 ### 1. Information Engine
 뉴스, 공시, 가격, 금리, 환율, 수급, 시장 스냅샷을 수집한다.
 
@@ -126,6 +140,7 @@ Telegram Bot
 역할 분리:
 - GitHub Actions: 뉴스 수집, 다이제스트, 장마감 리포트, 성과평가, 주간/월간 리뷰
 - Agent Server: Telegram webhook, 포트폴리오 조회, 매수/매도 기록 초안, 승인 버튼, 리스크 질의
+- Python worker: 로컬 백테스트, pykrx/FinanceDataReader 기반 OHLCV 조회, 대량 데이터 분석
 - Supabase: 기사, 추천, 실제 거래, 포트폴리오, 경제적 자유 목표, 대화 로그, pending action 기준 저장소
 - 로컬 JSON/SQLite: 분석 캐시와 백업
 
@@ -173,6 +188,7 @@ Telegram Bot
 - [x] KRX Open API 또는 공공데이터포털로 공식 일별 종가 백필
 - [ ] Massive는 미국 주식 고품질 히스토리/실시간이 필요해질 때 유료 계층으로 추가
 - [x] pykrx/FinanceDataReader는 로컬 백테스트 worker로 분리
+- [ ] Python worker를 주간/월간 리서치 리포트에 선택적으로 연결할지 검토
 - [x] 가격 source별 품질/오류율 모니터링
 
 ## Phase 3: 포트폴리오 기반 의사결정
