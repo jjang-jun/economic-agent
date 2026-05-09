@@ -29,6 +29,7 @@ module.exports = {
     { symbol: 'QQQ', name: 'Nasdaq 100 ETF' },
     { symbol: 'SOXX', name: 'Semiconductor ETF' },
     { symbol: 'CL=F', name: 'WTI Oil' },
+    { symbol: 'HG=F', name: 'Copper' },
     { symbol: 'GC=F', name: 'Gold' },
     { symbol: '^VIX', name: 'VIX' },
     { symbol: 'DX-Y.NYB', name: 'Dollar Index' },

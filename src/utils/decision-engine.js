@@ -16,6 +16,10 @@ function getChange(item) {
   return typeof item?.changePercent === 'number' ? item.changePercent : null;
 }
 
+function addReason(reasons, text) {
+  if (text) reasons.push(text);
+}
+
 function getTrendSignal(snapshot, symbols) {
   const items = symbols
     .map(symbol => findSnapshot(snapshot, symbol))
@@ -176,6 +180,17 @@ function scoreMarketRegime({ articles, indicators }) {
     reasons.push('KOSPI/KOSDAQ 동반 상승으로 상승 폭 확산 신호');
   }
 
+  if (bullishRatio >= 0.45 && typeof kospiChange === 'number' && kospiChange <= -0.5) {
+    score -= 1;
+    tags.push('NEGATIVE_PRICE_REACTION');
+    warnings.push(`호재성 뉴스가 많지만 KOSPI가 ${kospiChange}% 하락: 가격 반응이 약함`);
+  }
+  if (bearishRatio >= 0.35 && typeof kospiChange === 'number' && kospiChange >= 0.5) {
+    score += 1;
+    tags.push('RESILIENT_PRICE_REACTION');
+    reasons.push(`악재성 뉴스에도 KOSPI가 ${kospiChange}% 상승: 가격 회복력 확인`);
+  }
+
   const globalTrend = getTrendSignal(snapshot, ['SPY', 'QQQ', 'SOXX']);
   if (globalTrend.weak >= 3) {
     score -= 2;
@@ -188,6 +203,42 @@ function scoreMarketRegime({ articles, indicators }) {
   if (indicators.fedRate && Number(indicators.fedRate) >= 4.5) {
     score -= 1;
     reasons.push(`미국 기준금리 ${indicators.fedRate}%로 고금리 부담`);
+  }
+
+  const oil = findSnapshot(snapshot, 'CL=F');
+  const oilChange = getChange(oil);
+  if (typeof oilChange === 'number' && oilChange >= 3) {
+    score -= 1;
+    tags.push('OIL_SHOCK');
+    warnings.push(`WTI 유가 ${oilChange}% 급등: 인플레이션/마진 부담 확인`);
+  } else if (typeof oilChange === 'number' && oilChange <= -5) {
+    score -= 1;
+    tags.push('DEMAND_SHOCK');
+    warnings.push(`WTI 유가 ${oilChange}% 급락: 경기 수요 둔화 신호 가능`);
+  }
+  if (typeof oil?.return20dPct === 'number' && oil.return20dPct >= 10) {
+    score -= 1;
+    addReason(reasons, `WTI 20일 ${oil.return20dPct}% 상승으로 비용/물가 부담`);
+  }
+
+  const copper = findSnapshot(snapshot, 'HG=F');
+  if (typeof copper?.return20dPct === 'number' && copper.return20dPct <= -8) {
+    score -= 1;
+    tags.push('COPPER_WEAKNESS');
+    warnings.push(`구리 20일 ${copper.return20dPct}% 약세: 경기민감 수요 둔화 확인`);
+  }
+
+  const gold = findSnapshot(snapshot, 'GC=F');
+  const goldChange = getChange(gold);
+  if (
+    typeof goldChange === 'number'
+    && goldChange >= 2
+    && typeof vix?.price === 'number'
+    && vix.price >= 20
+  ) {
+    score -= 1;
+    tags.push('SAFE_HAVEN_BID');
+    warnings.push(`금 ${goldChange}% 상승과 VIX ${vix.price}: 안전자산 선호 확대`);
   }
 
   const investorFlow = scoreInvestorFlow(indicators.investorFlow);
@@ -273,6 +324,11 @@ function buildActions(market, portfolio) {
     tags.includes('OVERHEATED') ? '급등 당일 전액 진입 금지, 최소 3회 분할 진입' : '',
     tags.includes('SEMICONDUCTOR_LEADERSHIP') ? '반도체/AI 핵심주와 직접 수혜주만 공격 후보로 제한' : '',
     tags.includes('CONCENTRATED_LEADERSHIP') ? '주변 테마주 추격 금지, 지수보다 약한 종목은 제외' : '',
+    tags.includes('NEGATIVE_PRICE_REACTION') ? '호재에도 가격 반응이 약한 장: 신규 매수보다 관찰 우선' : '',
+    tags.includes('OIL_SHOCK') ? '유가 급등 구간: 운송/화학/소비재 마진 부담과 인플레이션 재점검' : '',
+    tags.includes('DEMAND_SHOCK') ? '유가 급락 구간: 경기민감주 수요 둔화 가능성 확인' : '',
+    tags.includes('COPPER_WEAKNESS') ? '구리 약세 구간: 경기민감/소재/산업재 비중 확대 보류' : '',
+    tags.includes('SAFE_HAVEN_BID') ? '안전자산 선호 구간: 현금과 방어적 비중 우선' : '',
     riskBudget.maxRisk1Pct ? `거래 1회 손실 허용액 ${formatKRW(riskBudget.maxRisk1Pct)}~${formatKRW(riskBudget.maxRisk2Pct)} 이내` : '',
     '손절선 없는 신규 매수 금지',
   ].filter(Boolean);

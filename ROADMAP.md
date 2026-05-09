@@ -188,9 +188,9 @@ Telegram Bot
 - [x] KOSPI/KOSDAQ/S&P/Nasdaq/반도체 5일·20일 추세 지표
 - [x] 급등장 과열/쏠림 감지와 분할진입 가드레일
 - [x] VIX, 달러, 환율, 금리 기반 위험 점수 초안
-- [ ] 유가/원자재와 가격 반응까지 포함한 위험 점수 고도화
+- [x] 유가/원자재와 가격 반응까지 포함한 위험 점수 고도화
 - [x] 외국인/기관 수급 데이터 추가
-- [ ] 뉴스/공시 악재 비율과 가격 반응 결합
+- [x] 뉴스/공시 악재 비율과 가격 반응 결합
 - [x] RISK_OFF 시 신규 매수 제한 자동 적용
 - [x] `STRONG_RISK_ON`, `FRAGILE_RISK_ON`, `PANIC` 세부 레짐 추가
 - [x] 레짐별 `maxEquityExposure`, `maxNewBuyRatio`, `minRiskReward` 정책 도입
