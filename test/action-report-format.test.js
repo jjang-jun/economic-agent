@@ -54,12 +54,15 @@ test('formatActionReport explains hold evidence and reduce amount', () => {
       ticker: 'VGT',
       quantity: 9.74,
       currentPrice: 515,
+      avgPrice: 433.14,
       unrealizedPnl: 1200000,
       unrealizedPnlPct: 18.9,
       weight: 0.08,
       actionReasons: ['손절/비중/추세 경고 없음'],
       actionEvidence: ['현재 손익 18.9%', '비중 8%', '손절 기준 -8% 미도달'],
       actionStopLossPct: 8,
+      actionStopPrice: 473.8,
+      actionStopPlan: { trailingApplied: true },
     }],
     reduceCandidates: [{
       name: '넷플릭스',
@@ -78,6 +81,7 @@ test('formatActionReport explains hold evidence and reduce amount', () => {
   });
 
   assert.match(message, /VGT/);
+  assert.match(message, /수익보호 손절가 \$473.8/);
   assert.match(message, /근거 현재 손익 18.9%, 비중 8%, 손절 기준 -8% 미도달/);
   assert.match(message, /넷플릭스/);
   assert.match(message, /축소안/);
@@ -180,4 +184,34 @@ test('buildActionReport moves Korean candidates to watch when one share exceeds 
   assert.equal(report.newBuyCandidates.length, 0);
   assert.equal(report.watchOnlyCandidates.length, 1);
   assert.match(report.watchOnlyCandidates[0].riskReview.blockers[0], /1주 가격 1,654,000원 > 제안금액 1,000,000원/);
+});
+
+test('classifyPosition applies trailing stop and rebalance trim plans', () => {
+  const report = buildActionReport({
+    portfolio: {
+      totalAssetValue: 10000000,
+      cashAmount: 1000000,
+      maxPositionRatio: 0.2,
+      maxSectorRatio: 0.4,
+      stopLossPct: -7,
+      trimProfitPct: 20,
+      positions: [{
+        name: 'Winner',
+        ticker: 'WIN',
+        sector: 'tech',
+        quantity: 10,
+        avgPrice: 100,
+        currentPrice: 130,
+        marketValue: 3000000,
+        weight: 0.3,
+        unrealizedPnlPct: 30,
+      }],
+    },
+    recommendations: [],
+  });
+
+  assert.equal(report.reduceCandidates.length, 1);
+  assert.equal(report.reduceCandidates[0].actionStopPrice, 120.9);
+  assert.equal(report.reduceCandidates[0].actionStopPlan.trailingApplied, true);
+  assert.equal(report.reduceCandidates[0].actionTrimPlan.amount, 1000000);
 });

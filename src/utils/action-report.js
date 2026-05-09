@@ -35,6 +35,12 @@ function positionValue(position, totalAssetValue = 0) {
   return 0;
 }
 
+function round(value, digits = 2) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  const factor = 10 ** digits;
+  return Math.round(value * factor) / factor;
+}
+
 function buildPortfolioLimitContext(portfolio = {}) {
   const totalAssetValue = typeof portfolio.totalAssetValue === 'number' ? portfolio.totalAssetValue : 0;
   const maxSectorRatio = typeof portfolio.maxSectorRatio === 'number' ? portfolio.maxSectorRatio : null;
@@ -138,6 +144,86 @@ function withActionReportReview(recommendation, portfolio, portfolioContext) {
   };
 }
 
+function buildStopPlan(position, portfolio, stopLossPct) {
+  const currentPrice = typeof position.currentPrice === 'number' ? position.currentPrice : null;
+  const avgPrice = typeof position.avgPrice === 'number' ? position.avgPrice : null;
+  const pnlPct = typeof position.unrealizedPnlPct === 'number' ? position.unrealizedPnlPct : null;
+  const stopWidth = Math.abs(stopLossPct);
+  const baseStopPrice = avgPrice ? avgPrice * (1 - stopWidth / 100) : null;
+  const trailingTriggerPct = typeof portfolio.trailingStopTriggerPct === 'number'
+    ? portfolio.trailingStopTriggerPct
+    : 10;
+  const trailingStopPrice = currentPrice && pnlPct !== null && pnlPct >= trailingTriggerPct
+    ? currentPrice * (1 - stopWidth / 100)
+    : null;
+  const stopPrice = [baseStopPrice, trailingStopPrice]
+    .filter(value => typeof value === 'number' && Number.isFinite(value))
+    .reduce((max, value) => Math.max(max, value), 0) || null;
+
+  return {
+    stopPrice: stopPrice ? round(stopPrice, 2) : null,
+    baseStopPrice: baseStopPrice ? round(baseStopPrice, 2) : null,
+    trailingStopPrice: trailingStopPrice ? round(trailingStopPrice, 2) : null,
+    trailingApplied: Boolean(trailingStopPrice && stopPrice === trailingStopPrice),
+    trailingTriggerPct,
+  };
+}
+
+function buildTrimPlan(position, portfolio, portfolioContext, reasons = []) {
+  const quantity = typeof position.quantity === 'number' ? position.quantity : null;
+  const currentPrice = typeof position.currentPrice === 'number' ? position.currentPrice : null;
+  const value = positionValue(position, portfolioContext.totalAssetValue);
+  const weight = typeof position.weight === 'number' ? position.weight : null;
+  const totalAssetValue = portfolioContext.totalAssetValue;
+  const candidates = [];
+
+  if (value > 0 && weight !== null && typeof portfolio.maxPositionRatio === 'number' && weight > portfolio.maxPositionRatio) {
+    candidates.push({
+      reason: 'position_limit',
+      amount: Math.max(0, value - totalAssetValue * portfolio.maxPositionRatio),
+    });
+  }
+
+  if (value > 0 && position.sector && portfolioContext.overweightSectors?.has(position.sector)) {
+    const sectorWeight = portfolioContext.overweightSectors.get(position.sector);
+    const sectorValue = totalAssetValue * sectorWeight;
+    const sectorExcess = Math.max(0, sectorValue - totalAssetValue * portfolioContext.maxSectorRatio);
+    const shareOfSector = sectorValue > 0 ? value / sectorValue : 0;
+    candidates.push({
+      reason: 'sector_rebalance',
+      amount: sectorExcess * shareOfSector,
+    });
+  }
+
+  if (value > 0 && reasons.some(reason => reason.includes('일부 이익 잠금'))) {
+    candidates.push({
+      reason: 'profit_lock',
+      amount: value * 0.25,
+    });
+  }
+
+  if (value > 0 && reasons.some(reason => reason.includes('단기 약세') || reason.includes('추세 약화'))) {
+    candidates.push({
+      reason: 'trend_weakness',
+      amount: value * 0.25,
+    });
+  }
+
+  const amount = candidates.length > 0
+    ? Math.max(...candidates.map(candidate => candidate.amount || 0))
+    : 0;
+  const boundedAmount = Math.min(value, Math.max(0, amount));
+  const quantityToSell = quantity && currentPrice && boundedAmount > 0
+    ? (isKoreanTicker(position.ticker) ? Math.ceil(boundedAmount / currentPrice) : boundedAmount / currentPrice)
+    : null;
+
+  return {
+    amount: boundedAmount ? Math.round(boundedAmount) : 0,
+    quantity: quantityToSell ? Math.min(quantityToSell, quantity) : null,
+    reasons: candidates.map(candidate => candidate.reason),
+  };
+}
+
 function buildNewBuyCandidates(recommendations, portfolio) {
   const positions = portfolio.positions || [];
   const portfolioContext = buildPortfolioLimitContext(portfolio);
@@ -192,7 +278,15 @@ function classifyPosition(position, portfolio, portfolioContext = buildPortfolio
   if (pnlPct !== null && pnlPct <= -Math.abs(stopLossPct)) {
     reasons.push(`손절 기준 ${stopLossPct}% 도달`);
     evidence.push(`현재 손익 ${pnlPct}% <= 손절 기준 -${Math.abs(stopLossPct)}%`);
-    return { action: 'sell', reasons, evidence, stopLossPct };
+    const stopPlan = buildStopPlan(position, portfolio, stopLossPct);
+    return {
+      action: 'sell',
+      reasons,
+      evidence,
+      stopLossPct,
+      stopPlan,
+      trimPlan: buildTrimPlan(position, portfolio, portfolioContext, reasons),
+    };
   }
 
   if (weight !== null && weight > portfolio.maxPositionRatio) {
@@ -217,14 +311,36 @@ function classifyPosition(position, portfolio, portfolioContext = buildPortfolio
     evidence.push(`20일 수익률 ${return20dPct}%`);
   }
 
-  if (reasons.length > 0) return { action: 'reduce', reasons, evidence, stopLossPct };
+  const stopPlan = buildStopPlan(position, portfolio, stopLossPct);
+
+  if (stopPlan.trailingApplied) {
+    evidence.push(`수익 보호 손절가 ${round(stopPlan.stopPrice, 0)?.toLocaleString('ko-KR')}`);
+  }
+
+  if (reasons.length > 0) {
+    return {
+      action: 'reduce',
+      reasons,
+      evidence,
+      stopLossPct,
+      stopPlan,
+      trimPlan: buildTrimPlan(position, portfolio, portfolioContext, reasons),
+    };
+  }
 
   if (pnlPct !== null) evidence.push(`현재 손익 ${pnlPct}%`);
   if (weight !== null) evidence.push(`비중 ${Math.round(weight * 100)}%`);
   if (return5dPct !== null) evidence.push(`5일 ${return5dPct}%`);
   if (return20dPct !== null) evidence.push(`20일 ${return20dPct}%`);
   evidence.push(`손절 기준 -${Math.abs(stopLossPct)}% 미도달`);
-  return { action: 'hold', reasons: ['손절/비중/추세 경고 없음'], evidence, stopLossPct };
+  return {
+    action: 'hold',
+    reasons: ['손절/비중/추세 경고 없음'],
+    evidence,
+    stopLossPct,
+    stopPlan,
+    trimPlan: buildTrimPlan(position, portfolio, portfolioContext, reasons),
+  };
 }
 
 function buildPositionActions(portfolio) {
@@ -237,6 +353,9 @@ function buildPositionActions(portfolio) {
       actionReasons: result.reasons,
       actionEvidence: result.evidence,
       actionStopLossPct: result.stopLossPct,
+      actionStopPrice: result.stopPlan?.stopPrice ?? null,
+      actionStopPlan: result.stopPlan,
+      actionTrimPlan: result.trimPlan,
     });
   }
   return groups;

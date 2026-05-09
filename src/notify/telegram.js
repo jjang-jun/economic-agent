@@ -492,8 +492,15 @@ function formatActionReport(report) {
     const stopLossPct = typeof item.stopLossPct === 'number'
       ? item.stopLossPct
       : (typeof item.actionStopLossPct === 'number' ? item.actionStopLossPct : null);
-    const stopPrice = stopLossPct && typeof item.currentPrice === 'number'
-      ? ` · 참고 손절가 ${formatAssetPrice(item.currentPrice * (1 - Math.abs(stopLossPct) / 100), currency)}`
+    const stopReferencePrice = typeof item.actionStopPrice === 'number'
+      ? item.actionStopPrice
+      : (stopLossPct && typeof item.avgPrice === 'number'
+        ? item.avgPrice * (1 - Math.abs(stopLossPct) / 100)
+        : null);
+    const stopPlan = item.actionStopPlan || {};
+    const stopLabel = stopPlan.trailingApplied ? '수익보호 손절가' : '참고 손절가';
+    const stopPrice = stopReferencePrice
+      ? ` · ${stopLabel} ${formatAssetPrice(stopReferencePrice, currency)}`
       : '';
     const trim = action === 'reduce' ? formatTrimSuggestion(item) : '';
     const reasonText = reasons ? ` · 판단 ${escapeHtml(reasons)}` : '';
@@ -502,11 +509,19 @@ function formatActionReport(report) {
   };
 
   function formatTrimSuggestion(item) {
+    const plan = item.actionTrimPlan || {};
     const quantity = typeof item.quantity === 'number' ? item.quantity : null;
     const value = typeof item.marketValue === 'number' ? item.marketValue : null;
     const currentPrice = typeof item.currentPrice === 'number' ? item.currentPrice : null;
     const weight = typeof item.weight === 'number' ? item.weight : null;
     const maxPositionRatio = typeof portfolio.maxPositionRatio === 'number' ? portfolio.maxPositionRatio : null;
+
+    if (typeof plan.quantity === 'number' && plan.quantity > 0) {
+      return ` · 축소안 ${formatQuantity(plan.quantity)} 매도`;
+    }
+    if (typeof plan.amount === 'number' && plan.amount > 0) {
+      return ` · 축소안 ${formatKRW(plan.amount)} 매도`;
+    }
 
     if (quantity && currentPrice && weight && maxPositionRatio && weight > maxPositionRatio) {
       const targetValue = (portfolio.totalAssetValue || 0) * maxPositionRatio;
