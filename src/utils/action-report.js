@@ -26,12 +26,126 @@ function sameHolding(position, recommendation) {
   );
 }
 
+function positionValue(position, totalAssetValue = 0) {
+  if (typeof position.marketValue === 'number' && Number.isFinite(position.marketValue)) return position.marketValue;
+  if (typeof position.costBasis === 'number' && Number.isFinite(position.costBasis)) return position.costBasis;
+  if (typeof position.weight === 'number' && Number.isFinite(position.weight) && totalAssetValue > 0) {
+    return position.weight * totalAssetValue;
+  }
+  return 0;
+}
+
+function buildPortfolioLimitContext(portfolio = {}) {
+  const totalAssetValue = typeof portfolio.totalAssetValue === 'number' ? portfolio.totalAssetValue : 0;
+  const maxSectorRatio = typeof portfolio.maxSectorRatio === 'number' ? portfolio.maxSectorRatio : null;
+  const sectorWeights = {};
+
+  for (const position of portfolio.positions || []) {
+    if (!position.sector) continue;
+    const value = positionValue(position, totalAssetValue);
+    if (value <= 0 && typeof position.weight !== 'number') continue;
+    if (typeof position.weight === 'number') {
+      sectorWeights[position.sector] = (sectorWeights[position.sector] || 0) + position.weight;
+    } else if (totalAssetValue > 0) {
+      sectorWeights[position.sector] = (sectorWeights[position.sector] || 0) + value / totalAssetValue;
+    }
+  }
+
+  const overweightSectors = new Map();
+  if (maxSectorRatio !== null) {
+    for (const [sector, weight] of Object.entries(sectorWeights)) {
+      if (weight > maxSectorRatio) overweightSectors.set(sector, weight);
+    }
+  }
+
+  return {
+    totalAssetValue,
+    maxSectorRatio,
+    sectorWeights,
+    overweightSectors,
+  };
+}
+
+function recommendationSector(recommendation = {}) {
+  const market = recommendation.marketProfile || recommendation.market_profile || {};
+  const fundamental = recommendation.fundamentalProfile || recommendation.fundamental_profile || {};
+  return recommendation.sector
+    || recommendation.primary_sector
+    || market.sector
+    || fundamental.sector
+    || '';
+}
+
+function isKoreanTicker(ticker = '') {
+  return /^\d{6}(\.KS|\.KQ)?$/i.test(String(ticker).trim());
+}
+
+function recommendationEntryPrice(recommendation = {}) {
+  const risk = recommendation.riskProfile || recommendation.risk_profile || {};
+  const market = recommendation.marketProfile || recommendation.market_profile || {};
+  const entry = recommendation.entry || {};
+  return [risk.entryReferencePrice, entry.price, market.price]
+    .find(value => typeof value === 'number' && Number.isFinite(value) && value > 0) || null;
+}
+
+function recommendationSuggestedAmount(recommendation = {}, portfolio = {}) {
+  const risk = recommendation.riskProfile || recommendation.risk_profile || {};
+  if (typeof risk.suggestedAmount !== 'number') return null;
+  if (typeof portfolio.maxNewBuyAmount === 'number') {
+    return Math.min(risk.suggestedAmount, portfolio.maxNewBuyAmount);
+  }
+  return risk.suggestedAmount;
+}
+
+function portfolioLimitBlockers(recommendation, portfolioContext) {
+  const blockers = [];
+  const sector = recommendationSector(recommendation);
+  if (sector && portfolioContext.overweightSectors?.has(sector)) {
+    const weight = portfolioContext.overweightSectors.get(sector);
+    blockers.push(`sector_limit: ${sector} 섹터 ${Math.round(weight * 100)}% > 한도 ${Math.round(portfolioContext.maxSectorRatio * 100)}%`);
+  }
+  return blockers;
+}
+
+function actionReportBlockers(recommendation, portfolio, portfolioContext) {
+  const blockers = [...portfolioLimitBlockers(recommendation, portfolioContext)];
+  const entryPrice = recommendationEntryPrice(recommendation);
+  const suggestedAmount = recommendationSuggestedAmount(recommendation, portfolio);
+  if (
+    isKoreanTicker(recommendation.ticker)
+    && entryPrice
+    && typeof suggestedAmount === 'number'
+    && suggestedAmount < entryPrice
+  ) {
+    blockers.push(`lot_size: 1주 가격 ${Math.round(entryPrice).toLocaleString('ko-KR')}원 > 제안금액 ${Math.round(suggestedAmount).toLocaleString('ko-KR')}원`);
+  }
+  return blockers;
+}
+
+function withActionReportReview(recommendation, portfolio, portfolioContext) {
+  const blockers = actionReportBlockers(recommendation, portfolio, portfolioContext);
+  if (blockers.length === 0) return recommendation;
+  const review = recommendation.riskReview || recommendation.risk_review || {};
+  return {
+    ...recommendation,
+    riskReview: {
+      ...review,
+      approved: false,
+      action: 'watch_only',
+      blockers: [...(review.blockers || []), ...blockers],
+    },
+    actionReportBlockers: blockers,
+  };
+}
+
 function buildNewBuyCandidates(recommendations, portfolio) {
   const positions = portfolio.positions || [];
+  const portfolioContext = buildPortfolioLimitContext(portfolio);
   return (recommendations || [])
     .filter(item => item.signal === 'bullish')
     .filter(item => isRecent(item))
     .filter(item => !(positions || []).some(position => sameHolding(position, item)))
+    .filter(item => actionReportBlockers(item, portfolio, portfolioContext).length === 0)
     .filter(item => {
       const review = item.riskReview || item.risk_review || {};
       const risk = item.riskProfile || item.risk_profile || {};
@@ -51,19 +165,21 @@ function buildNewBuyCandidates(recommendations, portfolio) {
 
 function buildWatchOnlyCandidates(recommendations, portfolio) {
   const positions = portfolio.positions || [];
+  const portfolioContext = buildPortfolioLimitContext(portfolio);
   return (recommendations || [])
     .filter(item => item.signal === 'bullish')
     .filter(item => isRecent(item))
     .filter(item => !(positions || []).some(position => sameHolding(position, item)))
+    .map(item => withActionReportReview(item, portfolio, portfolioContext))
     .filter(item => {
       const review = item.riskReview || item.risk_review || {};
       const risk = item.riskProfile || item.risk_profile || {};
-      return review.action === 'watch_only' || review.approved === false || risk.tradeable === false;
+      return review.action === 'watch_only' || review.approved === false || risk.tradeable === false || (item.actionReportBlockers || []).length > 0;
     })
     .slice(0, 5);
 }
 
-function classifyPosition(position, portfolio) {
+function classifyPosition(position, portfolio, portfolioContext = buildPortfolioLimitContext(portfolio)) {
   const stopLossPct = position.stopLossPct || portfolio.stopLossPct || 8;
   const trimProfitPct = portfolio.trimProfitPct || 20;
   const weight = typeof position.weight === 'number' ? position.weight : null;
@@ -82,6 +198,11 @@ function classifyPosition(position, portfolio) {
   if (weight !== null && weight > portfolio.maxPositionRatio) {
     reasons.push(`종목 비중 ${Math.round(weight * 100)}%로 한도 초과`);
     evidence.push(`비중 ${Math.round(weight * 100)}% > 한도 ${Math.round(portfolio.maxPositionRatio * 100)}%`);
+  }
+  if (position.sector && portfolioContext.overweightSectors?.has(position.sector)) {
+    const sectorWeight = portfolioContext.overweightSectors.get(position.sector);
+    reasons.push(`${position.sector} 섹터 비중 ${Math.round(sectorWeight * 100)}%로 한도 초과`);
+    evidence.push(`${position.sector} 섹터 ${Math.round(sectorWeight * 100)}% > 한도 ${Math.round(portfolioContext.maxSectorRatio * 100)}%`);
   }
   if (pnlPct !== null && pnlPct >= trimProfitPct) {
     reasons.push(`수익률 ${pnlPct}%로 일부 이익 잠금 후보`);
@@ -108,8 +229,9 @@ function classifyPosition(position, portfolio) {
 
 function buildPositionActions(portfolio) {
   const groups = { hold: [], reduce: [], sell: [] };
+  const portfolioContext = buildPortfolioLimitContext(portfolio);
   for (const position of portfolio.positions || []) {
-    const result = classifyPosition(position, portfolio);
+    const result = classifyPosition(position, portfolio, portfolioContext);
     groups[result.action].push({
       ...position,
       actionReasons: result.reasons,
@@ -159,6 +281,7 @@ module.exports = {
   buildNewBuyCandidates,
   buildWatchOnlyCandidates,
   buildPositionActions,
+  buildPortfolioLimitContext,
   classifyPosition,
   saveActionReport,
 };

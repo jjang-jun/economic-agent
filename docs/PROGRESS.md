@@ -200,6 +200,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 운영 알림 end-to-end를 확인했다. `notify:workflow-failure` dry-run은 private Telegram 전송에 성공했고, 가격 provider 점검은 의도적으로 낮춘 기준에서 private Telegram 경보 전송이 성공했다. Action Report workflow는 수동 실행에서 리포트 저장과 Telegram 전송까지 성공했다.
 - 프롬프트/모델별 추천 성과에 최소 표본 기준을 추가했다. 주간/월간 성과 리뷰는 모델별 평가 건수가 5건 미만이면 `표본 부족`으로 표시해, Claude Sonnet 전환 효과를 성급하게 판단하지 않도록 한다.
 - 가격 provider 운영 판단을 추가했다. 가격 점검과 주간/월간 성과 리뷰가 실패율, 공식 EOD 비중, fallback 비중을 보고 `현재 구조 유지`, `API 장애 점검`, `해외/글로벌 가격 API 보강 검토` 같은 행동 판단을 함께 표시한다.
+- 일일 행동 리포트에 포트폴리오 섹터 한도 강제 적용을 추가했다. 이미 특정 섹터가 `maxSectorRatio`를 초과하면 같은 섹터 신규 추천은 매수 후보가 아니라 관찰 후보로 내려가고, 해당 섹터 보유 종목은 축소 후보로 표시된다.
 
 ## 다음 작업
 

@@ -111,6 +111,8 @@ function explainRiskBlocker(blocker) {
   if (text.startsWith('stop_loss:')) return `손절 기준 문제: ${text.replace('stop_loss:', '').trim()}`;
   if (text.startsWith('position_size:')) return `매수 가능 금액 없음: ${text.replace('position_size:', '').trim()}`;
   if (text.startsWith('market_regime:')) return `시장 상태 차단: ${text.replace('market_regime:', '').trim()}`;
+  if (text.startsWith('sector_limit:')) return `섹터 비중 초과: ${text.replace('sector_limit:', '').trim()}`;
+  if (text.startsWith('lot_size:')) return `정수 주식 매수 불가: ${text.replace('lot_size:', '').trim()}`;
   return text;
 }
 
