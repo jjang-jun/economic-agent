@@ -752,6 +752,7 @@ function formatPerformanceReview(review) {
   const officialEod = priceQuality.officialEod || {};
   const priceFallback = priceQuality.fallback || {};
   const priceAttempts = priceQuality.attempts || {};
+  const priceDecision = priceQuality.providerDecision || {};
   const freedom = review.freedomStatus || {};
   const notes = (review.notes || []).map(item => `▸ ${escapeHtml(item)}`);
 
@@ -819,6 +820,7 @@ function formatPerformanceReview(review) {
     `▸ KRX ${officialEod.krx ?? 0}건 · 공공데이터 ${officialEod.dataGoKr ?? 0}건 · KIS fallback ${priceQuality.kisEodFallback ?? 0}건`,
     `▸ Naver/Yahoo fallback: ${priceFallback.total ?? 0}건 (${priceFallback.ratePct ?? 'n/a'}%)`,
     `▸ 오래된 가격 의심: ${priceQuality.staleSnapshots ?? 0}건`,
+    priceDecision.label ? `▸ 판단: ${priceDecision.label}` : '',
   ] : [];
 
   return [

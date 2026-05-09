@@ -21,6 +21,7 @@ function formatSummary(summary, anomalies) {
     `호출: ${attempts.total ?? 0}회 · 성공 ${attempts.success ?? 0} · 실패 ${attempts.failed ?? 0} · 빈 응답 ${attempts.empty ?? 0}`,
     `실패율: ${attempts.failureRatePct ?? 'n/a'}% · 빈 응답률: ${attempts.emptyRatePct ?? 'n/a'}%`,
     `공식 EOD 비중: ${summary.officialEod?.ratePct ?? 'n/a'}% · fallback 비중: ${summary.fallback?.ratePct ?? 'n/a'}%`,
+    summary.providerDecision?.label ? `판단: ${summary.providerDecision.label}` : '',
     providers ? `<b>Provider별</b>\n${providers}` : '',
     anomalies.length > 0
       ? [`<b>이상치</b>`, ...anomalies.map(item => `▸ ${item}`)].join('\n')

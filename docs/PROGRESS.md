@@ -199,10 +199,11 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 가격 provider 운영 알림을 추가했다. `price-provider:ops-report`는 최근 provider 호출 실패율, 빈 응답률, fallback 비중, 오래된 가격 스냅샷을 점검하고 기준 초과 시 private Telegram으로 보낸다. GitHub Actions `price-provider-ops-report.yml`은 평일 23:55 KST에 실행된다. fallback 탐색 과정의 빈 응답은 정상적으로 발생할 수 있어 경보 기준을 90%로 둔다.
 - 운영 알림 end-to-end를 확인했다. `notify:workflow-failure` dry-run은 private Telegram 전송에 성공했고, 가격 provider 점검은 의도적으로 낮춘 기준에서 private Telegram 경보 전송이 성공했다. Action Report workflow는 수동 실행에서 리포트 저장과 Telegram 전송까지 성공했다.
 - 프롬프트/모델별 추천 성과에 최소 표본 기준을 추가했다. 주간/월간 성과 리뷰는 모델별 평가 건수가 5건 미만이면 `표본 부족`으로 표시해, Claude Sonnet 전환 효과를 성급하게 판단하지 않도록 한다.
+- 가격 provider 운영 판단을 추가했다. 가격 점검과 주간/월간 성과 리뷰가 실패율, 공식 EOD 비중, fallback 비중을 보고 `현재 구조 유지`, `API 장애 점검`, `해외/글로벌 가격 API 보강 검토` 같은 행동 판단을 함께 표시한다.
 
 ## 다음 작업
 
 1. 프롬프트/모델별 추천 성과 5건 이상 누적 후 Claude Sonnet 전환 효과 평가
 2. Action Report 정기 실행 안정성 모니터링
-3. 가격 provider 빈 응답/대체 소스 사용 패턴 누적
+3. 가격 provider의 `해외/글로벌 가격 API 보강 검토` 판단이 반복되는지 모니터링
 4. 다음 실제 workflow 실패 시 private 알림 도착 여부 재확인

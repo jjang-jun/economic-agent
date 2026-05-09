@@ -82,7 +82,7 @@ function summarizePriceSourceQuality(rows = [], options = {}) {
     return 'ok';
   })();
 
-  return {
+  const summary = {
     totalSnapshots: rows.length,
     tickerCount: uniqueCount(rows, row => row.ticker),
     currentSnapshots: currentRows.length,
@@ -108,6 +108,8 @@ function summarizePriceSourceQuality(rows = [], options = {}) {
     attempts: summarizeProviderAttempts(attempts),
     healthLabel,
   };
+  summary.providerDecision = buildPriceProviderDecision(summary);
+  return summary;
 }
 
 function summarizeProviderAttempts(attempts = []) {
@@ -194,9 +196,66 @@ function buildPriceSourceQualityAnomalies(summary = {}, options = {}) {
   return anomalies;
 }
 
+function buildPriceProviderDecision(summary = {}) {
+  const attempts = summary.attempts || {};
+  const minAttempts = 5;
+  const fallbackRate = summary.fallback?.ratePct;
+  const officialEodRate = summary.officialEod?.ratePct;
+  const failureRate = attempts.failureRatePct;
+  const emptyRate = attempts.emptyRatePct;
+  const reasons = [];
+
+  if ((summary.totalSnapshots || 0) === 0) {
+    return {
+      action: 'investigate',
+      label: '가격 데이터 수집 경로 점검 필요',
+      reasons: ['최근 가격 스냅샷이 없습니다'],
+    };
+  }
+  if ((attempts.total || 0) >= minAttempts && typeof failureRate === 'number' && failureRate >= 30) {
+    reasons.push(`provider 실패율 ${failureRate}%`);
+    return {
+      action: 'fix_provider',
+      label: 'API 키/토큰/네트워크 장애 우선 점검',
+      reasons,
+    };
+  }
+  if (typeof fallbackRate === 'number' && fallbackRate >= 60) {
+    reasons.push(`fallback 가격 비중 ${fallbackRate}%`);
+    if (summary.fallback?.yahoo) reasons.push(`Yahoo 사용 ${summary.fallback.yahoo}건`);
+    return {
+      action: 'consider_paid_data',
+      label: '해외/글로벌 가격 API 보강 검토',
+      reasons,
+    };
+  }
+  if (typeof officialEodRate === 'number' && officialEodRate < 50) {
+    reasons.push(`공식 EOD 비중 ${officialEodRate}%`);
+    return {
+      action: 'improve_official_eod',
+      label: 'KRX/Data.go.kr EOD 경로 보강',
+      reasons,
+    };
+  }
+  if ((attempts.total || 0) >= minAttempts && typeof emptyRate === 'number' && emptyRate >= 70) {
+    reasons.push(`빈 응답률 ${emptyRate}%`);
+    return {
+      action: 'monitor',
+      label: 'fallback 탐색 정상 범위, 추세 모니터링',
+      reasons,
+    };
+  }
+  return {
+    action: 'ok',
+    label: '현재 가격 provider 구조 유지',
+    reasons: ['심각한 실패율이나 fallback 과다는 없습니다'],
+  };
+}
+
 module.exports = {
   summarizePriceSourceQuality,
   summarizeProviderAttempts,
   buildPriceSourceQualitySummary,
   buildPriceSourceQualityAnomalies,
+  buildPriceProviderDecision,
 };

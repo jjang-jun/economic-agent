@@ -251,7 +251,7 @@ Telegram Bot
 ## 현재 가장 중요한 다음 작업
 1. 추천 성과를 프롬프트/모델 버전별로 5건 이상 누적한 뒤 Claude Sonnet 전환 효과를 평가한다.
 2. Action Report 정기 실행 안정성을 며칠 더 모니터링한다.
-3. 가격 provider 빈 응답/대체 소스 사용 패턴을 누적해 유료 API 추가 필요성을 판단한다.
+3. 가격 provider의 `해외/글로벌 가격 API 보강 검토` 판단이 반복되는지 보고 유료 API 추가 필요성을 결정한다.
 4. Telegram smoke workflow 실패 알림은 다음 실제 실패 시 도착 여부를 재확인한다.
 5. 대시보드를 Agent Server의 인증된 `/dashboard` 화면으로 승격할지는 실제 사용 빈도를 더 본 뒤 결정한다.
 

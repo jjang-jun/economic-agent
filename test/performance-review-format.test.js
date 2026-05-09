@@ -79,6 +79,9 @@ test('formatPerformanceReview explains recommendation and execution metrics in p
         failureRatePct: 6.67,
         empty: 1,
       },
+      providerDecision: {
+        label: '현재 가격 provider 구조 유지',
+      },
       staleSnapshots: 0,
     },
     notes: ['실제 거래 중 추천과 연결되지 않은 비중이 높습니다.'],
@@ -103,6 +106,7 @@ test('formatPerformanceReview explains recommendation and execution metrics in p
   assert.match(message, /표본 부족: 평가 3\/5건/);
   assert.match(message, /가격 데이터 품질/);
   assert.match(message, /Provider 호출: 30건 · 실패 2건 \(6.67%\) · 빈 응답 1건/);
+  assert.match(message, /판단: 현재 가격 provider 구조 유지/);
   assert.match(message, /KRX 3건 · 공공데이터 4건 · KIS fallback 1건/);
   assert.match(message, /추천 수익률은 실제 계좌 수익률이 아닙니다/);
   assert.match(message, /다이제스트 처리: 전송완료 3건 · 대기 4건 · 실패 0건/);
