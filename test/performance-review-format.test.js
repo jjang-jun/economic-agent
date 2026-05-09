@@ -35,6 +35,12 @@ test('formatPerformanceReview explains recommendation and execution metrics in p
         aiVersions: [
           { key: 'stock-analysis-v2.1 / anthropic:claude-sonnet-4-5', evaluated: 3, winRatePct: 66.7, avgSignalReturnPct: 2.8, sampleNote: '표본 부족: 평가 3/5건' },
         ],
+        aiModels: [
+          { key: 'anthropic:claude-sonnet-4-5', evaluated: 3, winRatePct: 66.7, avgSignalReturnPct: 2.8, sampleNote: '표본 부족: 평가 3/5건' },
+        ],
+        promptVersions: [
+          { key: 'stock-analysis-v2.1', evaluated: 3, winRatePct: 66.7, avgSignalReturnPct: 2.8, sampleNote: '표본 부족: 평가 3/5건' },
+        ],
       },
     },
     behaviorReview: {
@@ -101,7 +107,11 @@ test('formatPerformanceReview explains recommendation and execution metrics in p
   assert.match(message, /semiconductor: 평가 3건/);
   assert.match(message, /리스크 요인별 성과/);
   assert.match(message, /rr_ok: 평가 4건/);
-  assert.match(message, /프롬프트\/모델별 성과/);
+  assert.match(message, /모델별 성과/);
+  assert.match(message, /anthropic:claude-sonnet-4-5: 평가 3건/);
+  assert.match(message, /프롬프트 버전별 성과/);
+  assert.match(message, /stock-analysis-v2\.1: 평가 3건/);
+  assert.match(message, /프롬프트\+모델 조합별 성과/);
   assert.match(message, /stock-analysis-v2\.1 \/ anthropic:claude-sonnet-4-5: 평가 3건/);
   assert.match(message, /표본 부족: 평가 3\/5건/);
   assert.match(message, /가격 데이터 품질/);

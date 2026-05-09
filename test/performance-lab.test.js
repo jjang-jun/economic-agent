@@ -4,6 +4,8 @@ const {
   buildPerformanceLab,
   riskRewardBucket,
   aiVersionKey,
+  aiModelKey,
+  promptVersionKey,
   addSampleConfidence,
   classifyFailure,
   sectorKey,
@@ -39,6 +41,10 @@ test('buildPerformanceLab separates executed and missed recommendation quality',
   assert.equal(lab.missedRecommendationQuality.avgSignalReturnPct, -3);
   assert.equal(lab.byRiskReward['2.0-3.0'].evaluated, 1);
   assert.equal(lab.byAiVersion['stock-analysis-v2.1 / anthropic:claude-sonnet-4-5'].avgSignalReturnPct, 5);
+  assert.equal(lab.byAiModel['anthropic:claude-sonnet-4-5'].avgSignalReturnPct, 5);
+  assert.equal(lab.byPromptVersion['stock-analysis-v2.1'].avgSignalReturnPct, 5);
+  assert.equal(lab.leaders.aiModels[0].sampleConfidence, 'insufficient');
+  assert.equal(lab.leaders.promptVersions[0].sampleNote, '표본 부족: 평가 1/5건');
   assert.equal(lab.leaders.aiVersions[0].sampleConfidence, 'insufficient');
   assert.equal(lab.leaders.aiVersions[0].sampleNote, '표본 부족: 평가 1/5건');
 });
@@ -52,6 +58,8 @@ test('riskRewardBucket groups missing and low risk reward values', () => {
     aiVersionKey({ aiMetadata: { promptVersion: 'p1', provider: 'anthropic', model: 'claude' } }),
     'p1 / anthropic:claude'
   );
+  assert.equal(aiModelKey({ aiMetadata: { provider: 'anthropic', model: 'claude' } }), 'anthropic:claude');
+  assert.equal(promptVersionKey({ aiMetadata: { promptVersion: 'p1' } }), 'p1');
   assert.equal(aiVersionKey({}), 'legacy_prompt / unknown_provider:unknown_model');
   assert.deepEqual(addSampleConfidence([{ key: 'a', evaluated: 5 }], 5)[0].sampleConfidence, 'enough');
   assert.deepEqual(addSampleConfidence([{ key: 'b', evaluated: 2 }], 5)[0].sampleNote, '표본 부족: 평가 2/5건');

@@ -822,6 +822,14 @@ function formatPerformanceReview(review) {
     const sample = item.sampleNote ? ` · ${item.sampleNote}` : '';
     return `▸ ${item.key}: 평가 ${item.evaluated}건 · 승률 ${fmtPct(item.winRatePct)} · 평균 ${fmtPct(item.avgSignalReturnPct)}${sample}`;
   });
+  const aiModelLines = (leaders.aiModels || []).slice(0, 4).map(item => {
+    const sample = item.sampleNote ? ` · ${item.sampleNote}` : '';
+    return `▸ ${item.key}: 평가 ${item.evaluated}건 · 승률 ${fmtPct(item.winRatePct)} · 평균 ${fmtPct(item.avgSignalReturnPct)}${sample}`;
+  });
+  const promptVersionLines = (leaders.promptVersions || []).slice(0, 4).map(item => {
+    const sample = item.sampleNote ? ` · ${item.sampleNote}` : '';
+    return `▸ ${item.key}: 평가 ${item.evaluated}건 · 승률 ${fmtPct(item.winRatePct)} · 평균 ${fmtPct(item.avgSignalReturnPct)}${sample}`;
+  });
 
   const collectorLines = collector.totalRuns ? [
     `▸ 수집 성공: ${collector.successfulRuns ?? 0}/${collector.completedRuns ?? collector.totalRuns}`,
@@ -851,10 +859,12 @@ function formatPerformanceReview(review) {
     failureLines.length > 0 ? [`<b>3. 실패 원인</b>`, ...failureLines.map(escapeHtml)].join('\n') : '',
     sectorLines.length > 0 ? [`<b>4. 섹터별 성과</b>`, ...sectorLines.map(escapeHtml)].join('\n') : '',
     riskFactorLines.length > 0 ? [`<b>5. 리스크 요인별 성과</b>`, ...riskFactorLines.map(escapeHtml)].join('\n') : '',
-    aiVersionLines.length > 0 ? [`<b>6. 프롬프트/모델별 성과</b>`, ...aiVersionLines.map(escapeHtml)].join('\n') : '',
-    collectorLines.length > 0 ? [`<b>7. 수집/알림 운영</b>`, ...collectorLines.map(escapeHtml)].join('\n') : '',
-    priceLines.length > 0 ? [`<b>8. 가격 데이터 품질</b>`, ...priceLines.map(escapeHtml)].join('\n') : '',
-    notes.length > 0 ? [`<b>9. 이번 주 점검할 것</b>`, ...notes].join('\n') : '',
+    aiModelLines.length > 0 ? [`<b>6. 모델별 성과</b>`, ...aiModelLines.map(escapeHtml)].join('\n') : '',
+    promptVersionLines.length > 0 ? [`<b>7. 프롬프트 버전별 성과</b>`, ...promptVersionLines.map(escapeHtml)].join('\n') : '',
+    aiVersionLines.length > 0 ? [`<b>8. 프롬프트+모델 조합별 성과</b>`, ...aiVersionLines.map(escapeHtml)].join('\n') : '',
+    collectorLines.length > 0 ? [`<b>9. 수집/알림 운영</b>`, ...collectorLines.map(escapeHtml)].join('\n') : '',
+    priceLines.length > 0 ? [`<b>10. 가격 데이터 품질</b>`, ...priceLines.map(escapeHtml)].join('\n') : '',
+    notes.length > 0 ? [`<b>11. 이번 주 점검할 것</b>`, ...notes].join('\n') : '',
     '<i>추천 수익률은 실제 계좌 수익률이 아닙니다. 추천 성과와 내 매매 성과를 분리해서 봅니다.</i>',
   ].filter(Boolean).join('\n');
 }

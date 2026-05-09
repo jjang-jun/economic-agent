@@ -129,6 +129,22 @@ function aiVersionKey(recommendation = {}) {
   return `${promptVersion} / ${provider}:${model}`;
 }
 
+function aiModelKey(recommendation = {}) {
+  const metadata = getAiMetadata(recommendation);
+  const provider = metadata.provider || recommendation.aiProvider || recommendation.ai_provider || 'unknown_provider';
+  const model = metadata.model || recommendation.aiModel || recommendation.ai_model || 'unknown_model';
+  return `${provider}:${model}`;
+}
+
+function promptVersionKey(recommendation = {}) {
+  const metadata = getAiMetadata(recommendation);
+  return metadata.promptVersion
+    || metadata.prompt_version
+    || recommendation.promptVersion
+    || recommendation.prompt_version
+    || 'legacy_prompt';
+}
+
 function sectorKey(recommendation = {}) {
   const market = getMarketProfile(recommendation);
   const fundamental = getFundamentalProfile(recommendation);
@@ -219,6 +235,14 @@ function buildPerformanceLab({ recommendations = [], trades = [] } = {}) {
     topGroups(summarizeGroups(recommendations, aiVersionKey), 5),
     5
   );
+  const aiModelLeaders = addSampleConfidence(
+    topGroups(summarizeGroups(recommendations, aiModelKey), 5),
+    5
+  );
+  const promptVersionLeaders = addSampleConfidence(
+    topGroups(summarizeGroups(recommendations, promptVersionKey), 5),
+    5
+  );
 
   return {
     generatedAt: new Date().toISOString(),
@@ -237,11 +261,15 @@ function buildPerformanceLab({ recommendations = [], trades = [] } = {}) {
     byRiskReward: summarizeGroups(recommendations, riskRewardBucket),
     bySector: summarizeGroups(recommendations, sectorKey),
     byAiVersion: summarizeGroups(recommendations, aiVersionKey),
+    byAiModel: summarizeGroups(recommendations, aiModelKey),
+    byPromptVersion: summarizeGroups(recommendations, promptVersionKey),
     byRiskFactor: summarizeMultiKeyGroups(recommendations, riskFactorKeys),
     failureAnalysis: summarizeFailures(recommendations),
     leaders: {
       sectors: topGroups(summarizeGroups(recommendations, sectorKey), 5),
       aiVersions: aiVersionLeaders,
+      aiModels: aiModelLeaders,
+      promptVersions: promptVersionLeaders,
       riskFactors: topGroups(summarizeMultiKeyGroups(recommendations, riskFactorKeys), 5),
     },
   };
@@ -254,6 +282,8 @@ module.exports = {
   buildPerformanceLab,
   riskRewardBucket,
   aiVersionKey,
+  aiModelKey,
+  promptVersionKey,
   sectorKey,
   riskFactorKeys,
   classifyFailure,
