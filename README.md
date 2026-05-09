@@ -280,6 +280,14 @@ npm run db:pull
 npm run dashboard
 ```
 
+Cloud Run Agent Server에서는 Supabase를 직접 조회하는 인증 대시보드를 제공합니다. 브라우저에서 볼 때는 별도 `DASHBOARD_SECRET`을 설정하는 것이 가장 좋고, 없으면 `JOB_SECRET`을 대체 인증값으로 사용합니다.
+
+```text
+https://<cloud-run-url>/dashboard?token=<DASHBOARD_SECRET>
+```
+
+이 화면은 경제적 자유 진행률, 포트폴리오 요약, 추천 평가, 수집기 상태, 최근 추천의 진입가/손절가를 빠르게 확인하는 운영 화면입니다.
+
 `db:push`에는 `SUPABASE_PROJECT_URL`과 `SUPABASE_DB_PASSWORD`가 필요합니다. 네트워크가 Supabase direct DB의 IPv6 연결을 지원하지 않으면 Supabase 대시보드의 pooler 연결 문자열을 `SUPABASE_DB_URL`로 넣어 우회합니다. 런타임 저장과 `db:pull`에는 `SUPABASE_PROJECT_URL`과 `SUPABASE_PUBLISHABLE_KEY`를 사용합니다.
 
 ## 대화형 Agent 서버

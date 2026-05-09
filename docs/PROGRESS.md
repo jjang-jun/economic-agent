@@ -206,6 +206,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 시장 레짐 점수에 원자재와 가격 반응을 추가했다. WTI 유가 급등/급락, 구리 20일 약세, 금 상승과 VIX 동반 상승을 위험 태그로 반영하고, 호재성 뉴스가 많은데 KOSPI가 하락하는 `NEGATIVE_PRICE_REACTION`과 악재에도 시장이 오르는 `RESILIENT_PRICE_REACTION`을 구분한다.
 - 추천 품질 리포트를 모델별, 프롬프트 버전별, 프롬프트+모델 조합별로 분리했다. 주간/월간 성과 리뷰는 각 그룹의 평가 건수, 승률, 평균 추천 수익률, 표본 부족 여부를 따로 표시하고, 추천을 실제로 산 경우와 추천했지만 매수하지 않은 경우의 평균 성과 차이를 계속 보여준다.
 - 로컬 백테스트용 선택형 worker를 추가했다. `npm run backtest:worker -- providers`로 pykrx/FinanceDataReader 설치 여부를 확인하고, 설치된 로컬 환경에서는 `ohlcv` 명령으로 국내 종목 일봉을 JSON으로 가져올 수 있다. 운영 수집은 계속 KRX/Data.go.kr/KIS 등 공식 API 경로를 사용한다.
+- Agent Server에 인증된 `/dashboard`를 추가했다. Cloud Run 서버가 Supabase를 직접 조회해 경제적 자유 진행률, 포트폴리오 요약, 추천 평가, 수집기 상태, 최근 추천의 진입가/손절가를 보여준다. 인증은 `DASHBOARD_SECRET`을 우선 사용하고 없으면 `JOB_SECRET`을 대체값으로 쓴다.
 
 ## 다음 작업
 
@@ -213,3 +214,4 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 2. Action Report 정기 실행 안정성 모니터링
 3. 가격 provider의 `해외/글로벌 가격 API 보강 검토` 판단이 반복되는지 모니터링
 4. 다음 실제 workflow 실패 시 private 알림 도착 여부 재확인
+5. `/dashboard` 실제 사용 빈도에 따라 탭 분리와 상세 차트 추가 여부 결정

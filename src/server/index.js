@@ -1,6 +1,7 @@
 const http = require('http');
 const pkg = require('../../package.json');
 const { handleTelegramWebhook } = require('./telegram-webhook');
+const { handleDashboardRequest } = require('./dashboard');
 const { runNewsCollector } = require('../jobs/run-news-collector');
 
 const PORT = Number(process.env.PORT || process.env.AGENT_PORT || 3000);
@@ -48,6 +49,11 @@ async function requestHandler(req, res) {
 
   if (req.method === 'GET' && url.pathname === '/version') {
     sendJson(res, 200, buildVersionPayload());
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/dashboard') {
+    await handleDashboardRequest(req, res, url);
     return;
   }
 

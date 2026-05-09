@@ -97,6 +97,11 @@ freedomGoal: {
 3. Ideas: 추천 후보, 손익비, 근거 뉴스, 리스크 리뷰
 4. Review: 추천 성과, 실제 거래 성과, 원칙 위반, 주간/월간 복기
 
+현재는 두 가지 경로를 둔다.
+
+- 로컬: `npm run db:pull && npm run dashboard`로 `data/dashboard/index.html` 생성
+- 서버: Cloud Run Agent Server의 인증된 `/dashboard`가 Supabase를 직접 조회해 운영 요약 제공
+
 ## 운영 모드
 
 자동매매는 목표가 아니라 선택 가능한 마지막 수단이다. 기본 운영은 `Assist Mode`다.
@@ -253,7 +258,7 @@ Telegram Bot
 2. Action Report 정기 실행 안정성을 며칠 더 모니터링한다.
 3. 가격 provider의 `해외/글로벌 가격 API 보강 검토` 판단이 반복되는지 보고 유료 API 추가 필요성을 결정한다.
 4. Telegram smoke workflow 실패 알림은 다음 실제 실패 시 도착 여부를 재확인한다.
-5. 대시보드를 Agent Server의 인증된 `/dashboard` 화면으로 승격할지는 실제 사용 빈도를 더 본 뒤 결정한다.
+5. 인증 `/dashboard`의 실제 사용 빈도를 보고 탭 분리와 상세 차트를 추가할지 결정한다.
 
 ## 운영 루프
 
