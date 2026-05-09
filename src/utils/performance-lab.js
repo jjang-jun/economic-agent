@@ -76,6 +76,21 @@ function topGroups(groupSummary = {}, limit = 5) {
     .slice(0, limit);
 }
 
+function addSampleConfidence(items = [], minEvaluated = 5) {
+  return items.map(item => {
+    const evaluated = item.evaluated || 0;
+    const sampleConfidence = evaluated >= minEvaluated ? 'enough' : 'insufficient';
+    return {
+      ...item,
+      minEvaluated,
+      sampleConfidence,
+      sampleNote: sampleConfidence === 'enough'
+        ? '표본 기준 충족'
+        : `표본 부족: 평가 ${evaluated}/${minEvaluated}건`,
+    };
+  });
+}
+
 function riskRewardBucket(recommendation) {
   const risk = recommendation.riskProfile || recommendation.risk_profile || {};
   const rr = risk.riskReward;
@@ -200,6 +215,11 @@ function buildPerformanceLab({ recommendations = [], trades = [] } = {}) {
   const evaluatedMissed = missedRecommendations.filter(item => latestEvaluation(item));
   const evaluatedExecuted = executedRecommendations.filter(item => latestEvaluation(item));
 
+  const aiVersionLeaders = addSampleConfidence(
+    topGroups(summarizeGroups(recommendations, aiVersionKey), 5),
+    5
+  );
+
   return {
     generatedAt: new Date().toISOString(),
     recommendationQuality: summarizeEvaluated(recommendations),
@@ -221,7 +241,7 @@ function buildPerformanceLab({ recommendations = [], trades = [] } = {}) {
     failureAnalysis: summarizeFailures(recommendations),
     leaders: {
       sectors: topGroups(summarizeGroups(recommendations, sectorKey), 5),
-      aiVersions: topGroups(summarizeGroups(recommendations, aiVersionKey), 5),
+      aiVersions: aiVersionLeaders,
       riskFactors: topGroups(summarizeMultiKeyGroups(recommendations, riskFactorKeys), 5),
     },
   };
@@ -230,6 +250,7 @@ function buildPerformanceLab({ recommendations = [], trades = [] } = {}) {
 module.exports = {
   latestEvaluation,
   summarizeEvaluated,
+  addSampleConfidence,
   buildPerformanceLab,
   riskRewardBucket,
   aiVersionKey,

@@ -33,7 +33,7 @@ test('formatPerformanceReview explains recommendation and execution metrics in p
           { key: 'rr_ok', evaluated: 4, winRatePct: 75, avgSignalReturnPct: 3.2 },
         ],
         aiVersions: [
-          { key: 'stock-analysis-v2.1 / anthropic:claude-sonnet-4-5', evaluated: 3, winRatePct: 66.7, avgSignalReturnPct: 2.8 },
+          { key: 'stock-analysis-v2.1 / anthropic:claude-sonnet-4-5', evaluated: 3, winRatePct: 66.7, avgSignalReturnPct: 2.8, sampleNote: '표본 부족: 평가 3/5건' },
         ],
       },
     },
@@ -100,6 +100,7 @@ test('formatPerformanceReview explains recommendation and execution metrics in p
   assert.match(message, /rr_ok: 평가 4건/);
   assert.match(message, /프롬프트\/모델별 성과/);
   assert.match(message, /stock-analysis-v2\.1 \/ anthropic:claude-sonnet-4-5: 평가 3건/);
+  assert.match(message, /표본 부족: 평가 3\/5건/);
   assert.match(message, /가격 데이터 품질/);
   assert.match(message, /Provider 호출: 30건 · 실패 2건 \(6.67%\) · 빈 응답 1건/);
   assert.match(message, /KRX 3건 · 공공데이터 4건 · KIS fallback 1건/);

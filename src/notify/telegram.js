@@ -800,9 +800,10 @@ function formatPerformanceReview(review) {
   const riskFactorLines = (leaders.riskFactors || []).slice(0, 4).map(item => (
     `▸ ${item.key}: 평가 ${item.evaluated}건 · 승률 ${fmtPct(item.winRatePct)} · 평균 ${fmtPct(item.avgSignalReturnPct)}`
   ));
-  const aiVersionLines = (leaders.aiVersions || []).slice(0, 4).map(item => (
-    `▸ ${item.key}: 평가 ${item.evaluated}건 · 승률 ${fmtPct(item.winRatePct)} · 평균 ${fmtPct(item.avgSignalReturnPct)}`
-  ));
+  const aiVersionLines = (leaders.aiVersions || []).slice(0, 4).map(item => {
+    const sample = item.sampleNote ? ` · ${item.sampleNote}` : '';
+    return `▸ ${item.key}: 평가 ${item.evaluated}건 · 승률 ${fmtPct(item.winRatePct)} · 평균 ${fmtPct(item.avgSignalReturnPct)}${sample}`;
+  });
 
   const collectorLines = collector.totalRuns ? [
     `▸ 수집 성공: ${collector.successfulRuns ?? 0}/${collector.completedRuns ?? collector.totalRuns}`,

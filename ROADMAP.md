@@ -249,7 +249,7 @@ Telegram Bot
 - [x] Telegram 승인 흐름 smoke script와 정기 점검 workflow 추가
 
 ## 현재 가장 중요한 다음 작업
-1. 추천 성과를 프롬프트/모델 버전별로 충분히 누적한 뒤 Claude Sonnet 전환 효과를 평가한다.
+1. 추천 성과를 프롬프트/모델 버전별로 5건 이상 누적한 뒤 Claude Sonnet 전환 효과를 평가한다.
 2. Action Report 정기 실행 안정성을 며칠 더 모니터링한다.
 3. 가격 provider 빈 응답/대체 소스 사용 패턴을 누적해 유료 API 추가 필요성을 판단한다.
 4. Telegram smoke workflow 실패 알림은 다음 실제 실패 시 도착 여부를 재확인한다.
