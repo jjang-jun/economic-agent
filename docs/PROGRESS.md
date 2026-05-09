@@ -207,6 +207,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 추천 품질 리포트를 모델별, 프롬프트 버전별, 프롬프트+모델 조합별로 분리했다. 주간/월간 성과 리뷰는 각 그룹의 평가 건수, 승률, 평균 추천 수익률, 표본 부족 여부를 따로 표시하고, 추천을 실제로 산 경우와 추천했지만 매수하지 않은 경우의 평균 성과 차이를 계속 보여준다.
 - 로컬 백테스트용 선택형 worker를 추가했다. `npm run backtest:worker -- providers`로 pykrx/FinanceDataReader 설치 여부를 확인하고, 설치된 로컬 환경에서는 `ohlcv` 명령으로 국내 종목 일봉을 JSON으로 가져올 수 있다. 운영 수집은 계속 KRX/Data.go.kr/KIS 등 공식 API 경로를 사용한다.
 - Agent Server에 인증된 `/dashboard`를 추가했다. Cloud Run 서버가 Supabase를 직접 조회해 경제적 자유 진행률, 포트폴리오 요약, 추천 평가, 수집기 상태, 최근 추천의 진입가/손절가를 보여준다. 인증은 `DASHBOARD_SECRET`을 우선 사용하고 없으면 `JOB_SECRET`을 대체값으로 쓴다.
+- 전체 점검에서 운영 설정 불일치를 정리했다. `.env.example`과 `render.yaml`에 `DASHBOARD_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `KRX_OPENAPI_KEY`, `DATA_GO_KR_API_KEY`, `DISABLE_FINBERT` 등 최근 운영 변수를 반영하고, 서버 `/dashboard`도 Telegram `/recommendations`와 동일하게 리스크 기준을 통과한 매수 후보만 기본 표시하도록 맞췄다. 대시보드 포트폴리오 요약은 `portfolio_snapshots`가 없으면 Supabase 원본 `portfolio_accounts`를 fallback으로 사용한다. Anthropic 기본 모델은 공식 안정 ID인 `claude-sonnet-4-20250514`로 정리했다.
 
 ## 다음 작업
 

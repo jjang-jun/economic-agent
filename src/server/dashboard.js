@@ -1,6 +1,24 @@
 const { isPersistenceEnabled, selectRows } = require('../utils/persistence');
 const { summarizeCollectorOps } = require('../utils/collector-ops');
 const { summarizePriceSourceQuality } = require('../utils/price-source-quality');
+const {
+  humanizeRiskReason,
+  isBuyCandidateRecommendation,
+} = require('../agent/recommendations-view');
+
+const ACTION_LABELS = {
+  candidate: '매수 검토 가능',
+  watch_only: '관찰만',
+  blocked: '매수 차단',
+  reduce: '비중 축소 검토',
+  avoid: '제외',
+};
+
+const SIGNAL_LABELS = {
+  bullish: '상승 후보',
+  bearish: '하락/축소 후보',
+  neutral: '관찰',
+};
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -74,6 +92,7 @@ async function loadDashboardData() {
   const [
     freedomGoals,
     portfolioSnapshots,
+    portfolioAccounts,
     recommendations,
     evaluations,
     collectorRuns,
@@ -91,10 +110,15 @@ async function loadDashboardData() {
       order: 'captured_at.desc,created_at.desc',
       limit: '1',
     }),
+    fetchDashboardRows('portfolio_accounts', {
+      select: '*',
+      order: 'updated_at.desc',
+      limit: '1',
+    }),
     fetchDashboardRows('recommendations', {
       select: '*',
       order: 'created_at.desc',
-      limit: '8',
+      limit: '50',
     }),
     fetchDashboardRows('recommendation_evaluations', {
       select: '*',
@@ -126,7 +150,7 @@ async function loadDashboardData() {
   return {
     persistenceEnabled: true,
     freedom: freedomGoals[0] || null,
-    portfolio: portfolioSnapshots[0] || null,
+    portfolio: portfolioSnapshots[0] || portfolioAccounts[0] || null,
     recommendations,
     evaluations,
     collectorOps: summarizeCollectorOps(collectorRuns, alertEvents),
@@ -148,6 +172,23 @@ function getRecommendationPayload(row = {}) {
   return row.payload || row;
 }
 
+function normalizeRecommendation(row = {}) {
+  const payload = getRecommendationPayload(row);
+  return {
+    ...payload,
+    id: row.id || payload.id,
+    date: row.date || payload.date,
+    createdAt: row.created_at || payload.createdAt,
+    ticker: row.ticker || payload.ticker || payload.symbol,
+    symbol: row.ticker || payload.symbol || payload.ticker,
+    name: row.name || payload.name,
+    signal: row.signal || payload.signal,
+    conviction: row.conviction || payload.conviction,
+    riskProfile: payload.riskProfile || payload.risk_profile || row.risk_profile || {},
+    riskReview: payload.riskReview || payload.risk_review || row.risk_review || {},
+  };
+}
+
 function getRiskProfile(row = {}) {
   const payload = getRecommendationPayload(row);
   return payload.riskProfile || payload.risk_profile || row.risk_profile || {};
@@ -164,11 +205,16 @@ function getEntry(row = {}) {
 }
 
 function renderRecommendationRows(recommendations = []) {
-  if (recommendations.length === 0) {
+  const candidates = recommendations
+    .map(normalizeRecommendation)
+    .filter(isBuyCandidateRecommendation)
+    .slice(0, 8);
+
+  if (candidates.length === 0) {
     return '<tr><td colspan="7" class="muted">최근 추천이 없습니다.</td></tr>';
   }
 
-  return recommendations.map(row => {
+  return candidates.map(row => {
     const payload = getRecommendationPayload(row);
     const risk = getRiskProfile(row);
     const review = getRiskReview(row);
@@ -176,15 +222,15 @@ function renderRecommendationRows(recommendations = []) {
     const currency = entry.currency || payload.marketProfile?.currency || payload.market_profile?.currency || 'KRW';
     const blockers = Array.isArray(review.blockers) ? review.blockers : [];
     const warnings = Array.isArray(review.warnings) ? review.warnings : [];
-    const riskText = [...blockers.map(item => `차단: ${item}`), ...warnings.map(item => `경고: ${item}`)]
+    const riskText = [...blockers.map(item => `차단: ${humanizeRiskReason(item)}`), ...warnings.map(item => `주의: ${humanizeRiskReason(item)}`)]
       .slice(0, 2)
       .join(' / ');
 
     return `<tr>
       <td>${escapeHtml(row.date || row.created_at || '')}</td>
       <td>${escapeHtml(row.name || payload.name || row.ticker || payload.ticker || '')}</td>
-      <td>${escapeHtml(payload.action || row.signal || '')}</td>
-      <td>${escapeHtml(review.action || '')}</td>
+      <td>${escapeHtml(SIGNAL_LABELS[row.signal] || row.signal || '')}</td>
+      <td>${escapeHtml(ACTION_LABELS[review.action] || review.action || '')}</td>
       <td>${escapeHtml(fmtPrice(risk.entryReferencePrice ?? risk.entry_reference_price ?? entry.price, currency))}</td>
       <td>${escapeHtml(fmtPrice(risk.stopLossPrice ?? risk.stop_loss_price, currency))}</td>
       <td>${escapeHtml(riskText || payload.reason || row.reason || '')}</td>
@@ -267,7 +313,8 @@ function buildDashboardHtml(data = {}) {
       </div>
     </section>
     <section class="panel">
-      <h2>최근 추천</h2>
+      <h2>최근 매수 검토 후보</h2>
+      <p class="muted">손익비와 리스크 리뷰를 통과한 후보만 표시합니다. 차단/관찰 후보는 Telegram의 /recommendations blocked에서 확인합니다.</p>
       <table>
         <thead><tr><th>일자</th><th>종목</th><th>의견</th><th>리스크 판정</th><th>진입가</th><th>손절가</th><th>근거/차단</th></tr></thead>
         <tbody>${renderRecommendationRows(data.recommendations || [])}</tbody>

@@ -415,8 +415,8 @@ npm run db:pull
 |--------|--------|-----------|------|
 | **Groq** | `groq` | llama-3.3-70b-versatile | 무료 티어 |
 | **Ollama** | `ollama` | llama3 | 완전 무료 (로컬) |
-| **Anthropic** | `anthropic` | claude-haiku-4-5-20251001 | ~$0.18/일 |
-| **OpenAI** | `openai` | gpt-4o-mini | ~$0.12/일 |
+| **Anthropic** | `anthropic` | claude-sonnet-4-20250514 | 사용량 의존 |
+| **OpenAI** | `openai` | gpt-4o-mini | 사용량 의존 |
 | **Custom** | `custom` | - | AI_BASE_URL 설정 |
 
 AI 비용을 줄이기 위해 전체 히스토리를 매번 프롬프트에 넣지 않습니다. 다이제스트는 상위 기사 16건, 종목 리포트는 상위 기사 32건과 핵심 시장 스냅샷만 잘라 넣고, 장기 히스토리는 Supabase/SQLite에 저장해 필요할 때만 조회합니다.

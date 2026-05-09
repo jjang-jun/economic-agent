@@ -3,7 +3,7 @@
  *
  * 지원 제공자:
  *   - openai     : OpenAI (gpt-4o-mini 등)
- *   - anthropic  : Anthropic Claude (claude-haiku 등)
+ *   - anthropic  : Anthropic Claude (claude-sonnet 등)
  *   - groq       : Groq (llama, mixtral — 무료 티어 있음)
  *   - ollama     : Ollama 로컬 (llama3 등 — 완전 무료)
  *   - custom     : OpenAI 호환 API (Together, Fireworks 등)
@@ -23,7 +23,7 @@ const PROVIDER_DEFAULTS = {
   },
   anthropic: {
     baseUrl: 'https://api.anthropic.com',
-    model: 'claude-haiku-4-5-20251001',
+    model: 'claude-sonnet-4-20250514',
     keyEnv: 'ANTHROPIC_API_KEY',
   },
   groq: {

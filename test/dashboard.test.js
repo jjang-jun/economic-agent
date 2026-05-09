@@ -65,10 +65,34 @@ test('buildDashboardHtml renders freedom and recommendation summary', () => {
       date: '2026-05-10',
       name: '삼성전자',
       payload: {
-        action: 'buy_candidate',
+        signal: 'bullish',
         entry: { price: 70000, currency: 'KRW' },
-        riskProfile: { stopLossPrice: 66500 },
-        riskReview: { action: 'pass', warnings: ['테스트 경고'] },
+        riskProfile: {
+          entryReferencePrice: 70000,
+          stopLossPrice: 66500,
+          riskReward: 2.2,
+        },
+        riskReview: {
+          approved: true,
+          action: 'candidate',
+          warnings: ['테스트 경고'],
+        },
+      },
+    }, {
+      date: '2026-05-10',
+      name: '차단종목',
+      payload: {
+        signal: 'neutral',
+        riskProfile: {
+          entryReferencePrice: 10000,
+          stopLossPrice: 9500,
+          riskReward: 0.8,
+        },
+        riskReview: {
+          approved: false,
+          action: 'watch_only',
+          blockers: ['risk_reward:0.8:1 / min 2:1'],
+        },
       },
     }],
   });
@@ -79,4 +103,5 @@ test('buildDashboardHtml renders freedom and recommendation summary', () => {
   assert.match(html, /삼성전자/);
   assert.match(html, /70,000원/);
   assert.match(html, /66,500원/);
+  assert.doesNotMatch(html, /차단종목/);
 });

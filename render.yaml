@@ -17,9 +17,13 @@ services:
         sync: false
       - key: JOB_SECRET
         sync: false
+      - key: DASHBOARD_SECRET
+        sync: false
       - key: SUPABASE_PROJECT_URL
         sync: false
       - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
       - key: PORTFOLIO_JSON_BASE64
         sync: false
@@ -35,6 +39,12 @@ services:
         sync: false
       - key: KIS_BASE_URL
         value: https://openapi.koreainvestment.com:9443
+      - key: KIS_MIN_REQUEST_INTERVAL_MS
+        value: "1100"
+      - key: KRX_OPENAPI_KEY
+        sync: false
+      - key: DATA_GO_KR_API_KEY
+        sync: false
       - key: ALPACA_API_KEY_ID
         sync: false
       - key: ALPACA_API_SECRET_KEY
@@ -45,6 +55,8 @@ services:
         value: https://financialmodelingprep.com/stable/
       - key: FMP_API_KEY
         sync: false
+      - key: DISABLE_FINBERT
+        value: "1"
 
   - type: cron
     name: economic-agent-news-collector
@@ -69,9 +81,17 @@ services:
         sync: false
       - key: SUPABASE_PUBLISHABLE_KEY
         sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
       - key: DART_API_KEY
         sync: false
       - key: BOK_API_KEY
         sync: false
       - key: FRED_API_KEY
         sync: false
+      - key: KRX_OPENAPI_KEY
+        sync: false
+      - key: DATA_GO_KR_API_KEY
+        sync: false
+      - key: DISABLE_FINBERT
+        value: "1"
