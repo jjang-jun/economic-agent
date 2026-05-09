@@ -163,7 +163,7 @@ async function buildPriceSourceQualitySummary({ days = 7 } = {}) {
 
 function buildPriceSourceQualityAnomalies(summary = {}, options = {}) {
   const maxFailureRatePct = options.maxFailureRatePct ?? Number(process.env.PRICE_PROVIDER_MAX_FAILURE_RATE_PCT || 30);
-  const maxEmptyRatePct = options.maxEmptyRatePct ?? Number(process.env.PRICE_PROVIDER_MAX_EMPTY_RATE_PCT || 40);
+  const maxEmptyRatePct = options.maxEmptyRatePct ?? Number(process.env.PRICE_PROVIDER_MAX_EMPTY_RATE_PCT || 90);
   const minAttempts = options.minAttempts ?? Number(process.env.PRICE_PROVIDER_MIN_ATTEMPTS || 5);
   const maxFallbackRatePct = options.maxFallbackRatePct ?? Number(process.env.PRICE_PROVIDER_MAX_FALLBACK_RATE_PCT || 80);
   const maxStaleSnapshots = options.maxStaleSnapshots ?? Number(process.env.PRICE_PROVIDER_MAX_STALE_SNAPSHOTS || 3);

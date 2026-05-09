@@ -249,10 +249,10 @@ Telegram Bot
 - [x] Telegram 승인 흐름 smoke script와 정기 점검 workflow 추가
 
 ## 현재 가장 중요한 다음 작업
-1. Action Report workflow 수동 실행으로 GitHub Actions 운영 경로를 검증한다.
-2. Telegram smoke workflow 실패 알림이 실제 실패 상황에서 private 채팅으로 도착하는지 확인한다.
-3. 가격 provider 실패율 알림이 실제 실패율 초과 상황에서 private 채팅으로 도착하는지 확인한다.
-4. 추천 성과를 프롬프트/모델 버전별로 충분히 누적한 뒤 Claude Sonnet 전환 효과를 평가한다.
+1. Telegram smoke workflow 실패 알림이 실제 실패 상황에서 private 채팅으로 도착하는지 확인한다.
+2. 가격 provider 실패율 알림이 실제 실패율 초과 상황에서 private 채팅으로 도착하는지 확인한다.
+3. 추천 성과를 프롬프트/모델 버전별로 충분히 누적한 뒤 Claude Sonnet 전환 효과를 평가한다.
+4. Action Report 정기 실행 안정성을 며칠 더 모니터링한다.
 5. 대시보드를 Agent Server의 인증된 `/dashboard` 화면으로 승격할지는 실제 사용 빈도를 더 본 뒤 결정한다.
 
 ## 운영 루프

@@ -196,11 +196,11 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 다이제스트 전송 후 상태 추적을 운영 리포트에 보강했다. 주간/월간 성과 리뷰의 수집/알림 운영 섹션이 `digest`와 `catch_up` 각각의 전송완료/대기/실패 건수를 따로 보여주고, 상태 전환 실패가 있으면 이상치로 표시한다.
 - 추천 생성 AI 버전 추적을 추가했다. 종목 분석 리포트와 추천 로그에 `aiMetadata`를 저장하고, Supabase `recommendations`에 `ai_provider`, `ai_model`, `prompt_version`, `ai_metadata`를 별도 컬럼으로 남긴다. 주간/월간 성과 리뷰는 프롬프트/모델 조합별 승률과 평균 추천 수익률을 분리 표시한다.
 - Telegram 승인 흐름 smoke 실패 알림을 추가했다. `telegram-smoke-actions.yml`에서 smoke 단계가 실패하면 `notify:workflow-failure`가 private Telegram으로 워크플로우명, 작업명, 브랜치, 커밋, GitHub Actions 로그 링크를 보낸다.
-- 가격 provider 운영 알림을 추가했다. `price-provider:ops-report`는 최근 provider 호출 실패율, 빈 응답률, fallback 비중, 오래된 가격 스냅샷을 점검하고 기준 초과 시 private Telegram으로 보낸다. GitHub Actions `price-provider-ops-report.yml`은 평일 23:55 KST에 실행된다.
+- 가격 provider 운영 알림을 추가했다. `price-provider:ops-report`는 최근 provider 호출 실패율, 빈 응답률, fallback 비중, 오래된 가격 스냅샷을 점검하고 기준 초과 시 private Telegram으로 보낸다. GitHub Actions `price-provider-ops-report.yml`은 평일 23:55 KST에 실행된다. fallback 탐색 과정의 빈 응답은 정상적으로 발생할 수 있어 경보 기준을 90%로 둔다.
 
 ## 다음 작업
 
-1. Action Report workflow 수동 실행으로 GitHub Actions 운영 경로 검증
-2. Telegram smoke workflow 실패 알림 end-to-end 확인
-3. 가격 provider 실패율 알림 end-to-end 확인
-4. 프롬프트/모델별 추천 성과 샘플 누적 후 Claude Sonnet 전환 효과 평가
+1. Telegram smoke workflow 실패 알림 end-to-end 확인
+2. 가격 provider 실패율 알림 end-to-end 재확인
+3. 프롬프트/모델별 추천 성과 샘플 누적 후 Claude Sonnet 전환 효과 평가
+4. Action Report 정기 실행 안정성 모니터링
