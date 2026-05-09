@@ -207,6 +207,29 @@ async function persistDailySummary(summary) {
   }], 'date');
 }
 
+async function loadPersistedDailySummaries(options = {}) {
+  const params = {
+    select: 'date,payload,stats,top_news,stock_report,updated_at',
+    order: options.order || 'date.desc,updated_at.desc',
+    limit: String(options.limit || 5),
+  };
+  if (options.date) params.date = `eq.${options.date}`;
+
+  const result = await selectRows('daily_summaries', params);
+  if (!result.rows) return result;
+
+  return {
+    rows: result.rows
+      .map(row => row.payload || {
+        date: row.date,
+        stats: row.stats || {},
+        topNews: row.top_news || [],
+        stockReport: row.stock_report || null,
+      })
+      .filter(Boolean),
+  };
+}
+
 async function persistStockReport(report, date = getKSTDate()) {
   if (!report) return { saved: 0 };
   return upsert('stock_reports', [{
@@ -217,6 +240,28 @@ async function persistStockReport(report, date = getKSTDate()) {
     decision: report.decision || null,
     created_at: new Date().toISOString(),
   }], 'id');
+}
+
+async function loadPersistedStockReports(options = {}) {
+  const params = {
+    select: 'date,market_summary,decision,report,created_at',
+    order: options.order || 'date.desc,created_at.desc',
+    limit: String(options.limit || 5),
+  };
+  if (options.date) params.date = `eq.${options.date}`;
+
+  const result = await selectRows('stock_reports', params);
+  if (!result.rows) return result;
+
+  return {
+    rows: result.rows
+      .map(row => row.report || {
+        date: row.date,
+        market_summary: row.market_summary || '',
+        decision: row.decision || null,
+      })
+      .filter(Boolean),
+  };
 }
 
 function recommendationRow(recommendation) {
@@ -734,7 +779,9 @@ module.exports = {
   loadPersistedArticleIds,
   loadPersistedArticles,
   persistDailySummary,
+  loadPersistedDailySummaries,
   persistStockReport,
+  loadPersistedStockReports,
   persistRecommendations,
   loadPersistedRecommendations,
   persistRecommendationEvaluations,

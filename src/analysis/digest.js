@@ -5,6 +5,7 @@ const {
   formatDigestArticle,
   formatMarketSnapshot,
 } = require('../utils/ai-budget');
+const { buildReportContext } = require('../utils/report-context');
 
 const DIGEST_NAMES = {
   preopen: '개장 전 브리핑',
@@ -67,6 +68,10 @@ async function generateDigest(articles, indicators, session) {
       `Investor flow (${flow.market}, ${flow.unit}): foreign ${flow.latest.foreign}, institution ${flow.latest.institution}, individual ${flow.latest.individual}, 5d foreign ${flow.sums5d?.foreign}, 5d institution ${flow.sums5d?.institution}`
     );
   }
+  const reportContext = buildReportContext({
+    dailySummaries: indicators.recentDailySummaries || [],
+    stockReports: indicators.recentStockReports || [],
+  });
 
   const sessionFocus = SESSION_FOCUS[session] || [];
 
@@ -75,6 +80,9 @@ Summarize the following news articles into a concise briefing.
 
 ## Economic Indicators
 ${indicatorInfo.length > 0 ? indicatorInfo.join('\n') : '(No data)'}
+
+## Recent Stored Context
+${reportContext.length > 0 ? reportContext.join('\n') : '(No stored context)'}
 
 ## Articles (${articles.length} total, top ${selectedArticles.length} shown)
 ${articleSummaries}

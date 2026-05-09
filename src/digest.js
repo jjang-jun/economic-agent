@@ -13,6 +13,8 @@ const {
   persistInvestorFlow,
   loadBufferedDigestArticles,
   persistAlertEvents,
+  loadPersistedDailySummaries,
+  loadPersistedStockReports,
 } = require('./utils/persistence');
 
 // 세션 자동 판별 (KST 기준)
@@ -50,6 +52,12 @@ async function main() {
   // 경제 지표
   const indicators = await fetchAllIndicators();
   indicators.marketSnapshot = await fetchMarketSnapshot(session);
+  const [recentDailySummaries, recentStockReports] = await Promise.all([
+    loadPersistedDailySummaries({ limit: 2 }),
+    loadPersistedStockReports({ limit: 2 }),
+  ]);
+  indicators.recentDailySummaries = recentDailySummaries.rows || [];
+  indicators.recentStockReports = recentStockReports.rows || [];
   archiveScoredArticles(articles);
   await persistArticles(articles);
   await persistMarketSnapshots(indicators.marketSnapshot, session);

@@ -25,6 +25,8 @@ const {
   persistPortfolioSnapshot,
   persistDecisionContext,
   loadPersistedArticles,
+  loadPersistedDailySummaries,
+  loadPersistedStockReports,
 } = require('./utils/persistence');
 
 function mergeArticles(...groups) {
@@ -46,6 +48,12 @@ async function main() {
 
   const indicators = await fetchAllIndicators();
   indicators.marketSnapshot = await fetchMarketSnapshot('close');
+  const [recentDailySummaries, recentStockReports] = await Promise.all([
+    loadPersistedDailySummaries({ limit: 2 }),
+    loadPersistedStockReports({ limit: 2 }),
+  ]);
+  indicators.recentDailySummaries = recentDailySummaries.rows || [];
+  indicators.recentStockReports = recentStockReports.rows || [];
   await persistMarketSnapshots(indicators.marketSnapshot, 'close');
   await persistInvestorFlow(indicators.investorFlow);
 
