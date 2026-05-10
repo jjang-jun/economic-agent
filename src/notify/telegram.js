@@ -129,6 +129,7 @@ function explainRiskBlocker(blocker) {
   if (text.startsWith('stop_loss:')) return `손절 기준 문제: ${text.replace('stop_loss:', '').trim()}`;
   if (text.startsWith('position_size:')) return `매수 가능 금액 없음: ${text.replace('position_size:', '').trim()}`;
   if (text.startsWith('market_regime:')) return `시장 상태 차단: ${text.replace('market_regime:', '').trim()}`;
+  if (text.startsWith('entry_timing:')) return `진입 타이밍 보류: ${text.replace('entry_timing:', '').trim()}`;
   if (text.startsWith('sector_limit:')) return `섹터 비중 초과: ${text.replace('sector_limit:', '').trim()}`;
   if (text.startsWith('lot_size:')) return `정수 주식 매수 불가: ${text.replace('lot_size:', '').trim()}`;
   return text;
@@ -372,6 +373,12 @@ function formatStockReport(report) {
       : '';
     const rs = typeof market.relativeStrength20d === 'number' ? `20일 상대강도 ${market.relativeStrength20d}%p` : '';
     const volume = typeof market.volumeRatio20d === 'number' ? `거래량 평소의 ${market.volumeRatio20d}배` : '';
+    const timing = market.entryTiming?.label
+      ? `진입 타이밍 ${market.entryTiming.label}`
+      : '';
+    const ma = typeof market.distanceFromMa20Pct === 'number'
+      ? `20일선 대비 ${market.distanceFromMa20Pct}%`
+      : '';
     const high = market.breakout20d
       ? '20일 고점 돌파'
       : (typeof market.distanceFrom20dHighPct === 'number' ? `20일 고점 대비 ${market.distanceFrom20dHighPct}%` : '');
@@ -387,7 +394,7 @@ function formatStockReport(report) {
     const invalidation = profile.invalidation ? `\n무효화: ${escapeHtml(profile.invalidation)}` : '';
     const blockers = (review.blockers || []).slice(0, 2).map(item => `\n차단: ${escapeHtml(explainRiskBlocker(item))}`).join('');
     const warnings = (review.warnings || []).slice(0, 1).map(item => `\n주의: ${escapeHtml(item)}`).join('');
-    const riskProfile = [entry, stopPrice, rr, stop, size, rs, volume, high, sector, marketCap, beta, revenueGrowth, fcfMargin, nextEarnings, tradeable].filter(Boolean).join(' · ');
+    const riskProfile = [entry, stopPrice, rr, stop, size, timing, ma, rs, volume, high, sector, marketCap, beta, revenueGrowth, fcfMargin, nextEarnings, tradeable].filter(Boolean).join(' · ');
     return `${icon.bar} <b>${escapeHtml(s.name)}</b>${ticker}  [${icon.label}${conviction}]\n└ ${escapeHtml(s.reason)}${riskProfile ? `\n└ ${escapeHtml(riskProfile)}` : ''}${invalidation}${blockers}${warnings}${risk}`;
   });
 
@@ -689,6 +696,117 @@ async function sendActionReport(report) {
   }
 }
 
+function formatTimingCandidate(item) {
+  const timing = item.entryTiming || {};
+  const plan = item.buyPlan || {};
+  const status = item.status === 'ready' ? '진입 가능' : '조건 대기';
+  const price = item.price ? `현재가 ${formatPrice(item.price)}` : '';
+  const rr = item.riskReward ? `손익비 ${item.riskReward}:1` : '';
+  const stop = item.stopLossPrice ? `손절 ${formatPrice(item.stopLossPrice)}` : '';
+  const firstLabel = item.status === 'ready' ? '1차' : '조건 충족 시 1차';
+  const first = plan.firstAmount
+    ? `${firstLabel} ${formatKRW(plan.firstAmount)}${plan.firstQuantity ? ` (${plan.firstQuantity}주)` : ''}`
+    : '';
+  const ma = typeof item.marketProfile?.distanceFromMa20Pct === 'number'
+    ? `20일선 대비 ${item.marketProfile.distanceFromMa20Pct}%`
+    : '';
+  const conditions = (item.conditions || [])
+    .slice(0, 3)
+    .map(condition => `  - ${escapeHtml(condition)}`)
+    .join('\n');
+  const blockers = item.status !== 'ready' && item.blockers?.length
+    ? `\n보류 사유: ${escapeHtml(explainRiskBlocker(item.blockers[0]))}`
+    : '';
+  const nameNote = item.originalName && item.originalName !== item.name
+    ? `└ 공식명 기준, 추천명 ${escapeHtml(item.originalName)}`
+    : '';
+
+  return [
+    `<b>${escapeHtml(item.name || item.ticker)}</b> ${escapeHtml(item.ticker || '')} [${status}]`,
+    `└ ${escapeHtml(timing.label || '확인 대기')}${[price, ma, rr, stop, first].filter(Boolean).length ? ` · ${escapeHtml([price, ma, rr, stop, first].filter(Boolean).join(' · '))}` : ''}`,
+    nameNote,
+    item.reason ? `└ 근거: ${escapeHtml(item.reason)}` : '',
+    conditions ? `조건:\n${conditions}` : '',
+    blockers,
+  ].filter(Boolean).join('\n');
+}
+
+function formatTimingAlertReport(report = {}) {
+  const title = report.mode === 'premarket'
+    ? '⏱ <b>장전 매매 타이밍 후보</b>'
+    : '⏱ <b>장중 진입 조건 충족</b>';
+  const candidates = report.candidates || [];
+  const empty = report.mode === 'premarket'
+    ? '오늘 장전 기준으로 볼 신규 국내주식 후보가 없습니다.'
+    : '현재 조건을 충족한 신규 진입 후보가 없습니다.';
+
+  return [
+    title,
+    `기준일: ${escapeHtml(report.date || '')}`,
+    report.mode === 'premarket'
+      ? `요약: 진입 가능 ${report.readyCount || 0}건 / 관찰 ${(report.watchCandidates || []).length}건`
+      : `요약: 조건 충족 ${candidates.length}건`,
+    '',
+    candidates.length > 0
+      ? candidates.map(formatTimingCandidate).join('\n\n')
+      : empty,
+    '',
+    '원칙: 장 시작 직후 추격매수 금지, 1차는 예정금액의 40% 이내, 손절선 이탈 시 추가매수 금지',
+  ].filter(line => line !== '').join('\n');
+}
+
+async function sendTimingAlertReport(report) {
+  const message = formatTimingAlertReport(report);
+  await sendTelegramMessage(message, { channel: 'private' });
+}
+
+function formatPreNewsSignal(signal) {
+  const market = signal.marketProfile || {};
+  const price = typeof market.price === 'number' ? `현재가 ${formatPrice(market.price)}` : '';
+  const volume = typeof market.volumeRatio20d === 'number' ? `거래량 ${market.volumeRatio20d}배` : '';
+  const rs = typeof market.relativeStrength20d === 'number' ? `20일 상대강도 ${market.relativeStrength20d}%p` : '';
+  const ma = typeof market.distanceFromMa20Pct === 'number' ? `20일선 대비 ${market.distanceFromMa20Pct}%` : '';
+  const reasons = (signal.reasons || []).slice(0, 4).map(item => `  - ${escapeHtml(item)}`).join('\n');
+  const warnings = (signal.warnings || []).slice(0, 2).map(item => `주의: ${escapeHtml(item)}`).join('\n');
+  const label = signal.action === 'pre_news_candidate' ? '선행 후보' : '관찰';
+  const nameNote = signal.originalName && signal.originalName !== signal.name
+    ? `공식명 기준, 추천명 ${signal.originalName}`
+    : '';
+
+  return [
+    `<b>${escapeHtml(signal.name || signal.ticker)}</b> ${escapeHtml(signal.ticker || '')} [${label} · ${escapeHtml(signal.sourceLabel || '')}]`,
+    `└ 점수 ${signal.score} · ${escapeHtml([price, ma, volume, rs].filter(Boolean).join(' · '))}`,
+    nameNote ? `└ ${escapeHtml(nameNote)}` : '',
+    signal.thesis ? `└ 기존 근거: ${escapeHtml(signal.thesis)}` : '',
+    reasons ? `선행 신호:\n${reasons}` : '',
+    warnings,
+  ].filter(Boolean).join('\n');
+}
+
+function formatPreNewsSignalReport(report = {}) {
+  const candidates = report.candidates || [];
+  const watch = report.watch || [];
+  return [
+    '📡 <b>기사 전 선행 신호</b>',
+    `기준일: ${escapeHtml(report.date || '')}`,
+    `감시 대상: ${report.universeCount || 0}개 · 선행 후보 ${candidates.length}개 · 관찰 ${watch.length}개`,
+    '',
+    candidates.length > 0
+      ? candidates.map(formatPreNewsSignal).join('\n\n')
+      : '현재 선행 후보는 없습니다.',
+    watch.length > 0
+      ? `\n<b>관찰</b>\n${watch.slice(0, 3).map(formatPreNewsSignal).join('\n\n')}`
+      : '',
+    '',
+    '원칙: 기사보다 먼저 움직이는 공개 가격/거래량 신호입니다. 공시·뉴스 확인 전 전액 진입 금지, 조건 충족 시 1차만 분할 진입.',
+  ].filter(line => line !== '').join('\n');
+}
+
+async function sendPreNewsSignalReport(report) {
+  const message = formatPreNewsSignalReport(report);
+  await sendTelegramMessage(message, { channel: 'private' });
+}
+
 const SESSION_EMOJI = {
   preopen: '🌅',
   midday: '☀️',
@@ -874,6 +992,13 @@ function formatMonths(months) {
   return `${years}년 ${rest}개월`;
 }
 
+function formatCompactKRW(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 'n/a';
+  if (Math.abs(value) >= 100000000) return `${round(value / 100000000, 1)}억`;
+  if (Math.abs(value) >= 10000) return `${round(value / 10000, 0)}만`;
+  return `${Math.round(value).toLocaleString('ko-KR')}원`;
+}
+
 function formatFreedomStatus(status = {}) {
   const goal = status.goal || {};
   const targetGap = typeof status.targetMonths === 'number' && typeof status.monthsToTarget === 'number'
@@ -886,6 +1011,21 @@ function formatFreedomStatus(status = {}) {
   })();
   const aggressiveLine = typeof status.aggressiveAnnualReturnPct === 'number'
     ? `▸ 공격 운용 목표: ${formatPct(status.aggressiveAnnualReturnPct)}`
+    : '';
+  const scenarioRows = (status.scenarios || [])
+    .filter(item => (
+      item.monthlySavingAmount === status.monthlySavingAmount
+      || item.annualReturnPct === status.expectedAnnualReturnPct
+    ))
+    .slice(0, 8)
+    .map(item => {
+      const gap = typeof item.targetGapMonths === 'number'
+        ? (item.targetGapMonths <= 0 ? `${formatMonths(Math.abs(item.targetGapMonths))} 빠름` : `${formatMonths(item.targetGapMonths)} 지연`)
+        : 'n/a';
+      return `${formatCompactKRW(item.monthlySavingAmount).padEnd(5, ' ')} ${String(item.annualReturnPct).padStart(4, ' ')}% ${item.estimatedTargetDate || 'n/a'} ${gap}`;
+    });
+  const scenarioTable = scenarioRows.length > 0
+    ? ['월투자 수익률 도달일     목표대비', ...scenarioRows].join('\n')
     : '';
 
   return [
@@ -904,6 +1044,9 @@ function formatFreedomStatus(status = {}) {
     `▸ 예상 도달일: ${escapeHtml(status.estimatedTargetDate || '데이터 부족')} (${formatMonths(status.monthsToTarget)})`,
     `▸ 목표일: ${escapeHtml(status.targetDate || goal.targetDate || '데이터 부족')} - ${escapeHtml(targetGapText)}`,
     `▸ 목표일까지 필요한 연수익률: ${formatPct(status.requiredAnnualReturnPct)}`,
+    scenarioTable ? '' : '',
+    scenarioTable ? '<b>시나리오</b>' : '',
+    scenarioTable ? `<pre>${escapeHtml(scenarioTable)}</pre>` : '',
     '',
     `<b>하락 스트레스</b>`,
     `▸ ${formatPct(status.stress?.drawdownPct)} 하락 시 순자산: ${formatKRW(status.stress?.stressedNetWorth)}`,
@@ -1069,6 +1212,6 @@ async function sendPerformanceReview(review) {
 }
 
 module.exports = {
-  notifyArticles, sendStockReport, sendDigest, sendPerformanceReport, sendTradePerformanceReport, sendPerformanceReview, sendActionReport, sendFreedomStatus, sendTelegramMessage, answerTelegramCallbackQuery, getTelegramChatId,
-  formatMessage, formatStockReport, formatDigest, formatPerformanceReport, formatTradePerformanceReport, formatPerformanceReview, formatActionReport, formatFreedomStatus,
+  notifyArticles, sendStockReport, sendDigest, sendPerformanceReport, sendTradePerformanceReport, sendPerformanceReview, sendActionReport, sendTimingAlertReport, sendPreNewsSignalReport, sendFreedomStatus, sendTelegramMessage, answerTelegramCallbackQuery, getTelegramChatId,
+  formatMessage, formatStockReport, formatDigest, formatPerformanceReport, formatTradePerformanceReport, formatPerformanceReview, formatActionReport, formatTimingAlertReport, formatPreNewsSignalReport, formatFreedomStatus,
 };

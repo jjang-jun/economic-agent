@@ -60,10 +60,35 @@ function fmtMonths(value) {
   return `${years}년 ${months}개월`;
 }
 
+function fmtGap(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 'n/a';
+  if (value <= 0) return `${fmtMonths(Math.abs(value))} 빠름`;
+  return `${fmtMonths(value)} 지연`;
+}
+
 function fmtPrice(value, currency = 'KRW') {
   if (typeof value !== 'number' || !Number.isFinite(value)) return 'n/a';
   if (currency === 'USD') return `$${value.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
   return `${value.toLocaleString('ko-KR')}원`;
+}
+
+function renderFreedomScenarios(scenarios = []) {
+  if (!Array.isArray(scenarios) || scenarios.length === 0) {
+    return '<p class="muted">시나리오 데이터가 없습니다.</p>';
+  }
+  return `
+      <table>
+        <thead><tr><th>월 투자금</th><th>연수익률</th><th>예상 도달일</th><th>목표 대비</th><th>판정</th></tr></thead>
+        <tbody>
+          ${scenarios.map(item => row([
+            fmtKRW(item.monthlySavingAmount),
+            fmtPct(item.annualReturnPct),
+            item.estimatedTargetDate || 'n/a',
+            fmtGap(item.targetGapMonths),
+            item.onTrack ? '목표 안' : '지연',
+          ])).join('')}
+        </tbody>
+      </table>`;
 }
 
 function latestByDate(rows, fields = ['created_at', 'generated_at', 'end_date', 'date']) {
@@ -312,6 +337,11 @@ function buildDashboard(options = {}) {
       ${metric('Cash', latestPortfolio.cash_amount ? fmtKRW(Number(latestPortfolio.cash_amount)) : 'n/a')}
       ${metric('Investor Flow', latestFlow.foreign_net_buy ? `외국인 ${fmtNumber(Number(latestFlow.foreign_net_buy))}억` : 'n/a')}
     </div>
+    <section class="panel">
+      <h2>Freedom Scenarios</h2>
+      <p class="muted">월 투자금과 연수익률 조합별 10억 도달 예상일입니다.</p>
+      ${renderFreedomScenarios(freedom.scenarios)}
+    </section>
     <section class="split">
       <div class="panel">
         <h2>Recommendation Quality</h2>

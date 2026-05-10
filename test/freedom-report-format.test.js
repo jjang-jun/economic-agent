@@ -15,6 +15,20 @@ test('formatFreedomStatus explains target progress and stress without internal j
     targetDate: '2036-12-31',
     targetMonths: 127,
     requiredAnnualReturnPct: 12.3,
+    scenarios: [
+      {
+        monthlySavingAmount: 3000000,
+        annualReturnPct: 12,
+        estimatedTargetDate: '2039-04-10',
+        targetGapMonths: 28,
+      },
+      {
+        monthlySavingAmount: 3000000,
+        annualReturnPct: 15,
+        estimatedTargetDate: '2037-12-10',
+        targetGapMonths: 11,
+      },
+    ],
     goal: {
       targetNetWorth: 1028571429,
       targetDate: '2036-12-31',
@@ -31,6 +45,8 @@ test('formatFreedomStatus explains target progress and stress without internal j
   assert.match(message, /달성률: 1.94%/);
   assert.match(message, /기준 계획 수익률: 12%/);
   assert.match(message, /공격 운용 목표: 15%/);
+  assert.match(message, /시나리오/);
+  assert.match(message, /월투자 수익률 도달일/);
   assert.match(message, /목표일보다 2년 4개월 늦은 속도/);
   assert.match(message, /목표일까지 필요한 연수익률: 12.3%/);
   assert.match(message, /20% 하락 시 순자산: 16,000,000원/);

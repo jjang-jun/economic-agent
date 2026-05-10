@@ -15,6 +15,7 @@ const baseStock = {
     relativeStrength20d: 1,
     near20dHigh: true,
     averageTurnover20d: 10000000000,
+    entryTiming: { approved: true, label: '눌림목 분할매수' },
   },
 };
 
@@ -87,4 +88,27 @@ test('reviewStock warns on near earnings and prior EPS shock', () => {
 
   assert.ok(review.warnings.some(item => item.includes('실적발표 임박')));
   assert.ok(review.warnings.some(item => item.includes('직전 EPS 쇼크')));
+});
+
+test('reviewStock blocks weak entry timing even when risk reward is high', () => {
+  const review = reviewStock({
+    ...baseStock,
+    market_profile: {
+      ...baseStock.market_profile,
+      entryTiming: {
+        approved: false,
+        label: '과열, 눌림 대기',
+        warnings: ['20일선 대비 9% 위: 추격매수 위험'],
+      },
+    },
+    fundamental_profile: {
+      source: 'fmp-profile',
+      isActivelyTrading: true,
+    },
+  }, { market: { regime: 'RISK_ON', tags: [] } });
+
+  assert.equal(review.approved, false);
+  assert.equal(review.action, 'watch_only');
+  assert.ok(review.blockers.some(item => item.includes('entry_timing')));
+  assert.ok(review.warnings.some(item => item.includes('추격매수 위험')));
 });

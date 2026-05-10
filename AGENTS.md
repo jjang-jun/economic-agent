@@ -29,6 +29,8 @@ RSS feeds
 - List recent recommendations and IDs: `npm run recommendations:list`
 - Record an actual manual trade execution: `npm run trade:record -- --side buy --ticker 005930 --quantity 3 --price 266000`
 - Review actual trade performance: `npm run trade:performance`
+- Send premarket/intraday timing alerts: `npm run timing:alert -- premarket`, `npm run timing:alert -- intraday`
+- Detect low-cost pre-news signals: `npm run pre-news:signal`
 - Build weekly/monthly performance reviews: `npm run review:weekly`, `npm run review:monthly`
 - Check model/prompt performance sample readiness: `npm run model:performance` after `npm run db:pull`
 - Build local HTML dashboard from pulled Supabase mirrors: `npm run dashboard`
@@ -79,6 +81,8 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - `src/utils/article-identity.js`: normalized article identity keys for duplicate suppression across RSS/DART, URLs, and titles
 - `src/utils/recommendation-log.js`: stores stock signals and evaluates returns against KOSPI benchmark when available
 - `src/utils/risk-reviewer.js`: rule-based risk manager for recommendation factor pass/fail and blockers
+- `src/utils/timing-alert.js`: builds KOSPI/KOSDAQ premarket watchlists and intraday entry alerts from recent recommendations and moving-average timing data
+- `src/utils/pre-news-signal.js`: low-cost public-data pre-news detector for holdings, recent domestic recommendations, and watchlist leaders
 - `src/utils/performance-review.js`: summarizes recommendation and trade performance over weekly/monthly windows
 - `src/utils/local-research-worker.js`: optional monthly review sidecar for local Python OHLCV research; disabled unless `LOCAL_RESEARCH_WORKER_ENABLED=true`
 - `src/utils/trade-log.js`: stores actual manual trade executions in ignored local data and Supabase
@@ -87,6 +91,7 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - Stock recommendations should be framed as expected-value trades. Prefer risk/reward, stop-loss width, invalidation, suggested amount, and account weight over plain buy/sell wording.
 - Recommended stocks can include `market_profile` with relative strength, volume ratio, and average turnover. Liquidity and relative strength filters should reduce tradeability, not just decorate the report.
 - `market_profile` also tracks 20d/60d highs and distance from the 20d high. For momentum candidates, being far below the 20d high should reduce tradeability.
+- `market_profile.entryTiming` tracks 5d/20d moving-average alignment, 20d moving-average distance/slope, breakout/pullback status, and should block chase entries even when AI text is bullish.
 - Recommendations should include `risk_review` before persistence. Treat blockers as a reason to mark a stock watch-only even when AI text sounds bullish.
 - `src/utils/portfolio.js`: loads ignored local portfolio data and derives cash/position risk inputs
 - Portfolio valuation snapshots are saved under ignored `data/portfolio-snapshots/` and persisted to Supabase `portfolio_snapshots` when configured.
@@ -102,7 +107,7 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - `supabase/migrations/`: Postgres schema migrations for long-term history
 - `scripts/push-supabase.js`, `scripts/pull-supabase.js`: Supabase CLI push and local history mirror scripts
 - `scripts/import-local-history.js`: uploads existing ignored `data/*.json` history into Supabase after schema creation
-- `.github/workflows/`: collector, five digest schedules, stock report, portfolio snapshot, recommendation evaluation, and trade performance schedules
+- `.github/workflows/`: collector, five digest schedules, stock report, timing alert, pre-news signal, portfolio snapshot, recommendation evaluation, and trade performance schedules
 - `docs/README.md`: docs index and folder roles
 - `docs/AGENT_HARNESS.md`: Codex/sub-agent long-running task contract, verification loop, and documentation cleanup rules
 - `docs/PROGRESS.md`: human-readable development progress and current operating context

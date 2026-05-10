@@ -78,6 +78,9 @@ function normalizeRecommendationRisk(stock, decision) {
     : null;
   const liquidityPass = typeof marketProfile.liquid === 'boolean' ? marketProfile.liquid : null;
   const momentumPass = typeof marketProfile.near20dHigh === 'boolean' ? marketProfile.near20dHigh : null;
+  const timingPass = typeof marketProfile.entryTiming?.approved === 'boolean'
+    ? marketProfile.entryTiming.approved
+    : null;
   const tradeable = Boolean(
     riskReward !== null
     && riskReward >= positionSize.regimePolicy.minRiskReward
@@ -88,6 +91,7 @@ function normalizeRecommendationRisk(stock, decision) {
     && liquidityPass !== false
     && relativeStrengthPass !== false
     && momentumPass !== false
+    && timingPass !== false
   );
 
   return {
@@ -106,6 +110,7 @@ function normalizeRecommendationRisk(stock, decision) {
     relativeStrengthPass,
     liquidityPass,
     momentumPass,
+    timingPass,
     tradeable,
     sizingFormula: positionSize.formula,
   };

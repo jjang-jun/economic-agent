@@ -1,0 +1,79 @@
+name: Timing Alert (장전·장중 매매 타이밍)
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+    # KST 08:45 = UTC 23:45 (KST 월-금은 UTC 일-목)
+    - cron: '45 23 * * 0-4'
+    # KST 09:05-14:50 = UTC 00:05-05:50 (평일)
+    - cron: '5,20,35,50 0-5 * * 1-5'
+    # KST 15:05, 15:20 = UTC 06:05, 06:20 (평일)
+    - cron: '5,20 6 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'premarket or intraday'
+        required: false
+        default: 'intraday'
+
+concurrency:
+  group: economic-agent-timing-alert
+  cancel-in-progress: false
+
+jobs:
+  timing-alert:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - uses: actions/cache@v5
+        with:
+          path: data/
+          key: data-${{ github.run_id }}
+          restore-keys: data-
+
+      - run: npm ci
+
+      - name: Send premarket timing candidates
+        if: github.event.schedule == '45 23 * * 0-4' || github.event.inputs.mode == 'premarket'
+        run: npm run timing:alert -- premarket
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_PRIVATE_CHAT_ID: ${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}
+          TELEGRAM_SECRET_CHAT_ID: ${{ secrets.TELEGRAM_SECRET_CHAT_ID }}
+          PORTFOLIO_JSON_BASE64: ${{ secrets.PORTFOLIO_JSON_BASE64 }}
+          PORTFOLIO_JSON: ${{ secrets.PORTFOLIO_JSON }}
+          SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      - name: Send intraday timing alerts
+        if: github.event.schedule != '45 23 * * 0-4' && github.event.inputs.mode != 'premarket'
+        run: npm run timing:alert -- intraday
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_PRIVATE_CHAT_ID: ${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}
+          TELEGRAM_SECRET_CHAT_ID: ${{ secrets.TELEGRAM_SECRET_CHAT_ID }}
+          PORTFOLIO_JSON_BASE64: ${{ secrets.PORTFOLIO_JSON_BASE64 }}
+          PORTFOLIO_JSON: ${{ secrets.PORTFOLIO_JSON }}
+          SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      - name: Notify private chat on failure
+        if: failure()
+        run: npm run notify:workflow-failure -- "Timing Alert (장전·장중 매매 타이밍)" "Build and send timing alert"
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_SECRET_CHAT_ID: ${{ secrets.TELEGRAM_SECRET_CHAT_ID }}
+          TELEGRAM_PRIVATE_CHAT_ID: ${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

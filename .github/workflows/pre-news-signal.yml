@@ -1,0 +1,57 @@
+name: Pre-news Signal (기사 전 선행 신호)
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+    # KST 09:05-14:50 = UTC 00:05-05:50 (평일), low-cost 15-minute polling.
+    - cron: '5,20,35,50 0-5 * * 1-5'
+    # KST 15:05, 15:20 = UTC 06:05, 06:20 (평일)
+    - cron: '5,20 6 * * 1-5'
+  workflow_dispatch:
+
+concurrency:
+  group: economic-agent-pre-news-signal
+  cancel-in-progress: false
+
+jobs:
+  pre-news-signal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - uses: actions/cache@v5
+        with:
+          path: data/
+          key: data-${{ github.run_id }}
+          restore-keys: data-
+
+      - run: npm ci
+
+      - name: Detect and send pre-news signals
+        run: npm run pre-news:signal
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_PRIVATE_CHAT_ID: ${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}
+          TELEGRAM_SECRET_CHAT_ID: ${{ secrets.TELEGRAM_SECRET_CHAT_ID }}
+          PORTFOLIO_JSON_BASE64: ${{ secrets.PORTFOLIO_JSON_BASE64 }}
+          PORTFOLIO_JSON: ${{ secrets.PORTFOLIO_JSON }}
+          SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      - name: Notify private chat on failure
+        if: failure()
+        run: npm run notify:workflow-failure -- "Pre-news Signal (기사 전 선행 신호)" "Detect and send pre-news signals"
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_SECRET_CHAT_ID: ${{ secrets.TELEGRAM_SECRET_CHAT_ID }}
+          TELEGRAM_PRIVATE_CHAT_ID: ${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

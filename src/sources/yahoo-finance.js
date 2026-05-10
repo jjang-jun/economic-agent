@@ -48,6 +48,21 @@ async function fetchQuote(ticker) {
         : null;
     const return5dPct = calculatePeriodReturn(price, closes, 5);
     const return20dPct = calculatePeriodReturn(price, closes, 20);
+    const movingAverage5d = calculateAverage(closes, 5, 2);
+    const movingAverage20d = calculateAverage(closes, 20, 2);
+    const priorMovingAverage20d = calculateAverage(closes.slice(0, -5), 20, 2);
+    const distanceFromMa5Pct = movingAverage5d
+      ? Number((((price - movingAverage5d) / movingAverage5d) * 100).toFixed(2))
+      : null;
+    const distanceFromMa20Pct = movingAverage20d
+      ? Number((((price - movingAverage20d) / movingAverage20d) * 100).toFixed(2))
+      : null;
+    const ma20Slope5dPct = movingAverage20d && priorMovingAverage20d
+      ? Number((((movingAverage20d - priorMovingAverage20d) / priorMovingAverage20d) * 100).toFixed(2))
+      : null;
+    const priceAboveMa5 = typeof distanceFromMa5Pct === 'number' ? distanceFromMa5Pct >= 0 : null;
+    const priceAboveMa20 = typeof distanceFromMa20Pct === 'number' ? distanceFromMa20Pct >= 0 : null;
+    const ma5AboveMa20 = movingAverage5d && movingAverage20d ? movingAverage5d >= movingAverage20d : null;
     const volume = meta.regularMarketVolume || volumes[volumes.length - 1] || null;
     const avgVolume20d = calculateAverage(volumes, 20);
     const volumeRatio20d = volume && avgVolume20d
@@ -88,6 +103,14 @@ async function fetchQuote(ticker) {
       changePercent,
       return5dPct,
       return20dPct,
+      movingAverage5d,
+      movingAverage20d,
+      distanceFromMa5Pct,
+      distanceFromMa20Pct,
+      ma20Slope5dPct,
+      priceAboveMa5,
+      priceAboveMa20,
+      ma5AboveMa20,
       volume,
       avgVolume20d,
       volumeRatio20d,
@@ -106,19 +129,42 @@ async function fetchQuote(ticker) {
       source: 'yahoo-finance',
     };
     if (naverQuote) {
+      const mergedPrice = typeof naverQuote.price === 'number' ? naverQuote.price : yahooQuote.price;
+      const mergedDistanceFromMa5Pct = yahooQuote.movingAverage5d
+        ? Number((((mergedPrice - yahooQuote.movingAverage5d) / yahooQuote.movingAverage5d) * 100).toFixed(2))
+        : yahooQuote.distanceFromMa5Pct;
+      const mergedDistanceFromMa20Pct = yahooQuote.movingAverage20d
+        ? Number((((mergedPrice - yahooQuote.movingAverage20d) / yahooQuote.movingAverage20d) * 100).toFixed(2))
+        : yahooQuote.distanceFromMa20Pct;
+      const mergedDistanceFrom20dHighPct = yahooQuote.high20d
+        ? Number((((mergedPrice - yahooQuote.high20d) / yahooQuote.high20d) * 100).toFixed(2))
+        : yahooQuote.distanceFrom20dHighPct;
+      const mergedDistanceFrom60dHighPct = yahooQuote.high60d
+        ? Number((((mergedPrice - yahooQuote.high60d) / yahooQuote.high60d) * 100).toFixed(2))
+        : yahooQuote.distanceFrom60dHighPct;
       return {
         ...yahooQuote,
         ...naverQuote,
         symbol,
         return5dPct: null,
         return20dPct: null,
-        history: [],
-        high20d: null,
-        high60d: null,
-        distanceFrom20dHighPct: null,
-        distanceFrom60dHighPct: null,
-        near20dHigh: null,
-        breakout20d: null,
+        movingAverage5d: yahooQuote.movingAverage5d,
+        movingAverage20d: yahooQuote.movingAverage20d,
+        distanceFromMa5Pct: mergedDistanceFromMa5Pct,
+        distanceFromMa20Pct: mergedDistanceFromMa20Pct,
+        ma20Slope5dPct: yahooQuote.ma20Slope5dPct,
+        priceAboveMa5: typeof mergedDistanceFromMa5Pct === 'number' ? mergedDistanceFromMa5Pct >= 0 : yahooQuote.priceAboveMa5,
+        priceAboveMa20: typeof mergedDistanceFromMa20Pct === 'number' ? mergedDistanceFromMa20Pct >= 0 : yahooQuote.priceAboveMa20,
+        ma5AboveMa20: yahooQuote.ma5AboveMa20,
+        history: yahooQuote.history,
+        high20d: yahooQuote.high20d,
+        high60d: yahooQuote.high60d,
+        distanceFrom20dHighPct: mergedDistanceFrom20dHighPct,
+        distanceFrom60dHighPct: mergedDistanceFrom60dHighPct,
+        near20dHigh: typeof mergedDistanceFrom20dHighPct === 'number' ? mergedDistanceFrom20dHighPct >= -3 : yahooQuote.near20dHigh,
+        breakout20d: yahooQuote.breakout20d === true
+          ? true
+          : (yahooQuote.high20d ? mergedPrice >= yahooQuote.high20d : yahooQuote.breakout20d),
         source: 'naver-finance',
         fallbackSource: 'yahoo-finance',
       };
@@ -130,10 +176,11 @@ async function fetchQuote(ticker) {
   }
 }
 
-function calculateAverage(values, days) {
+function calculateAverage(values, days, digits = 0) {
   const recent = values.slice(-days).filter(v => typeof v === 'number');
   if (recent.length === 0) return null;
-  return Math.round(recent.reduce((sum, value) => sum + value, 0) / recent.length);
+  const average = recent.reduce((sum, value) => sum + value, 0) / recent.length;
+  return Number(average.toFixed(digits));
 }
 
 function calculatePeriodHigh(values, days) {

@@ -8,6 +8,7 @@ function reviewStock(stock, decision = {}) {
   const profile = stock.risk_profile || {};
   const positionSize = profile.positionSize || profile.position_size || {};
   const market = stock.market_profile || {};
+  const timing = market.entryTiming || market.entry_timing || {};
   const fundamental = stock.fundamental_profile || stock.fundamentalProfile || {};
   const statements = fundamental.statements || {};
   const earnings = fundamental.earnings || {};
@@ -24,6 +25,7 @@ function reviewStock(stock, decision = {}) {
   addFactor(factors, 'liquidity', market.liquid !== false, market.averageTurnover20d ? `${Math.round(market.averageTurnover20d).toLocaleString('ko-KR')} KRW` : 'missing');
   addFactor(factors, 'relative_strength', market.relativeStrength20d === null || market.relativeStrength20d === undefined || market.relativeStrength20d >= 0, typeof market.relativeStrength20d === 'number' ? `${market.relativeStrength20d}%p` : 'missing');
   addFactor(factors, 'momentum', market.near20dHigh !== false, typeof market.distanceFrom20dHighPct === 'number' ? `${market.distanceFrom20dHighPct}% from 20d high` : 'missing');
+  addFactor(factors, 'entry_timing', timing.approved !== false, timing.label || timing.action || 'missing');
   addFactor(factors, 'position_size', Boolean(profile.suggestedAmount), profile.suggestedAmount ? `${profile.suggestedAmount.toLocaleString('ko-KR')} KRW` : 'missing');
   addFactor(factors, 'active_trading', fundamental.isActivelyTrading !== false, fundamental.isActivelyTrading === false ? 'inactive' : (fundamental.source || 'n/a'));
 
@@ -45,6 +47,9 @@ function reviewStock(stock, decision = {}) {
   }
   if (!profile.invalidation) {
     warnings.push('무효화 조건 누락');
+  }
+  for (const warning of timing.warnings || []) {
+    warnings.push(`진입 타이밍: ${warning}`);
   }
   if (typeof fundamental.marketCapUsd === 'number' && fundamental.marketCapUsd < 1_000_000_000) {
     warnings.push(`미국 소형주: 시가총액 ${Math.round(fundamental.marketCapUsd).toLocaleString('ko-KR')} USD`);

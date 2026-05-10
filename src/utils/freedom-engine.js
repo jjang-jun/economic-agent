@@ -69,6 +69,30 @@ function requiredAnnualReturnPct({ currentNetWorth, targetNetWorth, monthlySavin
   return round(high, 2);
 }
 
+function buildFreedomScenarios({ currentNetWorth, targetNetWorth, targetMonths, monthlyAmounts = [], annualReturnPcts = [], now = new Date() }) {
+  return (monthlyAmounts || []).flatMap(monthlySavingAmount => (
+    (annualReturnPcts || []).map(annualReturnPct => {
+      const monthsToTarget = estimateMonthsToTarget({
+        currentNetWorth,
+        targetNetWorth,
+        monthlySavingAmount,
+        expectedAnnualReturnPct: annualReturnPct,
+      });
+      const targetGapMonths = typeof monthsToTarget === 'number' && typeof targetMonths === 'number'
+        ? monthsToTarget - targetMonths
+        : null;
+      return {
+        monthlySavingAmount,
+        annualReturnPct,
+        monthsToTarget,
+        estimatedTargetDate: monthsToTarget === null ? null : addMonths(now, monthsToTarget),
+        targetGapMonths,
+        onTrack: targetGapMonths !== null ? targetGapMonths <= 0 : false,
+      };
+    })
+  ));
+}
+
 function buildFreedomStatus({ goal: rawGoal = {}, portfolio = {} } = {}) {
   const goal = normalizeGoal(rawGoal);
   const currentNetWorth = portfolio.totalAssetValue || goal.currentNetWorth || 0;
@@ -96,6 +120,13 @@ function buildFreedomStatus({ goal: rawGoal = {}, portfolio = {} } = {}) {
     monthlySavingAmount: goal.monthlySavingAmount,
     expectedAnnualReturnPct: goal.expectedAnnualReturnPct,
   });
+  const scenarios = buildFreedomScenarios({
+    currentNetWorth,
+    targetNetWorth: goal.targetNetWorth,
+    targetMonths,
+    monthlyAmounts: goal.scenarioMonthlyAmounts || [goal.monthlySavingAmount],
+    annualReturnPcts: goal.scenarioAnnualReturnPcts || [goal.expectedAnnualReturnPct],
+  });
 
   return {
     id: `${getKSTDate()}:freedom`,
@@ -112,6 +143,7 @@ function buildFreedomStatus({ goal: rawGoal = {}, portfolio = {} } = {}) {
     targetDate: goal.targetDate,
     targetMonths,
     requiredAnnualReturnPct: requiredReturnPct,
+    scenarios,
     stress: {
       drawdownPct: goal.stressDrawdownPct,
       stressedNetWorth: Math.round(stressedNetWorth),
@@ -145,4 +177,5 @@ module.exports = {
   normalizeGoal,
   estimateMonthsToTarget,
   requiredAnnualReturnPct,
+  buildFreedomScenarios,
 };

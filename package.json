@@ -19,6 +19,8 @@
     "trade:record": "node --env-file-if-exists=.env scripts/record-trade.js",
     "trade:performance": "node --env-file-if-exists=.env scripts/trade-performance.js",
     "action:report": "node --env-file-if-exists=.env scripts/action-report.js",
+    "timing:alert": "node --env-file-if-exists=.env scripts/timing-alert.js",
+    "pre-news:signal": "node --env-file-if-exists=.env scripts/pre-news-signal.js",
     "review:weekly": "node --env-file-if-exists=.env scripts/performance-review.js weekly",
     "review:monthly": "node --env-file-if-exists=.env scripts/performance-review.js monthly",
     "model:performance": "node scripts/model-performance-readiness.js",
