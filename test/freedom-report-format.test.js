@@ -8,7 +8,8 @@ test('formatFreedomStatus explains target progress and stress without internal j
     currentNetWorth: 20000000,
     targetProgressPct: 1.94,
     monthlySavingAmount: 3000000,
-    expectedAnnualReturnPct: 6,
+    expectedAnnualReturnPct: 12,
+    aggressiveAnnualReturnPct: 15,
     monthsToTarget: 155,
     estimatedTargetDate: '2039-04-10',
     targetDate: '2036-12-31',
@@ -28,6 +29,8 @@ test('formatFreedomStatus explains target progress and stress without internal j
   assert.match(message, /경제적 자유 상태/);
   assert.match(message, /현재 순자산: 20,000,000원/);
   assert.match(message, /달성률: 1.94%/);
+  assert.match(message, /기준 계획 수익률: 12%/);
+  assert.match(message, /공격 운용 목표: 15%/);
   assert.match(message, /목표일보다 2년 4개월 늦은 속도/);
   assert.match(message, /목표일까지 필요한 연수익률: 12.3%/);
   assert.match(message, /20% 하락 시 순자산: 16,000,000원/);

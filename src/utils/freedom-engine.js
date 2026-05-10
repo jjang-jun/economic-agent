@@ -106,6 +106,7 @@ function buildFreedomStatus({ goal: rawGoal = {}, portfolio = {} } = {}) {
     targetProgressPct,
     monthlySavingAmount: goal.monthlySavingAmount,
     expectedAnnualReturnPct: goal.expectedAnnualReturnPct,
+    aggressiveAnnualReturnPct: goal.aggressiveAnnualReturnPct ?? null,
     monthsToTarget,
     estimatedTargetDate,
     targetDate: goal.targetDate,

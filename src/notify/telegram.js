@@ -884,6 +884,9 @@ function formatFreedomStatus(status = {}) {
     if (targetGap <= 0) return `목표일보다 ${formatMonths(Math.abs(targetGap))} 빠른 속도`;
     return `목표일보다 ${formatMonths(targetGap)} 늦은 속도`;
   })();
+  const aggressiveLine = typeof status.aggressiveAnnualReturnPct === 'number'
+    ? `▸ 공격 운용 목표: ${formatPct(status.aggressiveAnnualReturnPct)}`
+    : '';
 
   return [
     '🎯 <b>경제적 자유 상태</b>',
@@ -896,7 +899,8 @@ function formatFreedomStatus(status = {}) {
     '',
     `<b>속도 점검</b>`,
     `▸ 월 저축액: ${formatKRW(status.monthlySavingAmount)}`,
-    `▸ 기대 연수익률: ${formatPct(status.expectedAnnualReturnPct)}`,
+    `▸ 기준 계획 수익률: ${formatPct(status.expectedAnnualReturnPct)}`,
+    aggressiveLine || '',
     `▸ 예상 도달일: ${escapeHtml(status.estimatedTargetDate || '데이터 부족')} (${formatMonths(status.monthsToTarget)})`,
     `▸ 목표일: ${escapeHtml(status.targetDate || goal.targetDate || '데이터 부족')} - ${escapeHtml(targetGapText)}`,
     `▸ 목표일까지 필요한 연수익률: ${formatPct(status.requiredAnnualReturnPct)}`,

@@ -4,6 +4,7 @@ module.exports = {
   targetWithdrawalRate: 0.035,
   targetNetWorth: 1000000000,
   targetDate: '2036-12-31',
-  expectedAnnualReturnPct: 7,
+  expectedAnnualReturnPct: 12,
+  aggressiveAnnualReturnPct: 15,
   stressDrawdownPct: 20,
 };
