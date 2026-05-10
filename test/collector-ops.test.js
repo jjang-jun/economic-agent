@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { summarizeCollectorOps, buildCollectorOpsAnomalies } = require('../src/utils/collector-ops');
+const { summarizeCollectorOps, buildCollectorOpsAnomalies, isCollectorExpectedNow } = require('../src/utils/collector-ops');
 const { parseArgs, formatSummary } = require('../scripts/collector-ops-report');
 
 test('summarizeCollectorOps reports run health and pending alerts', () => {
@@ -96,6 +96,21 @@ test('summarizeCollectorOps marks empty run windows explicitly', () => {
   assert.equal(summary.totalRuns, 0);
   assert.equal(summary.healthLabel, 'empty');
   assert.deepEqual(buildCollectorOpsAnomalies(summary), ['최근 수집 실행 기록이 없습니다']);
+});
+
+test('summarizeCollectorOps treats expected off-hours as idle', () => {
+  const summary = summarizeCollectorOps([], [], { expectedRuns: false });
+
+  assert.equal(summary.totalRuns, 0);
+  assert.equal(summary.expectedRuns, false);
+  assert.equal(summary.healthLabel, 'idle');
+  assert.deepEqual(buildCollectorOpsAnomalies(summary), []);
+});
+
+test('isCollectorExpectedNow follows KST weekday collection window', () => {
+  assert.equal(isCollectorExpectedNow(new Date('2026-05-08T10:00:00+09:00')), true);
+  assert.equal(isCollectorExpectedNow(new Date('2026-05-08T06:59:00+09:00')), false);
+  assert.equal(isCollectorExpectedNow(new Date('2026-05-10T10:00:00+09:00')), false);
 });
 
 test('buildCollectorOpsAnomalies flags unhealthy collector state', () => {

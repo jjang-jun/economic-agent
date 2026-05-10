@@ -27,6 +27,25 @@ function startIso(days) {
   return date.toISOString();
 }
 
+function getKstParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Seoul',
+    weekday: 'short',
+    hour: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+  return {
+    weekday: parts.find(part => part.type === 'weekday')?.value,
+    hour: Number(parts.find(part => part.type === 'hour')?.value),
+  };
+}
+
+function isCollectorExpectedNow(date = new Date()) {
+  const { weekday, hour } = getKstParts(date);
+  const isWeekday = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].includes(weekday);
+  return isWeekday && hour >= 7 && hour <= 23;
+}
+
 function toTime(value) {
   const time = new Date(value || 0).getTime();
   return Number.isFinite(time) ? time : 0;
@@ -45,6 +64,7 @@ function isResolvedCollectorFailure(run = {}) {
 
 function summarizeCollectorOps(runs = [], alerts = [], options = {}) {
   const now = options.now ? new Date(options.now).getTime() : Date.now();
+  const expectedRuns = options.expectedRuns !== false;
   const recentAlertFailureMs = (options.recentAlertFailureHours ?? 24) * 60 * 60 * 1000;
   const completed = runs.filter(run => run.status !== 'running');
   const success = runs.filter(run => run.status === 'success');
@@ -66,7 +86,7 @@ function summarizeCollectorOps(runs = [], alerts = [], options = {}) {
   const historicalFailedImmediateAlerts = failedImmediateAlerts.filter(alert => !recentFailedImmediateAlerts.includes(alert));
 
   const healthLabel = runs.length === 0
-    ? 'empty'
+    ? (expectedRuns ? 'empty' : 'idle')
     : (actionableFailures.length > 0
       ? (success.length > actionableFailures.length ? 'warn' : 'failed')
       : 'ok');
@@ -112,6 +132,7 @@ function summarizeCollectorOps(runs = [], alerts = [], options = {}) {
       triggerSource: run.trigger_source,
       errorMessage: run.error_message || '',
     })),
+    expectedRuns,
     healthLabel,
   };
 }
@@ -124,7 +145,7 @@ function buildCollectorOpsAnomalies(summary = {}, options = {}) {
   const maxLookbackMinutes = options.maxLookbackMinutes ?? 90;
   const anomalies = [];
 
-  if ((summary.totalRuns || 0) === 0) {
+  if ((summary.totalRuns || 0) === 0 && summary.expectedRuns !== false) {
     anomalies.push('최근 수집 실행 기록이 없습니다');
   }
   const actionableFailedRuns = summary.actionableFailedRuns ?? summary.failedRuns ?? 0;
@@ -166,6 +187,7 @@ function buildCollectorOpsAnomalies(summary = {}, options = {}) {
 
 async function buildCollectorOpsSummary({ days = 7 } = {}) {
   const since = startIso(days);
+  const expectedRuns = days > 1 || isCollectorExpectedNow();
   const [runResult, alertResult] = await Promise.all([
     selectRows('collector_runs', {
       select: '*',
@@ -181,7 +203,7 @@ async function buildCollectorOpsSummary({ days = 7 } = {}) {
     }),
   ]);
 
-  return summarizeCollectorOps(runResult.rows || [], alertResult.rows || []);
+  return summarizeCollectorOps(runResult.rows || [], alertResult.rows || [], { expectedRuns });
 }
 
 module.exports = {
@@ -189,4 +211,5 @@ module.exports = {
   buildCollectorOpsAnomalies,
   buildCollectorOpsSummary,
   isResolvedCollectorFailure,
+  isCollectorExpectedNow,
 };
