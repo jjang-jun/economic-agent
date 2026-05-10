@@ -280,12 +280,13 @@ Codex 작업 위임 원칙:
 - [x] Telegram 승인 흐름 smoke script와 정기 점검 workflow 추가
 
 ## 현재 가장 중요한 다음 작업
-1. `npm run db:pull && npm run model:performance`로 추천 성과를 프롬프트/모델 버전별로 확인하고, 메타데이터가 있는 평가 표본이 5건 이상 누적된 뒤 Claude Sonnet 전환 효과를 평가한다.
-2. Action Report는 실패 원인과 수동 성공을 확인했으므로, 현재 로컬 변경분을 원격에 반영한 뒤 다음 scheduled 실행 1회 성공 여부만 재확인한다.
-3. 가격 provider의 `해외/글로벌 가격 API 보강 검토` 판단이 반복되는지 보되, Massive 같은 유료 API는 미국 주식 고품질 히스토리/실시간 필요성이 명확해질 때까지 보류한다.
-4. 핵심 workflow 실패 알림은 다음 실제 실패 시 private Telegram 도착 여부를 재확인한다.
-5. 월간 로컬 리서치 worker 결과가 실제 월간 리뷰 의사결정에 도움이 되는지 다음 리뷰에서 확인한다.
-6. 인증 `/dashboard`의 실제 사용 빈도를 보고 탭 분리와 상세 차트를 추가할지 결정한다.
+1. 내일 DRAM ETF 30주 매도 체결 시 실제 체결가로 거래 기록, 포트폴리오/Actions secret 동기화, Action Report 검증을 진행한다.
+2. 다음 scheduled Action Report 1회 성공 여부를 확인한다. 2026-05-10 수동 workflow_dispatch는 성공했다.
+3. 메타데이터가 있는 추천 평가 표본이 5건 이상 누적된 뒤 `npm run db:pull && npm run model:performance`로 Claude Sonnet 전환 효과를 평가한다. 2026-05-10 재확인 기준 평가 완료 6건은 모두 legacy/unknown 메타데이터다.
+4. 가격 provider의 `해외/글로벌 가격 API 보강 검토` 판단이 반복되는지 보되, Massive 같은 유료 API는 미국 주식 고품질 히스토리/실시간 필요성이 명확해질 때까지 보류한다.
+5. 핵심 workflow 실패 알림은 다음 실제 실패 시 private Telegram 도착 여부를 재확인한다.
+6. 월간 로컬 리서치 worker 결과가 실제 월간 리뷰 의사결정에 도움이 되는지 다음 리뷰에서 확인한다.
+7. 인증 `/dashboard`의 실제 사용 빈도를 보고 탭 분리와 상세 차트를 추가할지 결정한다.
 
 ## 운영 루프
 

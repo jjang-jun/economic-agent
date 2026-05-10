@@ -243,14 +243,17 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - Action Report 문구를 초보자도 읽기 쉽게 정리했다. 상단에 Telegram `<pre>` 고정폭 요약표를 추가하고, 후보/보유 종목은 현재가·추천가·손절·제안수량·판정을 줄 단위로 분리한다. 해외 종목 축소 수량 계산에는 환율을 반영해 원화 리밸런싱 금액을 달러 주가로 직접 나누던 오류를 막았다.
 - 포트폴리오 원본과 저장 포트폴리오를 최신 수동 입력으로 맞췄다. DRAM ETF는 200주와 평가손익 +2,239,016원, NFLX는 현재가 $87.33과 평가손익 -156,702원을 기준으로 Action Report를 생성하며, GitHub Actions용 `PORTFOLIO_JSON_BASE64` secret도 같은 원본으로 동기화했다.
 - 경제적 자유 목표 입력을 갱신했다. 목표 순자산은 10억원, 월 투자 가능 금액은 200만원으로 설정했다.
+- 모델/프롬프트 성과 표본을 재확인했다. `npm run db:pull && npm run model:performance` 기준 추천 11건, 평가 완료 6건이지만 모두 `legacy_prompt / unknown_provider:unknown_model`이라 Claude Sonnet 전환 효과는 아직 비교 불가다. 메타데이터가 붙은 추천의 평가 완료 건이 5건 이상 쌓인 뒤 다시 판단한다.
+- 대시보드 숫자 일관성을 재확인했다. `npm run dashboard` 생성 HTML은 목표 1,000,000,000원, 월 투자 가능 금액 2,000,000원, 현재 순자산 57,377,347원, 달성률 5.74%를 표시한다.
 - 수집기 운영 점검에서 이미 해결된 과거 실패를 분리했다. `stale run cleaned` 계열 redeploy/smoke 실패와 과거 `toAdd` 초기화 버그 실패는 `resolvedFailureRuns`로 따로 보여주고, 성공률·상태·실패 이상치는 조치 필요 실패 기준으로 계산한다. 즉시 알림 실패도 최근 24시간 조치 필요 실패와 과거 실패로 나눈다. 2026-05-10 실조회 기준 최근 7일은 성공 244건, 조치 필요 실패 0건, 정리된 과거 실패 6건, 최근 즉시 알림 실패 0건, 과거 즉시 알림 실패 3건이며 이상치는 없다.
 - 로컬 HTML 대시보드와 서버 `/dashboard`의 수집기 상태 표시도 같은 기준으로 맞췄다. 기존 `Failures`/`실패` 대신 조치 필요 실패, 정리된 과거 실패, 최근/과거 즉시 알림 실패를 나눠 보여준다.
 
 ## 다음 작업
 
-1. `npm run db:pull && npm run model:performance`로 메타데이터가 있는 프롬프트/모델별 추천 성과 5건 이상 누적 여부 확인 후 Claude Sonnet 전환 효과 평가. 2026-05-10 재확인 기준 기존 6개 평가 건은 과거 stock report에도 메타데이터가 없어 backfill하지 않는다.
-2. Action Report 포맷/포트폴리오 보정 변경분을 원격 반영한 뒤 다음 scheduled Action Report 1회 성공 여부 확인. 2026-05-08 수동 실행은 성공했고, 직전 예약 실패는 원격의 과거 `node --env-file=.env` 실행 때문으로 확인됨
-3. 가격 provider의 `해외/글로벌 가격 API 보강 검토` 판단이 주간/월간 리뷰에서 반복되는지 모니터링하되, 최근 1일 점검은 정상이라 Massive 과금은 필요성이 명확해질 때까지 보류
-4. 다음 실제 workflow 실패 시 private 알림 도착 여부 재확인
-5. `/dashboard` 실제 사용 빈도에 따라 탭 분리와 상세 차트 추가 여부 결정
-6. 월간 리서치 worker 결과를 다음 월간 리뷰에서 실제 의사결정에 도움이 되는지 확인
+1. 내일 DRAM ETF 30주 매도 체결 시 실제 체결가로 `trade:record`, `portfolio:sync-secret`, `action:report -- --no-telegram` 순서로 반영하고 수량 170주/비중 변화를 검증한다.
+2. 다음 scheduled Action Report 1회 성공 여부 확인. 2026-05-10 수동 workflow_dispatch는 성공했고, 직전 예약 실패는 원격의 과거 `node --env-file=.env` 실행 때문으로 확인됨
+3. 메타데이터가 붙은 추천의 평가 완료 건이 5건 이상 쌓이면 `npm run db:pull && npm run model:performance`로 Claude Sonnet 전환 효과를 다시 평가한다.
+4. 가격 provider의 `해외/글로벌 가격 API 보강 검토` 판단이 주간/월간 리뷰에서 반복되는지 모니터링하되, 최근 1일 점검은 정상이라 Massive 과금은 필요성이 명확해질 때까지 보류
+5. 다음 실제 workflow 실패 시 private 알림 도착 여부 재확인
+6. `/dashboard` 실제 사용 빈도에 따라 탭 분리와 상세 차트 추가 여부 결정
+7. 월간 리서치 worker 결과를 다음 월간 리뷰에서 실제 의사결정에 도움이 되는지 확인
