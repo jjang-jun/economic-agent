@@ -144,6 +144,11 @@ Telegram Bot
 - Supabase: 기사, 추천, 실제 거래, 포트폴리오, 경제적 자유 목표, 대화 로그, pending action 기준 저장소
 - 로컬 JSON/SQLite: 분석 캐시와 백업
 
+Codex 작업 위임 원칙:
+- 단순 파일 탐색, 좁은 분석, 간단한 코드/테스트 보조처럼 독립적인 작업은 경량 sub-agent 모델을 우선 사용해 토큰과 컨텍스트 비용을 줄인다.
+- 복잡한 설계, 투자 로직 변경, 위험한 수정, 최종 통합 판단은 메인 세션에서 처리한다.
+- 장시간 또는 다중 파일 작업은 `docs/AGENT_HARNESS.md`의 작업 계약과 검증 루프를 따른다. 문서 맵을 바꾸면 `npm run agent:harness-check`로 드리프트를 점검한다.
+
 권장 배포:
 1. Cloud Run
 2. Fly.io 또는 Render
@@ -186,9 +191,9 @@ Telegram Bot
 - [x] Alpaca API key 설정 후 미국 보유 종목 현재가 검증
 - [x] KIS 일봉 데이터를 추천 성과 평가 fallback에 연결
 - [x] KRX Open API 또는 공공데이터포털로 공식 일별 종가 백필
-- [ ] Massive는 미국 주식 고품질 히스토리/실시간이 필요해질 때 유료 계층으로 추가
+- [ ] Massive는 미국 주식 고품질 히스토리/실시간이 필요해질 때 유료 계층으로 추가 (현재는 과금 이르므로 보류)
 - [x] pykrx/FinanceDataReader는 로컬 백테스트 worker로 분리
-- [ ] Python worker를 주간/월간 리서치 리포트에 선택적으로 연결할지 검토
+- [x] Python worker를 월간 리서치 리포트에 선택적으로 연결
 - [x] 가격 source별 품질/오류율 모니터링
 
 ## Phase 3: 포트폴리오 기반 의사결정
@@ -240,9 +245,13 @@ Telegram Bot
 - [x] Telegram 명령어 또는 간단한 대시보드
 - [x] 수동 매매 실행 기록 입력
 - [x] 실제 거래 현재가 기준 성과 리포트
+- [x] 평일 장마감 후 경제적 자유 상태 private Telegram 리포트
 - [x] 5분 뉴스 수집 workflow concurrency 적용
 - [x] `performance-lab.js`로 추천/실거래/미실행 추천 성과를 분리 분석
 - [x] `behavior-reviewer.js`로 원칙 위반 거래와 반복 행동 패턴을 경고
+- [x] 주요 GitHub Actions 실패 시 private Telegram 알림: 뉴스 백업 수집, 다이제스트, Action Report, 성과 리뷰, 운영 점검, 포트폴리오 스냅샷, 장마감 분석, 추천 평가, 실제 거래 성과
+- [x] 주간 의존성 취약점 점검 workflow와 실패 시 private Telegram 알림
+- [x] main push 품질 게이트: `npm test`, `npm run agent:harness-check`, 실패 시 private Telegram 알림
 
 ## Phase 7: 경제적 자유 엔진
 - [x] `freedom-engine.js` 추가
@@ -252,6 +261,7 @@ Telegram Bot
 - [x] 최대낙폭 발생 시 목표 지연 기간 추정
 - [x] 월간 리뷰에 경제적 자유 목표 달성률 포함
 - [x] 대시보드 첫 탭을 Freedom 중심으로 재구성
+- [x] `freedom:report -- --telegram`과 `freedom-report.yml`로 목표 달성 속도 정기 점검
 
 ## Phase 8: 대화형 Agent 플랫폼
 - [x] Telegram을 대화 UI로 유지하고 Agent Server를 별도 런타임으로 분리하는 방향 결정
@@ -270,11 +280,12 @@ Telegram Bot
 - [x] Telegram 승인 흐름 smoke script와 정기 점검 workflow 추가
 
 ## 현재 가장 중요한 다음 작업
-1. 추천 성과를 프롬프트/모델 버전별로 5건 이상 누적한 뒤 Claude Sonnet 전환 효과를 평가한다.
-2. Action Report 정기 실행 안정성을 며칠 더 모니터링한다.
-3. 가격 provider의 `해외/글로벌 가격 API 보강 검토` 판단이 반복되는지 보고 유료 API 추가 필요성을 결정한다.
-4. Telegram smoke workflow 실패 알림은 다음 실제 실패 시 도착 여부를 재확인한다.
-5. 인증 `/dashboard`의 실제 사용 빈도를 보고 탭 분리와 상세 차트를 추가할지 결정한다.
+1. `npm run db:pull && npm run model:performance`로 추천 성과를 프롬프트/모델 버전별로 확인하고, 메타데이터가 있는 평가 표본이 5건 이상 누적된 뒤 Claude Sonnet 전환 효과를 평가한다.
+2. Action Report는 실패 원인과 수동 성공을 확인했으므로, 현재 로컬 변경분을 원격에 반영한 뒤 다음 scheduled 실행 1회 성공 여부만 재확인한다.
+3. 가격 provider의 `해외/글로벌 가격 API 보강 검토` 판단이 반복되는지 보되, Massive 같은 유료 API는 미국 주식 고품질 히스토리/실시간 필요성이 명확해질 때까지 보류한다.
+4. 핵심 workflow 실패 알림은 다음 실제 실패 시 private Telegram 도착 여부를 재확인한다.
+5. 월간 로컬 리서치 worker 결과가 실제 월간 리뷰 의사결정에 도움이 되는지 다음 리뷰에서 확인한다.
+6. 인증 `/dashboard`의 실제 사용 빈도를 보고 탭 분리와 상세 차트를 추가할지 결정한다.
 
 ## 운영 루프
 

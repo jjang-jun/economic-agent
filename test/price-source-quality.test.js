@@ -5,6 +5,7 @@ const {
   buildPriceSourceQualityAnomalies,
   buildPriceProviderDecision,
 } = require('../src/utils/price-source-quality');
+const { parseArgs, formatSummary } = require('../scripts/price-provider-ops-report');
 
 test('summarizePriceSourceQuality separates official EOD and fallback sources', () => {
   const summary = summarizePriceSourceQuality([
@@ -92,4 +93,36 @@ test('buildPriceProviderDecision prioritizes failures over fallback usage', () =
 
   assert.equal(decision.action, 'fix_provider');
   assert.equal(decision.label, 'API 키/토큰/네트워크 장애 우선 점검');
+});
+
+test('price provider ops args support noTelegram and explicit days', () => {
+  assert.deepEqual(parseArgs(['--noTelegram'], {}), { days: 1, noTelegram: true });
+  assert.deepEqual(parseArgs(['--days', '7'], {}), { days: 7, noTelegram: false });
+  assert.deepEqual(parseArgs(['--days=3', '--no-telegram'], {}), { days: 3, noTelegram: true });
+});
+
+test('price provider ops summary includes provider decision and anomalies', () => {
+  const message = formatSummary({
+    healthLabel: 'warn',
+    totalSnapshots: 10,
+    tickerCount: 3,
+    officialEod: { ratePct: 40 },
+    fallback: { ratePct: 63 },
+    providerDecision: { label: '해외/글로벌 가격 API 보강 검토' },
+    attempts: {
+      total: 5,
+      success: 3,
+      failed: 0,
+      empty: 2,
+      failureRatePct: 0,
+      emptyRatePct: 40,
+      byProvider: [
+        { provider: 'yahoo-finance', count: 3, failed: 0, failureRatePct: 0 },
+      ],
+    },
+  }, ['Naver/Yahoo fallback 비중 63%']);
+
+  assert.match(message, /가격 Provider 점검/);
+  assert.match(message, /판단: 해외\/글로벌 가격 API 보강 검토/);
+  assert.match(message, /Naver\/Yahoo fallback 비중 63%/);
 });

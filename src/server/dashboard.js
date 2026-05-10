@@ -238,6 +238,41 @@ function renderRecommendationRows(recommendations = []) {
   }).join('');
 }
 
+function renderReviewNotes(notes = []) {
+  return notes.length > 0
+    ? `<ul>${notes.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
+    : '<p class="muted">최근 리뷰 점검 항목이 없습니다.</p>';
+}
+
+function renderLocalResearch(backtestResearch = {}) {
+  if (!backtestResearch.enabled) {
+    return '<p class="muted">월간 로컬 리서치 worker가 비활성입니다.</p>';
+  }
+  const results = backtestResearch.results || [];
+  const failures = backtestResearch.failures || [];
+  const resultRows = results.map(item => `<tr>
+    <td>${escapeHtml(item.name || item.ticker || '')}</td>
+    <td>${escapeHtml(item.ticker || '')}</td>
+    <td>${escapeHtml(item.provider || '')}</td>
+    <td>${escapeHtml(`${item.rowCount ?? 0}일`)}</td>
+    <td>${escapeHtml(fmtPct(item.returnPct))}</td>
+    <td>${escapeHtml(fmtPct(item.maxDrawdownPct))}</td>
+  </tr>`).join('');
+  const failureRows = failures.map(item => `<tr>
+    <td>${escapeHtml(item.name || item.ticker || '')}</td>
+    <td>${escapeHtml(item.ticker || '')}</td>
+    <td>${escapeHtml(item.provider || '')}</td>
+    <td>실패</td>
+    <td>${escapeHtml(item.error || '')}</td>
+    <td>${escapeHtml(item.message || '')}</td>
+  </tr>`).join('');
+
+  return [
+    `<p class="muted">기간 ${escapeHtml(backtestResearch.startDate || '')} ~ ${escapeHtml(backtestResearch.endDate || '')} · provider ${escapeHtml(backtestResearch.provider || 'auto')}</p>`,
+    `<table><thead><tr><th>종목</th><th>티커</th><th>Provider</th><th>거래일</th><th>수익률</th><th>최대낙폭</th></tr></thead><tbody>${resultRows || failureRows || '<tr><td colspan="6">결과 없음</td></tr>'}</tbody></table>`,
+  ].join('');
+}
+
 function buildDashboardHtml(data = {}) {
   const freedom = data.freedom?.payload || data.freedom || {};
   const portfolio = data.portfolio || {};
@@ -248,7 +283,10 @@ function buildDashboardHtml(data = {}) {
   const avgAlpha = average(evaluations, 'alpha_pct');
   const avgDrawdown = average(evaluations, 'max_drawdown_pct');
   const progress = Math.max(0, Math.min(100, Number(freedom.targetProgressPct || data.freedom?.target_progress_pct || 0)));
-  const behaviorWarnings = data.performanceReview?.payload?.behaviorReview?.warnings || [];
+  const latestReviewPayload = data.performanceReview?.payload || {};
+  const behaviorWarnings = latestReviewPayload.behaviorReview?.warnings || [];
+  const reviewNotes = latestReviewPayload.notes || [];
+  const backtestResearch = latestReviewPayload.backtestResearch || {};
 
   return `<!doctype html>
 <html lang="ko">
@@ -307,8 +345,10 @@ function buildDashboardHtml(data = {}) {
       <h2>수집기 상태</h2>
       <div class="grid">
         ${metric('성공/완료', `${collectorOps.successfulRuns || 0}/${collectorOps.completedRuns || collectorOps.totalRuns || 0}`)}
-        ${metric('실패', collectorOps.failedRuns || 0)}
+        ${metric('조치 필요 실패', collectorOps.actionableFailedRuns ?? collectorOps.failedRuns ?? 0)}
+        ${metric('정리된 과거 실패', collectorOps.resolvedFailureRuns ?? 0)}
         ${metric('성공률', fmtPct(collectorOps.successRatePct))}
+        ${metric('즉시 알림 실패', `최근 ${collectorOps.alertEvents?.actionableFailedImmediate ?? collectorOps.alertEvents?.failedImmediate ?? 0} / 과거 ${collectorOps.alertEvents?.historicalFailedImmediate ?? 0}`)}
         ${metric('대기 알림', `즉시 ${collectorOps.alertEvents?.pendingImmediate || 0} / 다이제스트 ${collectorOps.alertEvents?.pendingDigest || 0}`)}
       </div>
     </section>
@@ -325,6 +365,14 @@ function buildDashboardHtml(data = {}) {
       ${behaviorWarnings.length
         ? `<ul>${behaviorWarnings.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
         : '<p class="muted">최근 리뷰에 행동 경고가 없습니다.</p>'}
+    </section>
+    <section class="panel">
+      <h2>리뷰 점검 항목</h2>
+      ${renderReviewNotes(reviewNotes)}
+    </section>
+    <section class="panel">
+      <h2>로컬 리서치</h2>
+      ${renderLocalResearch(backtestResearch)}
     </section>
   </main>
 </body>
@@ -352,4 +400,6 @@ module.exports = {
   buildDashboardHtml,
   handleDashboardRequest,
   loadDashboardData,
+  renderLocalResearch,
+  renderReviewNotes,
 };

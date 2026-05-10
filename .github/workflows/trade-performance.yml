@@ -1,14 +1,22 @@
 name: Trade Performance (실제 거래 성과)
 
+permissions:
+  contents: read
+
 on:
   schedule:
     # KST 17:40 = UTC 08:40 (월~금)
     - cron: '40 8 * * 1-5'
   workflow_dispatch:
 
+concurrency:
+  group: economic-agent-trade-performance
+  cancel-in-progress: false
+
 jobs:
   performance:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -22,7 +30,8 @@ jobs:
           restore-keys: data-
 
       - run: npm ci
-      - run: node scripts/trade-performance.js
+      - name: Build and send trade performance
+        run: node scripts/trade-performance.js
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -31,3 +40,13 @@ jobs:
           SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      - name: Notify private chat on failure
+        if: failure()
+        run: npm run notify:workflow-failure -- "Trade Performance (실제 거래 성과)" "Build and send trade performance"
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_PRIVATE_CHAT_ID: ${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}
+          TELEGRAM_SECRET_CHAT_ID: ${{ secrets.TELEGRAM_SECRET_CHAT_ID }}
+          GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

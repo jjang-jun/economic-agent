@@ -1,13 +1,21 @@
 name: Digest 오전장 점검 (11:50 KST)
 
+permissions:
+  contents: read
+
 on:
   schedule:
     - cron: '50 2 * * 1-5'
   workflow_dispatch:
 
+concurrency:
+  group: economic-agent-digest-lunch
+  cancel-in-progress: false
+
 jobs:
   digest:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -19,7 +27,8 @@ jobs:
           key: data-${{ github.run_id }}
           restore-keys: data-
       - run: npm ci
-      - run: node src/digest.js midday
+      - name: Build and send midday digest
+        run: node src/digest.js midday
         env:
           AI_PROVIDER: ${{ secrets.AI_PROVIDER }}
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
@@ -31,3 +40,13 @@ jobs:
           SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      - name: Notify private chat on failure
+        if: failure()
+        run: npm run notify:workflow-failure -- "Digest 오전장 점검 (11:50 KST)" "Build and send midday digest"
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_PRIVATE_CHAT_ID: ${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}
+          TELEGRAM_SECRET_CHAT_ID: ${{ secrets.TELEGRAM_SECRET_CHAT_ID }}
+          GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

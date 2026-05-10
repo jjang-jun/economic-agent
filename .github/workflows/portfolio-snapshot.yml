@@ -1,14 +1,22 @@
 name: Portfolio Snapshot (포트폴리오 평가)
 
+permissions:
+  contents: read
+
 on:
   schedule:
     # KST 16:10 = UTC 07:10 (월~금)
     - cron: '10 7 * * 1-5'
   workflow_dispatch:
 
+concurrency:
+  group: economic-agent-portfolio-snapshot
+  cancel-in-progress: false
+
 jobs:
   snapshot:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -22,10 +30,21 @@ jobs:
           restore-keys: data-
 
       - run: npm ci
-      - run: node scripts/portfolio-snapshot.js
+      - name: Build portfolio snapshot
+        run: node scripts/portfolio-snapshot.js
         env:
           PORTFOLIO_JSON_BASE64: ${{ secrets.PORTFOLIO_JSON_BASE64 }}
           PORTFOLIO_JSON: ${{ secrets.PORTFOLIO_JSON }}
           SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      - name: Notify private chat on failure
+        if: failure()
+        run: npm run notify:workflow-failure -- "Portfolio Snapshot (포트폴리오 평가)" "Build portfolio snapshot"
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_PRIVATE_CHAT_ID: ${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}
+          TELEGRAM_SECRET_CHAT_ID: ${{ secrets.TELEGRAM_SECRET_CHAT_ID }}
+          GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

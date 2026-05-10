@@ -54,6 +54,7 @@ test('formatStockReport explains regime, VIX, USD/KRW, and risk reward blockers'
   assert.match(message, /중립 \(점수 0\)/);
   assert.match(message, /VIX는 미국 주식시장 공포\/변동성 지표/);
   assert.match(message, /달러\/원 환율이 올랐다는 뜻/);
-  assert.match(message, /제안 매수 1,000,000원 \(1회 상한\)/);
+  assert.match(message, /제안 매수 원안 3,000,000원 → 1,000,000원 \(1회 상한 적용\) \(총자산 1.7%, 현금 6.7%\)/);
   assert.match(message, /손익비 부족: 기대수익이 예상손실의 1.14배/);
+  assert.match(message, /매수 보류/);
 });

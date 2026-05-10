@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { formatActionReport } = require('../src/notify/telegram');
-const { buildActionReport } = require('../src/utils/action-report');
+const { buildActionReport, enrichRecommendationsWithLatestPrices } = require('../src/utils/action-report');
 
 test('formatActionReport renders Korean buy candidates as whole shares with entry and stop', () => {
   const message = formatActionReport({
@@ -23,6 +23,11 @@ test('formatActionReport renders Korean buy candidates as whole shares with entr
         stopLossPrice: 159030,
         riskReward: 2,
       },
+      latestQuote: {
+        price: 168000,
+        currency: 'KRW',
+        source: 'kis-rest',
+      },
       riskReview: { action: 'candidate' },
     }],
     watchOnlyCandidates: [],
@@ -31,10 +36,11 @@ test('formatActionReport renders Korean buy candidates as whole shares with entr
     sellCandidates: [],
   });
 
-  assert.match(message, /기준매수가 171,000원/);
-  assert.match(message, /손절가 159,030원/);
-  assert.match(message, /제안 5주 \/ 855,000원 \(1회 상한\)/);
-  assert.doesNotMatch(message, /2,966,738원/);
+  assert.match(message, /읽는 법/);
+  assert.match(message, /기준가\(추천시\) 171,000원/);
+  assert.match(message, /현재가 168,000원 \(-1.7%\)/);
+  assert.match(message, /손절 기준 159,030원/);
+  assert.match(message, /제안 원안 2,966,738원 → 5주 \/ 855,000원 \(1회 상한 적용\)/);
 });
 
 test('formatActionReport explains hold evidence and reduce amount', () => {
@@ -102,6 +108,7 @@ test('formatActionReport blocks Korean candidates when one share exceeds suggest
       name: 'SK하이닉스',
       ticker: '000660.KS',
       entry: { price: 1654000 },
+      latestQuote: { price: 1686000, currency: 'KRW' },
       riskProfile: {
         suggestedAmount: 2966738,
         expectedLossPct: 5,
@@ -115,9 +122,42 @@ test('formatActionReport blocks Korean candidates when one share exceeds suggest
     sellCandidates: [],
   });
 
-  assert.match(message, /기준매수가 1,654,000원/);
-  assert.match(message, /손절가 1,571,300원/);
+  assert.match(message, /기준가\(추천시\) 1,654,000원/);
+  assert.match(message, /현재가 1,686,000원 \(\+1.9%\)/);
+  assert.match(message, /손절 기준 1,571,300원/);
   assert.match(message, /매수 보류: 1주 매수에 필요한 금액 1,654,000원보다 제안금액이 작습니다/);
+  assert.match(message, /원안은 2,966,738원이나 1회 상한 1,000,000원을 적용했습니다/);
+});
+
+test('formatActionReport defaults non-Korean prices to USD when currency is omitted', () => {
+  const message = formatActionReport({
+    date: '2026-05-08',
+    portfolio: {
+      totalAssetValue: 60000000,
+      cashAmount: 15000000,
+      cashRatio: 0.25,
+      positionCount: 1,
+      maxNewBuyAmount: 1000000,
+    },
+    newBuyCandidates: [{
+      name: 'VGT',
+      ticker: 'VGT',
+      riskProfile: {
+        suggestedAmount: 500000,
+        entryReferencePrice: 515.25,
+        stopLossPrice: 474.03,
+        riskReward: 2.2,
+      },
+      riskReview: { action: 'candidate' },
+    }],
+    watchOnlyCandidates: [],
+    holdCandidates: [],
+    reduceCandidates: [],
+    sellCandidates: [],
+  });
+
+  assert.match(message, /기준가\(추천시\) \$515.25/);
+  assert.match(message, /손절 기준 \$474.03/);
 });
 
 test('buildActionReport enforces sector limits on buys and holdings', () => {
@@ -184,6 +224,39 @@ test('buildActionReport moves Korean candidates to watch when one share exceeds 
   assert.equal(report.newBuyCandidates.length, 0);
   assert.equal(report.watchOnlyCandidates.length, 1);
   assert.match(report.watchOnlyCandidates[0].riskReview.blockers[0], /1주 가격 1,654,000원 > 제안금액 1,000,000원/);
+});
+
+test('enrichRecommendationsWithLatestPrices attaches current quote to recent non-held candidates only', async () => {
+  const recommendations = await enrichRecommendationsWithLatestPrices([
+    {
+      name: '삼성전자',
+      ticker: '005930.KS',
+      signal: 'bullish',
+      createdAt: new Date().toISOString(),
+      riskProfile: { entryReferencePrice: 270000 },
+    },
+    {
+      name: '보유종목',
+      ticker: '000660.KS',
+      signal: 'bullish',
+      createdAt: new Date().toISOString(),
+      riskProfile: { entryReferencePrice: 1600000 },
+    },
+  ], {
+    positions: [{ ticker: '000660.KS' }],
+  }, {
+    fetcher: async symbol => ({
+      symbol,
+      price: 268500,
+      currency: 'KRW',
+      source: 'test-price',
+      marketTime: '2026-05-08T06:30:00.000Z',
+    }),
+  });
+
+  assert.equal(recommendations[0].latestQuote.price, 268500);
+  assert.equal(recommendations[0].latestPriceChangePct, -0.56);
+  assert.equal(recommendations[1].latestQuote, undefined);
 });
 
 test('classifyPosition applies trailing stop and rebalance trim plans', () => {

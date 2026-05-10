@@ -66,7 +66,33 @@ function shouldLogRecommendation(stock = {}) {
   return stock.risk_review?.approved === true && stock.risk_review?.action === 'candidate';
 }
 
-async function buildRecommendation(stock, articles, indicators, date, aiMetadata = {}) {
+function hasMeaningfulAiMetadata(metadata) {
+  return !!(
+    metadata
+    && typeof metadata === 'object'
+    && (
+      metadata.provider
+      || metadata.model
+      || metadata.promptVersion
+      || metadata.prompt_version
+      || metadata.task
+    )
+  );
+}
+
+function resolveRecommendationAiMetadata(stock = {}, report = {}, context = {}) {
+  const candidates = [
+    stock.ai_metadata,
+    stock.aiMetadata,
+    report.aiMetadata,
+    report.ai_metadata,
+    context.aiMetadata,
+    context.ai_metadata,
+  ];
+  return candidates.find(hasMeaningfulAiMetadata) || null;
+}
+
+async function buildRecommendation(stock, articles, indicators, date, aiMetadata = null) {
   const symbol = normalizeYahooSymbol(stock.ticker);
   const [quote, benchmark] = await Promise.all([
     symbol ? fetchCurrentPrice(symbol) : null,
@@ -92,7 +118,7 @@ async function buildRecommendation(stock, articles, indicators, date, aiMetadata
     marketProfile: stock.market_profile || null,
     fundamentalProfile: stock.fundamental_profile || null,
     riskReview: stock.risk_review || null,
-    aiMetadata: stock.ai_metadata || stock.aiMetadata || aiMetadata || null,
+    aiMetadata: resolveRecommendationAiMetadata(stock, { aiMetadata }) || null,
     relatedNews: getRelatedArticleIds(stock, articles),
     indicators,
     entry: quote
@@ -211,7 +237,7 @@ async function logRecommendations(report, context = {}) {
       context.articles || [],
       context.indicators || {},
       date,
-      report.aiMetadata || report.ai_metadata || context.aiMetadata || context.ai_metadata || null
+      resolveRecommendationAiMetadata(stock, report, context)
     );
     byId.set(id, recommendation);
     added++;
@@ -373,6 +399,7 @@ module.exports = {
   saveRecommendations,
   logRecommendations,
   shouldLogRecommendation,
+  resolveRecommendationAiMetadata,
   evaluateRecommendations,
   calculateReturn,
   calculateBenchmarkReturn,

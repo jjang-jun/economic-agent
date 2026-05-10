@@ -1,21 +1,30 @@
 name: Price Provider Ops Report (가격 데이터 점검)
 
+permissions:
+  contents: read
+
 on:
   schedule:
     # KST 23:55 = UTC 14:55
     - cron: '55 14 * * 1-5'
   workflow_dispatch:
 
+concurrency:
+  group: economic-agent-price-provider-ops-report
+  cancel-in-progress: false
+
 jobs:
   report:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
       - run: npm ci
-      - run: npm run price-provider:ops-report
+      - name: Build and send price provider ops report
+        run: npm run price-provider:ops-report
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_PRIVATE_CHAT_ID: ${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}
@@ -28,3 +37,12 @@ jobs:
           PRICE_PROVIDER_MAX_EMPTY_RATE_PCT: '90'
           PRICE_PROVIDER_MIN_ATTEMPTS: '5'
           PRICE_PROVIDER_MAX_FALLBACK_RATE_PCT: '80'
+      - name: Notify private chat on failure
+        if: failure()
+        run: npm run notify:workflow-failure -- "Price Provider Ops Report (가격 데이터 점검)" "Build and send price provider ops report"
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_PRIVATE_CHAT_ID: ${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}
+          TELEGRAM_SECRET_CHAT_ID: ${{ secrets.TELEGRAM_SECRET_CHAT_ID }}
+          GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

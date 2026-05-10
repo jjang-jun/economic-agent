@@ -9,8 +9,12 @@ for ad-hoc local research and backfill experiments.
 import argparse
 import importlib.util
 import json
+import os
 import sys
+import tempfile
 from datetime import datetime
+
+os.environ.setdefault("MPLCONFIGDIR", os.path.join(tempfile.gettempdir(), "economic-agent-matplotlib"))
 
 
 def has_module(name):

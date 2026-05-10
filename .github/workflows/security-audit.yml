@@ -1,0 +1,37 @@
+name: Security Audit (의존성 취약점 점검)
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+    # KST Monday 09:10 = UTC Sunday 00:10
+    - cron: '10 0 * * 0'
+  workflow_dispatch:
+
+concurrency:
+  group: economic-agent-security-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - run: npm ci
+      - name: Run dependency security audit
+        run: npm run security:audit
+
+      - name: Notify private chat on failure
+        if: failure()
+        run: npm run notify:workflow-failure -- "Security Audit (의존성 취약점 점검)" "Run dependency security audit"
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_PRIVATE_CHAT_ID: ${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}
+          TELEGRAM_SECRET_CHAT_ID: ${{ secrets.TELEGRAM_SECRET_CHAT_ID }}
+          GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

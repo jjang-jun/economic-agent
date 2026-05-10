@@ -8,9 +8,9 @@ const OUT_FILE = path.join(OUT_DIR, 'index.html');
 const { summarizeCollectorOps } = require('../src/utils/collector-ops');
 const { summarizePriceSourceQuality } = require('../src/utils/price-source-quality');
 
-function readTable(name) {
+function readTable(name, dataDir = DATA_DIR) {
   try {
-    return JSON.parse(fs.readFileSync(path.join(DATA_DIR, `${name}.json`), 'utf-8'));
+    return JSON.parse(fs.readFileSync(path.join(dataDir, `${name}.json`), 'utf-8'));
   } catch {
     return [];
   }
@@ -164,17 +164,54 @@ function buildEvaluationSummary(evaluations) {
   };
 }
 
-function buildDashboard() {
-  const articles = readTable('articles');
-  const recommendations = readTable('recommendations');
-  const trades = readTable('trade_executions');
-  const portfolio = readTable('portfolio_snapshots');
-  const investorFlows = readTable('investor_flows');
-  const performanceReviews = readTable('performance_reviews');
-  const evaluations = readTable('recommendation_evaluations');
-  const collectorRuns = readTable('collector_runs');
-  const alertEvents = readTable('alert_events');
-  const priceSnapshots = readTable('price_snapshots');
+function renderReviewNotes(notes = []) {
+  return notes.length > 0
+    ? `<ul class="list">${notes.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
+    : '<p class="muted">최근 리뷰 점검 항목이 없습니다.</p>';
+}
+
+function renderLocalResearch(backtestResearch = {}) {
+  if (!backtestResearch.enabled) {
+    return '<p class="muted">월간 로컬 리서치 worker가 비활성입니다.</p>';
+  }
+  const results = backtestResearch.results || [];
+  const failures = backtestResearch.failures || [];
+  const resultRows = results.map(item => row([
+    item.name || item.ticker,
+    item.ticker,
+    item.provider,
+    `${item.rowCount ?? 0}일`,
+    fmtPct(item.returnPct),
+    fmtPct(item.maxDrawdownPct),
+  ])).join('');
+  const failureRows = failures.map(item => row([
+    item.name || item.ticker,
+    item.ticker,
+    item.provider,
+    '실패',
+    item.error,
+    item.message || '',
+  ])).join('');
+
+  return [
+    `<p class="muted">기간 ${escapeHtml(backtestResearch.startDate || '')} ~ ${escapeHtml(backtestResearch.endDate || '')} · provider ${escapeHtml(backtestResearch.provider || 'auto')}</p>`,
+    `<table><thead><tr><th>종목</th><th>티커</th><th>Provider</th><th>거래일</th><th>수익률</th><th>최대낙폭</th></tr></thead><tbody>${resultRows || failureRows || '<tr><td colspan="6">결과 없음</td></tr>'}</tbody></table>`,
+  ].join('');
+}
+
+function buildDashboard(options = {}) {
+  const dataDir = options.dataDir || DATA_DIR;
+  const freedomFile = options.freedomFile || FREEDOM_FILE;
+  const articles = readTable('articles', dataDir);
+  const recommendations = readTable('recommendations', dataDir);
+  const trades = readTable('trade_executions', dataDir);
+  const portfolio = readTable('portfolio_snapshots', dataDir);
+  const investorFlows = readTable('investor_flows', dataDir);
+  const performanceReviews = readTable('performance_reviews', dataDir);
+  const evaluations = readTable('recommendation_evaluations', dataDir);
+  const collectorRuns = readTable('collector_runs', dataDir);
+  const alertEvents = readTable('alert_events', dataDir);
+  const priceSnapshots = readTable('price_snapshots', dataDir);
   const latestPortfolio = portfolio[0] || {};
   const latestFlow = investorFlows[0] || {};
   const latestRecommendations = recommendations.slice(0, 12);
@@ -182,12 +219,14 @@ function buildDashboard() {
   const latestReview = latestByDate(performanceReviews);
   const reviewPayload = latestReview?.payload || {};
   const behaviorWarnings = reviewPayload.behaviorReview?.warnings || [];
+  const reviewNotes = reviewPayload.notes || [];
+  const backtestResearch = reviewPayload.backtestResearch || {};
   const lab = reviewPayload.performanceLab || {};
   const missed = lab.missedRecommendationQuality || {};
   const evalSummary = buildEvaluationSummary(evaluations);
   const collectorOps = summarizeCollectorOps(collectorRuns, alertEvents);
   const priceQuality = summarizePriceSourceQuality(priceSnapshots);
-  const freedom = readJson(FREEDOM_FILE) || {};
+  const freedom = readJson(freedomFile) || {};
   const freedomGoal = freedom.goal || {};
   const progress = typeof freedom.targetProgressPct === 'number' ? Math.max(0, Math.min(100, freedom.targetProgressPct)) : 0;
   const requiredReturn = typeof freedom.requiredAnnualReturnPct === 'number' ? `${freedom.requiredAnnualReturnPct}%` : 'n/a';
@@ -292,10 +331,12 @@ function buildDashboard() {
         <p><span class="badge ${escapeHtml(collectorOps.healthLabel || 'ok')}">${escapeHtml(collectorOps.healthLabel || 'ok')}</span></p>
         <div class="grid">
           ${metric('Runs', `${collectorOps.successfulRuns}/${collectorOps.completedRuns || collectorOps.totalRuns}`)}
-          ${metric('Failures', collectorOps.failedRuns)}
+          ${metric('Actionable Failures', collectorOps.actionableFailedRuns ?? collectorOps.failedRuns ?? 0)}
+          ${metric('Resolved Failures', collectorOps.resolvedFailureRuns ?? 0)}
           ${metric('Success Rate', fmtPct(collectorOps.successRatePct))}
           ${metric('Max Lookback', collectorOps.maxLookbackMinutes !== null ? `${collectorOps.maxLookbackMinutes}분` : 'n/a')}
           ${metric('Immediate Sent', collectorOps.alertEvents.sentImmediate)}
+          ${metric('Immediate Failures', `최근 ${collectorOps.alertEvents.actionableFailedImmediate ?? collectorOps.alertEvents.failedImmediate ?? 0} / 과거 ${collectorOps.alertEvents.historicalFailedImmediate ?? 0}`)}
           ${metric('Pending Digest', collectorOps.alertEvents.pendingDigest)}
           ${metric('Pending Catch-up', collectorOps.alertEvents.pendingCatchUp)}
         </div>
@@ -319,6 +360,14 @@ function buildDashboard() {
       ${behaviorWarnings.length > 0
         ? `<ul class="list">${behaviorWarnings.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
         : '<p class="muted">최근 리뷰에 행동 경고가 없습니다.</p>'}
+    </section>
+    <section class="panel">
+      <h2>Review Notes</h2>
+      ${renderReviewNotes(reviewNotes)}
+    </section>
+    <section class="panel">
+      <h2>Local Research</h2>
+      ${renderLocalResearch(backtestResearch)}
     </section>
     <section class="panel">
       <h2>Recommendation Risk Events</h2>
@@ -360,4 +409,12 @@ function main() {
   console.log(`[Dashboard] ${OUT_FILE}`);
 }
 
-main();
+if (require.main === module) {
+  main();
+}
+
+module.exports = {
+  buildDashboard,
+  renderLocalResearch,
+  renderReviewNotes,
+};

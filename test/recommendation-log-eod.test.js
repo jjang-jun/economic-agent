@@ -5,6 +5,7 @@ const {
   historyFromEodRows,
   buildEodEvaluationQuote,
   shouldLogRecommendation,
+  resolveRecommendationAiMetadata,
 } = require('../src/utils/recommendation-log');
 
 test('addKstDays returns KST calendar target date', () => {
@@ -60,4 +61,29 @@ test('shouldLogRecommendation excludes watch-only risk review candidates', () =>
   assert.equal(shouldLogRecommendation({
     schema_validation: { passed: true },
   }), false);
+});
+
+test('resolveRecommendationAiMetadata carries report model metadata into recommendations', () => {
+  const reportMetadata = {
+    task: 'stock_analysis',
+    provider: 'anthropic',
+    model: 'claude-sonnet-4-20250514',
+    promptVersion: 'stock-analysis-v2.1',
+  };
+
+  assert.deepEqual(
+    resolveRecommendationAiMetadata({}, { aiMetadata: reportMetadata }, {}),
+    reportMetadata,
+  );
+
+  assert.deepEqual(
+    resolveRecommendationAiMetadata(
+      { ai_metadata: { provider: 'openai', model: 'gpt-4.1-mini', prompt_version: 'stock-analysis-v2.0' } },
+      { aiMetadata: reportMetadata },
+      {},
+    ),
+    { provider: 'openai', model: 'gpt-4.1-mini', prompt_version: 'stock-analysis-v2.0' },
+  );
+
+  assert.equal(resolveRecommendationAiMetadata({}, { aiMetadata: {} }, {}), null);
 });

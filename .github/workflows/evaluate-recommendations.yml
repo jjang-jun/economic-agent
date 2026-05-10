@@ -1,14 +1,22 @@
 name: Evaluate Recommendations (추천 성과 평가)
 
+permissions:
+  contents: read
+
 on:
   schedule:
     # KST 17:30 = UTC 08:30 (월~금)
     - cron: '30 8 * * 1-5'
   workflow_dispatch:
 
+concurrency:
+  group: economic-agent-evaluate-recommendations
+  cancel-in-progress: false
+
 jobs:
   evaluate:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -22,7 +30,8 @@ jobs:
           restore-keys: data-
 
       - run: npm ci
-      - run: node src/evaluate-recommendations.js
+      - name: Evaluate and send recommendation performance
+        run: node src/evaluate-recommendations.js
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -32,3 +41,13 @@ jobs:
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           KRX_OPENAPI_KEY: ${{ secrets.KRX_OPENAPI_KEY }}
+
+      - name: Notify private chat on failure
+        if: failure()
+        run: npm run notify:workflow-failure -- "Evaluate Recommendations (추천 성과 평가)" "Evaluate and send recommendation performance"
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_PRIVATE_CHAT_ID: ${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}
+          TELEGRAM_SECRET_CHAT_ID: ${{ secrets.TELEGRAM_SECRET_CHAT_ID }}
+          GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

@@ -206,15 +206,48 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 시장 레짐 점수에 원자재와 가격 반응을 추가했다. WTI 유가 급등/급락, 구리 20일 약세, 금 상승과 VIX 동반 상승을 위험 태그로 반영하고, 호재성 뉴스가 많은데 KOSPI가 하락하는 `NEGATIVE_PRICE_REACTION`과 악재에도 시장이 오르는 `RESILIENT_PRICE_REACTION`을 구분한다.
 - 추천 품질 리포트를 모델별, 프롬프트 버전별, 프롬프트+모델 조합별로 분리했다. 주간/월간 성과 리뷰는 각 그룹의 평가 건수, 승률, 평균 추천 수익률, 표본 부족 여부를 따로 표시하고, 추천을 실제로 산 경우와 추천했지만 매수하지 않은 경우의 평균 성과 차이를 계속 보여준다.
 - 로컬 백테스트용 선택형 worker를 추가했다. `npm run backtest:worker -- providers`로 pykrx/FinanceDataReader 설치 여부를 확인하고, 설치된 로컬 환경에서는 `ohlcv` 명령으로 국내 종목 일봉을 JSON으로 가져올 수 있다. 운영 수집은 계속 KRX/Data.go.kr/KIS 등 공식 API 경로를 사용한다.
+- 월간 성과 리뷰에 선택형 Python 리서치 worker 연결을 추가했다. `LOCAL_RESEARCH_WORKER_ENABLED=true`일 때만 최근 국내 추천 후보 최대 3개에 대해 로컬 `ohlcv` worker를 호출하고, 기간 수익률/최대낙폭/거래일 수를 `backtestResearch` sidecar와 Telegram 로컬 리서치 섹션에 표시한다. 기본값은 비활성이라 Python 의존성이나 데이터 provider 실패가 정기 리뷰를 막지 않는다.
+- Agent harness 문서를 추가해 Codex/sub-agent 장기 작업의 목표·범위·안전·검증·handoff 계약을 명시했다. `npm run agent:harness-check`는 `AGENTS.md`, `README.md`, `docs/README.md`, `docs/AGENT_HARNESS.md`, `package.json`의 문서 맵 연결이 깨졌는지 점검한다.
+- Codex MCP 설정에 Playwright, GitHub, Supabase 서버를 등록했다. Playwright는 headless browser 검증용이고, GitHub/Supabase는 각각 `GITHUB_PAT_TOKEN`, `SUPABASE_ACCESS_TOKEN` 환경변수로 bearer token을 읽는다. Supabase MCP는 read-only URL로 등록했다.
+- Action Report 안정성 점검을 진행했다. 2026-05-08 17:53 KST scheduled 실패는 원격 main의 과거 `node --env-file=.env` 실행이 `.env` 없는 GitHub Actions에서 실패한 건으로 확인했고, 현재 로컬 `action:report`는 `--env-file-if-exists=.env`라 로컬 `--noTelegram`과 2026-05-08 수동 workflow 실행이 성공했다. 다음 scheduled 성공 여부는 현재 로컬 변경분이 원격에 반영된 뒤 재확인해야 한다.
+- Telegram 승인 흐름 smoke를 로컬에서 실제 Supabase/Telegram 환경으로 재확인했다. `/buy`, `/sell`, `/cash` 초안 3건을 생성한 뒤 모두 `cancelled` 상태로 취소했고, 실제 거래/현금 변경은 수행하지 않았다. 실패 알림 경로는 다음 실제 workflow 실패 시 private Telegram 도착 여부를 확인해야 한다.
+- 월간 로컬 리서치 worker를 `LOCAL_RESEARCH_WORKER_ENABLED=true`로 실행해 월간 리뷰 sidecar 연결을 확인했다. 로컬에 `pykrx`를 설치한 뒤 국내 후보 2개에 대해 19거래일 OHLCV, 기간 수익률, 최대낙폭이 생성되는 것을 확인했다. `FinanceDataReader`는 아직 미설치이며, worker는 matplotlib cache 경고를 줄이기 위해 임시 `MPLCONFIGDIR`를 사용한다.
+- 서버 `/dashboard`와 로컬 `npm run dashboard` 렌더링을 맞췄다. 최신 성과 리뷰의 점검 항목과 월간 로컬 리서치 sidecar를 두 대시보드 모두에 표시하고, 로컬 Supabase 미러 기반 HTML도 테스트에서 직접 생성해 회귀를 잡도록 했다.
 - Agent Server에 인증된 `/dashboard`를 추가했다. Cloud Run 서버가 Supabase를 직접 조회해 경제적 자유 진행률, 포트폴리오 요약, 추천 평가, 수집기 상태, 최근 추천의 진입가/손절가를 보여준다. 인증은 `DASHBOARD_SECRET`을 우선 사용하고 없으면 `JOB_SECRET`을 대체값으로 쓴다.
 - 전체 점검에서 운영 설정 불일치를 정리했다. `.env.example`과 `render.yaml`에 `DASHBOARD_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `KRX_OPENAPI_KEY`, `DATA_GO_KR_API_KEY`, `DISABLE_FINBERT` 등 최근 운영 변수를 반영하고, 서버 `/dashboard`도 Telegram `/recommendations`와 동일하게 리스크 기준을 통과한 매수 후보만 기본 표시하도록 맞췄다. 대시보드 포트폴리오 요약은 `portfolio_snapshots`가 없으면 Supabase 원본 `portfolio_accounts`를 fallback으로 사용한다. Anthropic 기본 모델은 공식 안정 ID인 `claude-sonnet-4-20250514`로 정리했다.
 - 런타임 언어 원칙을 로드맵에 반영했다. 운영 서버는 Node.js 1대를 기본으로 유지하고, Python은 pykrx/FinanceDataReader, 백테스트, 대량 OHLCV 처리 같은 분석 worker로만 사용한다. 별도 Python 서버는 장시간/대량 분석을 API로 자주 호출해야 할 때만 검토한다.
+- Telegram 리포트 문구와 숫자 방어를 개선했다. 일일 행동/장마감/성과 리포트에서 기준매수가, fallback, EOD, RS20 같은 초보자에게 어려운 표현을 기준가, 대체 가격, 장마감 가격, 20일 상대강도 등으로 풀어 쓰고, 상한 적용 시 원안과 실제 제안 금액을 함께 표시한다. 평가 데이터가 없을 때 `NaN%`나 가짜 `0%`가 보이지 않도록 추천 성과/실제 거래 성과 포맷 테스트를 추가했다.
+- 모델/프롬프트 성과 판단 준비도 명령을 추가했다. `npm run model:performance`는 `data/supabase/recommendations.json`과 `recommendation_evaluations.json`을 읽어 모델별, 프롬프트별, 조합별 평가 건수/평균 추천 수익률/승률/표본 충족 여부를 보여준다. 2026-05-10 기준 미러에는 평가 완료 6건이 있으나 모두 legacy/unknown 메타데이터라 Claude Sonnet 전환 효과 평가는 새 메타데이터가 붙은 추천 평가가 더 쌓인 뒤 가능하다.
+- 추천 로그의 AI 메타데이터 전달 계약을 테스트로 고정했다. stock별 `ai_metadata`가 있으면 우선 사용하고, 없으면 report/context의 `provider`, `model`, `promptVersion`을 추천 로그로 내려보낸다. 과거 `stock_reports`에도 메타데이터가 없어 기존 6개 평가 건은 안전한 backfill이 불가능하므로 legacy/unknown으로 유지한다.
+- `npm run model:performance` 출력에 전체 추천 중 메타데이터 보유 건수와 평가 대기 중 메타데이터 보유 건수를 추가했다. 새 추천에는 메타데이터가 붙었지만 아직 1/5/20일 평가가 안 끝난 상태인지 바로 구분하기 위한 용도다.
+- `npm audit`에서 확인된 `@huggingface/transformers` 하위 `protobufjs < 7.5.5` critical, `tar <= 7.5.10` high 취약점을 lockfile 패치로 해소했다. 직접 의존성인 `@huggingface/transformers@3.8.1`은 유지하고, 하위 패키지만 `protobufjs@7.5.7`, `tar@7.5.15`로 갱신했다. 2026-05-10 재점검 기준 `npm audit`은 0 vulnerabilities이며, 반복 점검용 `npm run security:audit` 명령을 추가했다.
+- `security-audit.yml`을 추가했다. 매주 월요일 09:10 KST에 `npm run security:audit`를 실행하고, 취약점 발견 또는 registry/audit 실패 시 private Telegram으로 Actions 로그 링크를 보낸다.
+- `quality-gate.yml`을 추가했다. main push, main 대상 pull request, 수동 실행에서 `npm test`와 `npm run agent:harness-check`를 실행한다. 실패 알림은 secrets가 없는 PR을 피하기 위해 push/수동 실행에서만 private Telegram으로 보낸다.
+- Quality Gate와 Security Audit job에 10분 timeout을 설정했다. 테스트, npm registry, audit endpoint가 비정상적으로 오래 걸릴 때 비용과 알림 지연을 제한한다.
+- 기존 주요 GitHub Actions workflow에도 10분 timeout을 일괄 적용했다. 다이제스트, 장마감 분석, 추천 평가, 포트폴리오 스냅샷, 성과 리뷰, 운영 점검, Action Report, 실제 거래 성과가 장시간 멈추면 실패로 종료되고 private 알림 경로를 탄다.
+- 모든 GitHub Actions workflow에 `permissions: contents: read`를 명시했다. checkout과 실행만 필요한 workflow들이 기본 토큰 권한을 넓게 쓰지 않도록 하고, 새 workflow가 권한 선언을 빠뜨리면 테스트에서 잡히게 했다.
+- `telegram-smoke-actions.yml`도 다른 workflow와 맞춰 `actions/checkout@v6`, `actions/setup-node@v6`로 정리하고 실패 알림 env에 `TELEGRAM_PRIVATE_CHAT_ID`를 추가했다. 전체 workflow 테스트가 checkout/setup-node v6 사용 여부도 검증한다.
+- 모든 GitHub Actions workflow에 concurrency group을 명시했다. 다이제스트/리포트/운영 점검은 중복 실행을 큐잉하도록 `cancel-in-progress: false`를 사용하고, Quality Gate는 같은 ref의 새 실행이 오면 이전 실행을 취소하도록 했다.
+- `AGENTS.md`의 운영 명령 설명에서 과거 `.env` 강제 로딩 문구를 정리했다. 현재 대부분의 운영 script는 `--env-file-if-exists=.env`를 사용하고, `npm start`만 로컬 one-shot collector용 `--env-file=.env` 진입점으로 남아 있다.
+- 가격 provider 운영 점검 명령을 보강했다. `npm run price-provider:ops-report -- --noTelegram`처럼 숫자가 아닌 옵션을 넘기면 `Invalid time value`가 나던 문제를 고치고, `--days`, `--days=N`, `--no-telegram`도 지원한다. 2026-05-10 실조회 기준 최근 1일은 스냅샷 21건, 실패율 0%, 빈 응답률 34.02%, fallback 4.76%로 `현재 가격 provider 구조 유지` 판단이며 Massive 과금 필요는 없다.
+- 수집기 운영 점검 명령도 같은 인자 파싱 문제를 수정했다. `npm run collector:ops-report -- --noTelegram`, `--days`, `--days=N`, `--no-telegram`을 지원하고, 최근 실행이 0건이면 `ok`가 아니라 `empty`와 `최근 수집 실행 기록이 없습니다` 이상치로 표시한다. 이후 과거 해결 실패와 최근 조치 필요 실패를 분리하도록 고도화했다.
+- 성과 리뷰 명령에 안전한 dry-run을 추가했다. `npm run review:weekly -- --dry-run`은 리뷰를 만들되 로컬 파일 저장, Supabase 저장, Telegram 전송을 모두 생략한다. `--noTelegram`은 기존처럼 전송만 생략하고 저장은 수행하며, Supabase 저장만 생략하려면 `--noPersist`/`--no-persist`를 사용한다.
+- 주간/월간 성과 리뷰 workflow에도 private Telegram 실패 알림 단계를 추가했다. 리뷰 생성/저장/전송 단계가 실패하면 `notify:workflow-failure`가 workflow명, 작업명, 브랜치, 커밋, GitHub Actions 로그 링크를 보내도록 했다.
+- 수집기 운영 점검과 가격 데이터 점검 workflow에도 private Telegram 실패 알림 단계를 추가했다. 운영 점검 스크립트 자체가 실패할 때도 Actions 로그 링크가 private 방으로 전송된다.
+- 포트폴리오 스냅샷, 장마감 분석, 추천 성과 평가, 실제 거래 성과 workflow에도 private Telegram 실패 알림을 추가했다. 의사결정 숫자를 만드는 핵심 스케줄 작업이 실패하면 해당 작업명과 Actions 로그 링크를 바로 확인할 수 있다.
+- 뉴스 백업 수집과 5개 다이제스트 workflow에도 같은 실패 알림 표준을 적용했다. 브리핑 본문은 기존 공유방으로 유지하고, 워크플로 실패만 private Telegram으로 라우팅한다.
+- 모든 `.github/workflows/*.yml`에 `Notify private chat on failure` 단계가 있는지 확인하는 회귀 테스트를 추가했다. 새 workflow를 만들 때 실패 알림을 빠뜨리면 `npm test`에서 잡힌다.
+- 경제적 자유 상태를 정기 운영 루프에 연결했다. `npm run freedom:report`는 기존처럼 저장과 콘솔 출력을 유지하고, `--telegram`을 붙이면 목표 순자산/현재 순자산/달성률/예상 도달일/목표일 대비 속도/하락 스트레스를 private Telegram으로 전송한다. `freedom-report.yml`은 평일 16:20 KST, 포트폴리오 스냅샷 직후 실행된다.
+- Action Report 드라이런에서 국내 종목 가격을 네이버 실시간 API와 대조했다. 2026-05-10 기준 삼성전자 268,500원, SK하이닉스 1,686,000원 수준으로 저장 가격 단위는 정상이며, 추천 당시 가격과 현재가 혼동을 줄이기 위해 후보 종목 문구를 `기준가(추천시)`로 바꿨다.
+- Action Report 후보 종목에 최신 현재가를 추가했다. 최근 bullish 후보 중 보유 중이 아닌 종목만 현재가를 다시 조회해 `기준가(추천시)` 옆에 `현재가`와 추천가 대비 변동률을 표시한다. 가격 조회가 실패해도 리포트는 기존 추천시 기준가로 계속 생성된다.
+- 수집기 운영 점검에서 이미 해결된 과거 실패를 분리했다. `stale run cleaned` 계열 redeploy/smoke 실패와 과거 `toAdd` 초기화 버그 실패는 `resolvedFailureRuns`로 따로 보여주고, 성공률·상태·실패 이상치는 조치 필요 실패 기준으로 계산한다. 즉시 알림 실패도 최근 24시간 조치 필요 실패와 과거 실패로 나눈다. 2026-05-10 실조회 기준 최근 7일은 성공 244건, 조치 필요 실패 0건, 정리된 과거 실패 6건, 최근 즉시 알림 실패 0건, 과거 즉시 알림 실패 3건이며 이상치는 없다.
+- 로컬 HTML 대시보드와 서버 `/dashboard`의 수집기 상태 표시도 같은 기준으로 맞췄다. 기존 `Failures`/`실패` 대신 조치 필요 실패, 정리된 과거 실패, 최근/과거 즉시 알림 실패를 나눠 보여준다.
 
 ## 다음 작업
 
-1. 프롬프트/모델별 추천 성과 5건 이상 누적 후 Claude Sonnet 전환 효과 평가
-2. Action Report 정기 실행 안정성 모니터링
-3. 가격 provider의 `해외/글로벌 가격 API 보강 검토` 판단이 반복되는지 모니터링
+1. `npm run db:pull && npm run model:performance`로 메타데이터가 있는 프롬프트/모델별 추천 성과 5건 이상 누적 여부 확인 후 Claude Sonnet 전환 효과 평가. 2026-05-10 재확인 기준 기존 6개 평가 건은 과거 stock report에도 메타데이터가 없어 backfill하지 않는다.
+2. 현재 로컬 변경분을 원격에 반영한 뒤 다음 scheduled Action Report 1회 성공 여부 확인. 2026-05-08 수동 실행은 성공했고, 직전 예약 실패는 원격의 과거 `node --env-file=.env` 실행 때문으로 확인됨
+3. 가격 provider의 `해외/글로벌 가격 API 보강 검토` 판단이 주간/월간 리뷰에서 반복되는지 모니터링하되, 최근 1일 점검은 정상이라 Massive 과금은 필요성이 명확해질 때까지 보류
 4. 다음 실제 workflow 실패 시 private 알림 도착 여부 재확인
 5. `/dashboard` 실제 사용 빈도에 따라 탭 분리와 상세 차트 추가 여부 결정
-6. Python worker를 주간/월간 리서치 리포트에 선택적으로 연결할지 검토
+6. 월간 리서치 worker 결과를 다음 월간 리뷰에서 실제 의사결정에 도움이 되는지 확인

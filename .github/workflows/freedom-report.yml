@@ -1,20 +1,20 @@
-name: Stock Report (장 마감 분석)
+name: Freedom Report (경제적 자유 상태)
 
 permissions:
   contents: read
 
 on:
   schedule:
-    # KST 16:00 = UTC 07:00 (월~금)
-    - cron: '0 7 * * 1-5'
+    # KST 16:20 = UTC 07:20 (월~금), portfolio snapshot 직후
+    - cron: '20 7 * * 1-5'
   workflow_dispatch:
 
 concurrency:
-  group: economic-agent-stock-report
+  group: economic-agent-freedom-report
   cancel-in-progress: false
 
 jobs:
-  stock-report:
+  report:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -29,35 +29,22 @@ jobs:
           key: data-${{ github.run_id }}
           restore-keys: data-
 
-      - uses: actions/cache@v5
-        with:
-          path: .cache/
-          key: finbert-model-v1
-          restore-keys: finbert-model-
-
       - run: npm ci
-      - name: Build and send stock report
-        run: node src/stock-report.js
+      - name: Build and send freedom report
+        run: npm run freedom:report -- --telegram
         env:
-          AI_PROVIDER: ${{ secrets.AI_PROVIDER }}
-          AI_API_KEY: ${{ secrets.AI_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PORTFOLIO_JSON_BASE64: ${{ secrets.PORTFOLIO_JSON_BASE64 }}
+          PORTFOLIO_JSON: ${{ secrets.PORTFOLIO_JSON }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TELEGRAM_PRIVATE_CHAT_ID: ${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}
           TELEGRAM_SECRET_CHAT_ID: ${{ secrets.TELEGRAM_SECRET_CHAT_ID }}
-          BOK_API_KEY: ${{ secrets.BOK_API_KEY }}
-          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-          DART_API_KEY: ${{ secrets.DART_API_KEY }}
-          PORTFOLIO_JSON_BASE64: ${{ secrets.PORTFOLIO_JSON_BASE64 }}
-          PORTFOLIO_JSON: ${{ secrets.PORTFOLIO_JSON }}
           SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
       - name: Notify private chat on failure
         if: failure()
-        run: npm run notify:workflow-failure -- "Stock Report (장 마감 분석)" "Build and send stock report"
+        run: npm run notify:workflow-failure -- "Freedom Report (경제적 자유 상태)" "Build and send freedom report"
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

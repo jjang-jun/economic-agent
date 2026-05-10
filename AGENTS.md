@@ -30,15 +30,17 @@ RSS feeds
 - Record an actual manual trade execution: `npm run trade:record -- --side buy --ticker 005930 --quantity 3 --price 266000`
 - Review actual trade performance: `npm run trade:performance`
 - Build weekly/monthly performance reviews: `npm run review:weekly`, `npm run review:monthly`
+- Check model/prompt performance sample readiness: `npm run model:performance` after `npm run db:pull`
 - Build local HTML dashboard from pulled Supabase mirrors: `npm run dashboard`
 - Create a current portfolio valuation snapshot: `npm run portfolio:snapshot`
 - Sync ignored local portfolio to GitHub Actions secret: `npm run portfolio:sync-secret`
 - Push Supabase schema: `npm run db:push`
 - Import existing local `data/*.json` history into Supabase: `npm run db:import-local`
 - Pull Supabase history to local JSON/SQLite: `npm run db:pull`
+- Check dependency vulnerabilities: `npm run security:audit`
 - Test: `npm test`
 
-`npm start`, `npm run digest`, `npm run report`, `npm run evaluate`, `npm run db:push`, `npm run db:import-local`, and `npm run db:pull` read `.env` through Node's `--env-file=.env` flag. They may call RSS/API/Telegram/AI/Supabase services. Use them intentionally.
+Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.env` flag, so GitHub Actions can rely on injected secrets without a checked-in `.env`. `npm start` remains the local one-shot collector entrypoint with `--env-file=.env`. Networked commands such as `npm run digest`, `npm run report`, `npm run evaluate`, `npm run db:push`, `npm run db:import-local`, `npm run db:pull`, and `npm run security:audit` may call RSS/API/Telegram/AI/Supabase/npm registry services. Use them intentionally.
 
 ## Environment
 - Required for Telegram delivery: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`
@@ -47,6 +49,7 @@ RSS feeds
 - Optional history store: `SUPABASE_PROJECT_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_DB_PASSWORD` or `SUPABASE_DB_URL` for schema pushes
 - Optional private portfolio file: `PORTFOLIO_FILE`, defaulting to ignored `data/portfolio.json`
 - Optional private portfolio env for GitHub Actions: `PORTFOLIO_JSON_BASE64` or `PORTFOLIO_JSON`
+- Optional local research worker: `LOCAL_RESEARCH_WORKER_ENABLED=true` enables the monthly review sidecar that calls `scripts/local-backtest-worker.py`; `LOCAL_RESEARCH_WORKER_PROVIDER` and `LOCAL_RESEARCH_MAX_TICKERS` tune provider and ticker count.
 - `.env` is private and must not be committed.
 
 ## File Map
@@ -57,6 +60,7 @@ RSS feeds
 - `scripts/record-trade.js`: records a manual buy/sell execution separately from AI recommendations
 - `scripts/trade-performance.js`: evaluates actual trade executions with current quotes and sends a Telegram report when trades exist
 - `scripts/performance-review.js`: writes weekly/monthly recommendation-vs-trade performance reviews
+- `scripts/model-performance-readiness.js`: reads Supabase mirrors and reports model/prompt sample readiness for recommendation performance
 - `scripts/dashboard.js`: generates ignored local HTML dashboard from `data/supabase/*.json`
 - `src/sources/`: RSS, DART, BOK, FRED integrations
 - `src/sources/dart-api.js`: OpenDART disclosure fetcher, optional `DART_API_KEY`
@@ -76,6 +80,7 @@ RSS feeds
 - `src/utils/recommendation-log.js`: stores stock signals and evaluates returns against KOSPI benchmark when available
 - `src/utils/risk-reviewer.js`: rule-based risk manager for recommendation factor pass/fail and blockers
 - `src/utils/performance-review.js`: summarizes recommendation and trade performance over weekly/monthly windows
+- `src/utils/local-research-worker.js`: optional monthly review sidecar for local Python OHLCV research; disabled unless `LOCAL_RESEARCH_WORKER_ENABLED=true`
 - `src/utils/trade-log.js`: stores actual manual trade executions in ignored local data and Supabase
 - `src/utils/decision-engine.js`: rule-based market regime, index trend scoring, and action guardrails
 - Market regime can include tags such as `OVERHEATED`, `CONCENTRATED_LEADERSHIP`, `SEMICONDUCTOR_LEADERSHIP`, and `MOMENTUM_ALLOWED`. Treat these as risk controls, not pure buy signals.
@@ -99,6 +104,7 @@ RSS feeds
 - `scripts/import-local-history.js`: uploads existing ignored `data/*.json` history into Supabase after schema creation
 - `.github/workflows/`: collector, five digest schedules, stock report, portfolio snapshot, recommendation evaluation, and trade performance schedules
 - `docs/README.md`: docs index and folder roles
+- `docs/AGENT_HARNESS.md`: Codex/sub-agent long-running task contract, verification loop, and documentation cleanup rules
 - `docs/PROGRESS.md`: human-readable development progress and current operating context
 - `docs/portfolio.example.json`: private `data/portfolio.json` template
 - `docs/trade-executions.example.json`: private `data/trades/trade-executions.json` template
@@ -119,6 +125,9 @@ RSS feeds
 ## Working Rules
 - Prefer existing CommonJS style: `require`, `module.exports`, async functions, and small utility modules.
 - Keep changes focused. Avoid broad refactors unless the task needs them.
+- For simple, independent Codex subtasks that can be delegated, use a lightweight sub-agent model to reduce token/context cost: prefer `gpt-5.4-mini` for file lookup or narrow analysis, and `gpt-5.3-codex-spark` for simple code/test assistance. Keep complex design, risky edits, and final integration in the main session.
+- For long-running or multi-file agent work, follow `docs/AGENT_HARNESS.md`: define goal/scope/safety/verification/handoff, keep generated state inspectable, and run `npm run agent:harness-check` after changing the doc map.
+- When MCP resources are available, prefer them over ad-hoc scripts or web search for matching tasks: Supabase MCP for database/log context, GitHub MCP for Actions/PR/repository context, and Playwright MCP for dashboard/browser verification.
 - When changing behavior, update `README.md` if user-facing usage, architecture, schedules, or environment variables change.
 - Keep `docs/PROGRESS.md` current when milestones, storage strategy, operating checklist, or next priorities change.
 - Keep `README.md`, `AGENTS.md`, `ROADMAP.md`, and docs aligned when architecture, schedules, commands, or environment variables change.

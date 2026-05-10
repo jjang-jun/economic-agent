@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { getKSTDate } = require('./article-archive');
+const { fetchCurrentPrice, normalizeYahooSymbol } = require('../sources/price-provider');
 
 const ACTION_REPORT_DIR = path.join(__dirname, '..', '..', 'data', 'action-reports');
 
@@ -92,6 +93,61 @@ function recommendationEntryPrice(recommendation = {}) {
   const entry = recommendation.entry || {};
   return [risk.entryReferencePrice, entry.price, market.price]
     .find(value => typeof value === 'number' && Number.isFinite(value) && value > 0) || null;
+}
+
+function recommendationPriceSymbol(recommendation = {}) {
+  return recommendation.ticker || recommendation.symbol || normalizeYahooSymbol(recommendation.ticker || recommendation.symbol || '');
+}
+
+function recommendationLatestPrice(recommendation = {}) {
+  const quote = recommendation.latestQuote || recommendation.latest_quote || {};
+  return [quote.price, recommendation.latestPrice, recommendation.latest_price]
+    .find(value => typeof value === 'number' && Number.isFinite(value) && value > 0) || null;
+}
+
+function latestPriceChangePct(recommendation = {}) {
+  const latestPrice = recommendationLatestPrice(recommendation);
+  const entryPrice = recommendationEntryPrice(recommendation);
+  if (!latestPrice || !entryPrice) return null;
+  return round(((latestPrice - entryPrice) / entryPrice) * 100);
+}
+
+async function enrichRecommendationsWithLatestPrices(recommendations = [], portfolio = {}, options = {}) {
+  const fetcher = options.fetcher || fetchCurrentPrice;
+  const positions = portfolio.positions || [];
+  const candidates = (recommendations || [])
+    .filter(item => item.signal === 'bullish')
+    .filter(item => isRecent(item))
+    .filter(item => !(positions || []).some(position => sameHolding(position, item)));
+
+  const quoteBySymbol = new Map();
+  for (const recommendation of candidates) {
+    const symbol = recommendationPriceSymbol(recommendation);
+    if (!symbol || quoteBySymbol.has(symbol)) continue;
+    try {
+      quoteBySymbol.set(symbol, await fetcher(symbol));
+    } catch (err) {
+      quoteBySymbol.set(symbol, { error: err.message });
+    }
+  }
+
+  return (recommendations || []).map(recommendation => {
+    const symbol = recommendationPriceSymbol(recommendation);
+    const quote = quoteBySymbol.get(symbol);
+    if (!quote || typeof quote.price !== 'number') return recommendation;
+    return {
+      ...recommendation,
+      latestQuote: {
+        price: quote.price,
+        currency: quote.currency || '',
+        source: quote.source || '',
+        marketTime: quote.marketTime || null,
+        priceType: quote.priceType || 'current',
+      },
+      latestPrice: quote.price,
+      latestPriceChangePct: latestPriceChangePct({ ...recommendation, latestQuote: quote }),
+    };
+  });
 }
 
 function recommendationSuggestedAmount(recommendation = {}, portfolio = {}) {
@@ -401,6 +457,9 @@ module.exports = {
   buildWatchOnlyCandidates,
   buildPositionActions,
   buildPortfolioLimitContext,
+  enrichRecommendationsWithLatestPrices,
   classifyPosition,
+  latestPriceChangePct,
+  recommendationLatestPrice,
   saveActionReport,
 };

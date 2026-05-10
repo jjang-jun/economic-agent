@@ -6,6 +6,37 @@ const {
 } = require('../src/utils/price-source-quality');
 const { sendTelegramMessage } = require('../src/notify/telegram');
 
+function parseArgs(argv = process.argv.slice(2), env = process.env) {
+  const options = {
+    days: Number(env.PRICE_PROVIDER_OPS_DAYS || 1),
+    noTelegram: false,
+  };
+
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === '--noTelegram' || arg === '--no-telegram') {
+      options.noTelegram = true;
+      continue;
+    }
+    if (arg === '--days') {
+      options.days = Number(argv[++i]);
+      continue;
+    }
+    if (arg.startsWith('--days=')) {
+      options.days = Number(arg.slice('--days='.length));
+      continue;
+    }
+    if (/^\d+$/.test(arg)) {
+      options.days = Number(arg);
+    }
+  }
+
+  if (!Number.isFinite(options.days) || options.days <= 0) {
+    throw new Error(`유효하지 않은 PRICE_PROVIDER_OPS_DAYS 값: ${options.days}`);
+  }
+  return options;
+}
+
 function formatSummary(summary, anomalies) {
   const alert = anomalies.length > 0 ? '⚠️' : '✅';
   const attempts = summary.attempts || {};
@@ -30,10 +61,15 @@ function formatSummary(summary, anomalies) {
 }
 
 async function main() {
-  const days = Number(process.argv[2] || process.env.PRICE_PROVIDER_OPS_DAYS || 1);
+  const { days, noTelegram } = parseArgs();
   const summary = await buildPriceSourceQualitySummary({ days });
   const anomalies = buildPriceSourceQualityAnomalies(summary);
   console.log(JSON.stringify({ days, summary, anomalies }, null, 2));
+
+  if (noTelegram) {
+    console.log('[price-provider-ops] --noTelegram 지정. Telegram 전송 생략.');
+    return;
+  }
 
   if (anomalies.length === 0 && process.env.PRICE_PROVIDER_SEND_OK !== '1') {
     console.log('[price-provider-ops] 이상치 없음. Telegram 전송 생략.');
@@ -52,5 +88,6 @@ if (require.main === module) {
 }
 
 module.exports = {
+  parseArgs,
   formatSummary,
 };

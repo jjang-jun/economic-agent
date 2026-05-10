@@ -1,5 +1,8 @@
 name: News Collector Backup (뉴스 수집 백업)
 
+permissions:
+  contents: read
+
 on:
   schedule:
     # 메인 5분 수집은 Agent Server/Scheduler가 담당한다.
@@ -36,7 +39,8 @@ jobs:
           restore-keys: finbert-model-
 
       - run: npm ci
-      - run: npm run collect:news
+      - name: Collect backup news alerts
+        run: npm run collect:news
         env:
           COLLECTOR_TRIGGER_SOURCE: github_actions_backup
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -47,3 +51,13 @@ jobs:
           SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      - name: Notify private chat on failure
+        if: failure()
+        run: npm run notify:workflow-failure -- "News Collector Backup (뉴스 수집 백업)" "Collect backup news alerts"
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_PRIVATE_CHAT_ID: ${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}
+          TELEGRAM_SECRET_CHAT_ID: ${{ secrets.TELEGRAM_SECRET_CHAT_ID }}
+          GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

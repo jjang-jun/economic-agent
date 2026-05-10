@@ -10,6 +10,7 @@ const { buildPerformanceLab } = require('./performance-lab');
 const { buildBehaviorReview } = require('./behavior-reviewer');
 const { buildCollectorOpsSummary } = require('./collector-ops');
 const { buildPriceSourceQualitySummary } = require('./price-source-quality');
+const { buildLocalResearchSummary } = require('./local-research-worker');
 
 const REVIEW_DIR = path.join(__dirname, '..', '..', 'data', 'performance-reviews');
 
@@ -111,6 +112,14 @@ async function buildPerformanceReview(period = 'weekly') {
     buildCollectorOpsSummary({ days }),
     buildPriceSourceQualitySummary({ days }),
   ]);
+  const backtestResearch = period === 'monthly'
+    ? buildLocalResearchSummary({
+        period,
+        startDate,
+        endDate: getKSTDate(),
+        recommendations: periodRecommendations,
+      })
+    : null;
   let freedomPortfolio = null;
   if (period === 'monthly') {
     const enriched = await enrichPortfolio(loadPortfolio());
@@ -139,12 +148,13 @@ async function buildPerformanceReview(period = 'weekly') {
     behaviorReview,
     collectorOps,
     priceSourceQuality,
+    backtestResearch,
     freedomStatus,
-    notes: buildNotes(recommendationSummary, tradeSummary, behaviorReview, collectorOps, priceSourceQuality),
+    notes: buildNotes(recommendationSummary, tradeSummary, behaviorReview, collectorOps, priceSourceQuality, backtestResearch),
   };
 }
 
-function buildNotes(recommendationSummary, tradeSummary, behaviorReview = {}, collectorOps = {}, priceSourceQuality = {}) {
+function buildNotes(recommendationSummary, tradeSummary, behaviorReview = {}, collectorOps = {}, priceSourceQuality = {}, backtestResearch = null) {
   const notes = [];
   if (recommendationSummary.evaluated === 0) {
     notes.push('평가 완료된 추천이 아직 부족합니다.');
@@ -160,11 +170,13 @@ function buildNotes(recommendationSummary, tradeSummary, behaviorReview = {}, co
   for (const warning of behaviorReview.warnings || []) {
     notes.push(warning);
   }
-  if (collectorOps.failedRuns > 0) {
-    notes.push(`최근 수집 작업 실패 ${collectorOps.failedRuns}건이 있습니다. Cloud Run/Scheduler 로그를 확인해야 합니다.`);
+  const actionableFailedRuns = collectorOps.actionableFailedRuns ?? collectorOps.failedRuns ?? 0;
+  if (actionableFailedRuns > 0) {
+    notes.push(`최근 조치가 필요한 수집 작업 실패 ${actionableFailedRuns}건이 있습니다. Cloud Run/Scheduler 로그를 확인해야 합니다.`);
   }
-  if ((collectorOps.alertEvents?.failedImmediate || 0) > 0) {
-    notes.push(`즉시 알림 전송 실패 ${collectorOps.alertEvents.failedImmediate}건이 있습니다.`);
+  const actionableFailedImmediate = collectorOps.alertEvents?.actionableFailedImmediate ?? collectorOps.alertEvents?.failedImmediate ?? 0;
+  if (actionableFailedImmediate > 0) {
+    notes.push(`최근 즉시 알림 전송 실패 ${actionableFailedImmediate}건이 있습니다.`);
   }
   if ((collectorOps.alertEvents?.pendingCatchUp || 0) > 0) {
     notes.push(`catch-up 중요 알림 ${collectorOps.alertEvents.pendingCatchUp}건이 다이제스트 대기 중입니다.`);
@@ -174,6 +186,9 @@ function buildNotes(recommendationSummary, tradeSummary, behaviorReview = {}, co
   }
   if (priceSourceQuality.healthLabel === 'warn') {
     notes.push('가격 source 품질이 주의 상태입니다. KRX/Data.go.kr/KIS와 fallback 사용 비율을 확인해야 합니다.');
+  }
+  if (backtestResearch?.enabled && backtestResearch.failures?.length > 0 && backtestResearch.results?.length === 0) {
+    notes.push('로컬 Python 리서치 worker가 켜져 있지만 OHLCV 결과를 만들지 못했습니다. pykrx/FinanceDataReader 설치와 provider 상태를 확인해야 합니다.');
   }
   return notes;
 }
