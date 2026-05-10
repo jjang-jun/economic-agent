@@ -280,7 +280,7 @@ Codex 작업 위임 원칙:
 - [x] Telegram 승인 흐름 smoke script와 정기 점검 workflow 추가
 
 ## 현재 가장 중요한 다음 작업
-1. 내일 DRAM ETF 30주 매도 체결 시 실제 체결가로 거래 기록, 포트폴리오/Actions secret 동기화, Action Report 검증을 진행한다.
+1. 내일 DRAM ETF 30주 매도 체결 시 실제 체결가로 거래 기록, 포트폴리오/Actions secret 동기화, Action Report 검증을 진행한다. 사전 계획은 `trade:plan`으로 남겨 일일 행동 리포트에서 확인한다.
 2. 다음 scheduled Action Report 1회 성공 여부를 확인한다. 2026-05-10 수동 workflow_dispatch는 성공했다.
 3. 메타데이터가 있는 추천 평가 표본이 5건 이상 누적된 뒤 `npm run db:pull && npm run model:performance`로 Claude Sonnet 전환 효과를 평가한다. 2026-05-10 재확인 기준 평가 완료 6건은 모두 legacy/unknown 메타데이터다.
 4. 가격 provider의 `해외/글로벌 가격 API 보강 검토` 판단이 반복되는지 보되, Massive 같은 유료 API는 미국 주식 고품질 히스토리/실시간 필요성이 명확해질 때까지 보류한다.
@@ -297,9 +297,10 @@ Codex 작업 위임 원칙:
 2. 추천 후보 확인: `npm run recommendations:list`
 3. 일일 행동 후보 확인: `npm run action:report`
 4. 경제적 자유 상태 확인: `npm run freedom:report`
-5. 실제 매매 기록: `npm run trade:record -- --side buy --symbol 005930 --name 삼성전자 --qty 1 --price 70000`
-6. GitHub Actions 포트폴리오 동기화: `npm run portfolio:sync-secret`
-7. 평가손익 스냅샷: `npm run portfolio:snapshot`
+5. 예정 매매 기록: `npm run trade:plan -- --side sell --ticker DRAM --name "DRAM ETF" --quantity 30 --plannedDate 2026-05-11`
+6. 실제 매매 기록: `npm run trade:record -- --side buy --symbol 005930 --name 삼성전자 --qty 1 --price 70000`
+7. GitHub Actions 포트폴리오 동기화: `npm run portfolio:sync-secret`
+8. 평가손익 스냅샷: `npm run portfolio:snapshot`
 
 ### 매주
 1. 실제 거래 성과 확인: `npm run trade:performance`

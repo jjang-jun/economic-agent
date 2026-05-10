@@ -679,10 +679,23 @@ function formatActionReport(report) {
       '<b>6. 전량 매도 후보</b>',
       (report.sellCandidates || []).map(item => formatPosition(item, 'sell')).join('\n\n') || '▸ 없음',
     ].join('\n'),
+    [
+      '<b>7. 예정 매매 확인</b>',
+      (report.plannedTrades || []).map(formatPlannedTrade).join('\n') || '▸ 없음',
+    ].join('\n'),
     '<i>자동 주문이 아닙니다. 실제 매매 전 손절선, 유동성, 당일 수급을 다시 확인하세요.</i>',
   ];
 
   return sections.join('\n\n');
+
+  function formatPlannedTrade(plan) {
+    const side = plan.side === 'sell' ? '매도 예정' : '매수 예정';
+    const target = typeof plan.targetRemainingQuantity === 'number'
+      ? ` · 체결 후 목표 잔여 ${formatQuantity(plan.targetRemainingQuantity)}`
+      : '';
+    const notes = plan.notes ? ` · ${plan.notes}` : '';
+    return `▸ ${escapeHtml(plan.plannedDate || report.date)} ${escapeHtml(side)}: <b>${escapeHtml(plan.name || plan.ticker || plan.symbol)}</b> ${formatQuantity(plan.quantity)}${target}${escapeHtml(notes)}`;
+  }
 }
 
 async function sendActionReport(report) {

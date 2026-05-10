@@ -252,10 +252,11 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 수집기 운영 점검의 주말 오탐을 줄였다. KST 평일 07:00-23:59 수집 시간대가 아니면 최근 1일 실행 0건을 이상치로 보지 않고 `idle` 상태로 표시한다. 2026-05-10 일요일 재실행 기준 이상치 없음으로 확인했다.
 - 수집기 운영 점검에서 이미 해결된 과거 실패를 분리했다. `stale run cleaned` 계열 redeploy/smoke 실패와 과거 `toAdd` 초기화 버그 실패는 `resolvedFailureRuns`로 따로 보여주고, 성공률·상태·실패 이상치는 조치 필요 실패 기준으로 계산한다. 즉시 알림 실패도 최근 24시간 조치 필요 실패와 과거 실패로 나눈다. 2026-05-10 실조회 기준 최근 7일은 성공 244건, 조치 필요 실패 0건, 정리된 과거 실패 6건, 최근 즉시 알림 실패 0건, 과거 즉시 알림 실패 3건이며 이상치는 없다.
 - 로컬 HTML 대시보드와 서버 `/dashboard`의 수집기 상태 표시도 같은 기준으로 맞췄다. 기존 `Failures`/`실패` 대신 조치 필요 실패, 정리된 과거 실패, 최근/과거 즉시 알림 실패를 나눠 보여준다.
+- 예정 매매 체크리스트를 추가했다. `npm run trade:plan`은 아직 체결되지 않은 매수/매도 계획을 `data/trades/trade-plans.json`과 포트폴리오 payload에 남기고, 일일 행동 리포트는 오늘까지 확인해야 할 계획을 `예정 매매 확인` 섹션에 표시한다. 이후 같은 방향/종목/수량의 `trade:record`가 들어오면 열린 계획을 자동으로 실행 완료 처리한다.
 
 ## 다음 작업
 
-1. 내일 DRAM ETF 30주 매도 체결 시 실제 체결가로 `trade:record`, `portfolio:sync-secret`, `action:report -- --no-telegram` 순서로 반영하고 수량 170주/비중 변화를 검증한다.
+1. 내일 DRAM ETF 30주 매도 체결 시 실제 체결가로 `trade:record`, `portfolio:sync-secret`, `action:report -- --no-telegram` 순서로 반영하고 수량 170주/비중 변화를 검증한다. 체결 전 계획은 `trade:plan`으로 남겨 행동 리포트에서 누락 여부를 확인한다.
 2. 다음 scheduled Action Report 1회 성공 여부 확인. 2026-05-10 수동 workflow_dispatch는 성공했고, 직전 예약 실패는 원격의 과거 `node --env-file=.env` 실행 때문으로 확인됨
 3. 메타데이터가 붙은 추천의 평가 완료 건이 5건 이상 쌓이면 `npm run db:pull && npm run model:performance`로 Claude Sonnet 전환 효과를 다시 평가한다.
 4. 가격 provider의 `해외/글로벌 가격 API 보강 검토` 판단이 주간/월간 리뷰에서 반복되는지 모니터링하되, 최근 1일 점검은 정상이라 Massive 과금은 필요성이 명확해질 때까지 보류

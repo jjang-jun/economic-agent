@@ -16,6 +16,7 @@
     "report": "node --env-file-if-exists=.env src/stock-report.js",
     "evaluate": "node --env-file-if-exists=.env src/evaluate-recommendations.js",
     "recommendations:list": "node --env-file-if-exists=.env scripts/list-recommendations.js",
+    "trade:plan": "node --env-file-if-exists=.env scripts/plan-trade.js",
     "trade:record": "node --env-file-if-exists=.env scripts/record-trade.js",
     "trade:performance": "node --env-file-if-exists=.env scripts/trade-performance.js",
     "action:report": "node --env-file-if-exists=.env scripts/action-report.js",

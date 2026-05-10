@@ -2,6 +2,7 @@ const { loadRecommendations } = require('../src/utils/recommendation-log');
 const { loadPortfolio, enrichPortfolio } = require('../src/utils/portfolio');
 const { loadStoredPortfolio } = require('../src/utils/portfolio-store');
 const { buildActionReport, enrichRecommendationsWithLatestPrices, saveActionReport } = require('../src/utils/action-report');
+const { loadOpenTradePlans } = require('../src/utils/trade-plan');
 const { sendActionReport, formatActionReport } = require('../src/notify/telegram');
 
 function hasFlag(name) {
@@ -19,7 +20,11 @@ async function main() {
   ]);
   const portfolio = await enrichPortfolio(storedPortfolio || loadPortfolio());
   const enrichedRecommendations = await enrichRecommendationsWithLatestPrices(recommendations, portfolio);
-  const report = buildActionReport({ recommendations: enrichedRecommendations, portfolio });
+  const report = buildActionReport({
+    recommendations: enrichedRecommendations,
+    portfolio,
+    plannedTrades: loadOpenTradePlans(),
+  });
   const file = saveActionReport(report);
 
   console.log(`[행동리포트] 저장: ${file}`);

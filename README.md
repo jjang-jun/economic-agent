@@ -174,6 +174,7 @@ Telegram 채팅창에서 명령어를 실제로 쓰기 위한 배포와 webhook 
 - `data/daily-summary/YYYY-MM-DD.json`: 다이제스트/종목 리포트 요약
 - `data/recommendations/recommendations.json`: 추천/성과 평가 로컬 미러. 기준 저장소는 Supabase `recommendations`, `recommendation_evaluations`
 - `data/trades/trade-executions.json`: 실제 매수/매도 기록 로컬 미러. 추천과 실제 실행은 분리합니다.
+- `data/trades/trade-plans.json`: 아직 체결되지 않은 예정 매매 로컬 체크리스트
 - `data/portfolio-snapshots/YYYY-MM-DD.json`: 보유 종목 현재가/평가손익 스냅샷
 - `data/action-reports/YYYY-MM-DD.json`: 신규 매수/관찰/보유/축소/매도 후보 일일 행동 리포트
 - `data/freedom/freedom-status.json`: 경제적 자유 목표와 현재 달성률
@@ -205,6 +206,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 추천 리포트를 보고 실제로 매수/매도했다면 별도 거래 기록으로 남깁니다. 이 기록은 추천 성과와 실제 계좌 성과를 분리해서 검증하기 위한 데이터입니다.
 
 ```bash
+npm run trade:plan -- --side sell --ticker DRAM --name "DRAM ETF" --quantity 30 --plannedDate 2026-05-11 --targetRemainingQuantity 170
 npm run trade:record -- --side buy --ticker 005930 --name 삼성전자 --quantity 3 --price 266000 --notes "1차 분할 진입"
 npm run recommendations:list
 npm run action:report
@@ -224,6 +226,8 @@ npm run security:audit
 ```bash
 npm run review:weekly -- --dry-run
 ```
+
+`trade:plan`은 아직 체결되지 않은 매수/매도 예정 작업을 `data/trades/trade-plans.json`과 포트폴리오 payload에 남깁니다. 일일 행동 리포트는 오늘까지 확인해야 할 열린 계획을 별도 섹션에 표시하고, 이후 `trade:record`가 같은 방향/종목/수량으로 기록되면 해당 계획을 자동으로 실행 완료 처리합니다. GitHub Actions에서도 보려면 계획 등록 후 `portfolio:sync-secret` 또는 `portfolio:seed-store`로 비공개 포트폴리오 원본을 동기화합니다.
 
 `trade:record`는 기본적으로 `data/portfolio.json`의 현금, 보유수량, 평균단가를 함께 갱신합니다. 거래만 기록하고 포트폴리오를 건드리지 않으려면 `--noPortfolio`를 붙입니다.
 

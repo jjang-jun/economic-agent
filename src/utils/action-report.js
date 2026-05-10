@@ -427,7 +427,7 @@ function buildPositionActions(portfolio) {
   return groups;
 }
 
-function buildActionReport({ recommendations, portfolio }) {
+function buildActionReport({ recommendations, portfolio, plannedTrades = [] }) {
   const positionActions = buildPositionActions(portfolio);
   return {
     id: `${getKSTDate()}:action-report`,
@@ -450,6 +450,7 @@ function buildActionReport({ recommendations, portfolio }) {
     holdCandidates: positionActions.hold,
     reduceCandidates: positionActions.reduce,
     sellCandidates: positionActions.sell,
+    plannedTrades,
   };
 }
 
