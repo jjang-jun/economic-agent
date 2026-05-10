@@ -130,6 +130,7 @@ function explainRiskBlocker(blocker) {
   if (text.startsWith('position_size:')) return `매수 가능 금액 없음: ${text.replace('position_size:', '').trim()}`;
   if (text.startsWith('market_regime:')) return `시장 상태 차단: ${text.replace('market_regime:', '').trim()}`;
   if (text.startsWith('entry_timing:')) return `진입 타이밍 보류: ${text.replace('entry_timing:', '').trim()}`;
+  if (text.includes('identity_name_mismatch:')) return `종목명-티커 불일치: ${text.replace(/^schema_?identity_name_mismatch:\s*/, '').trim()}`;
   if (text.startsWith('sector_limit:')) return `섹터 비중 초과: ${text.replace('sector_limit:', '').trim()}`;
   if (text.startsWith('lot_size:')) return `정수 주식 매수 불가: ${text.replace('lot_size:', '').trim()}`;
   return text;

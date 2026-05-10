@@ -123,6 +123,9 @@ function humanizeRiskReason(reason = '') {
   if (/position_size:\s*missing/i.test(text)) {
     return '제안 비중/금액 없음';
   }
+  if (/identity_name_mismatch/i.test(text)) {
+    return `종목명-티커 불일치: ${text.replace(/^schema_?identity_name_mismatch:\s*/i, '')}`;
+  }
   if (/liquidity/i.test(text)) {
     return `유동성 기준 미달: ${text}`;
   }

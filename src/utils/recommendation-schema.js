@@ -6,8 +6,23 @@ function hasNumber(value) {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
+function normalizeName(value) {
+  return String(value || '')
+    .replace(/\s+/g, '')
+    .replace(/[()㈜주식회사.,·-]/g, '')
+    .toLowerCase();
+}
+
+function isNameMismatch(stockName, officialName) {
+  const candidate = normalizeName(stockName);
+  const official = normalizeName(officialName);
+  if (!candidate || !official) return false;
+  return candidate !== official && !candidate.includes(official) && !official.includes(candidate);
+}
+
 function validateRecommendationSchema(stock = {}) {
   const risk = stock.risk_profile || stock.riskProfile || {};
+  const market = stock.market_profile || stock.marketProfile || {};
   const relatedNews = Array.isArray(stock.related_news)
     ? stock.related_news
     : (Array.isArray(stock.relatedNews) ? stock.relatedNews : []);
@@ -22,6 +37,9 @@ function validateRecommendationSchema(stock = {}) {
   if (!hasNumber(risk.riskReward)) blockers.push('risk_reward: missing');
   if (!hasNumber(risk.suggestedWeightPct) && !hasNumber(risk.suggestedAmount)) blockers.push('position_size: missing');
   if (!hasText(risk.invalidation) && !hasText(stock.invalidation)) blockers.push('invalidation: missing');
+  if (hasText(stock.name) && hasText(market.name) && isNameMismatch(stock.name, market.name)) {
+    blockers.push(`identity_name_mismatch: recommended ${stock.name} / official ${market.name}`);
+  }
 
   return {
     passed: blockers.length === 0,
@@ -59,4 +77,5 @@ function applyRecommendationSchemaValidation(report) {
 module.exports = {
   validateRecommendationSchema,
   applyRecommendationSchemaValidation,
+  isNameMismatch,
 };

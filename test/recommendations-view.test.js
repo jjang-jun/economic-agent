@@ -183,4 +183,8 @@ test('humanizeRiskReason explains common internal blockers', () => {
     humanizeRiskReason('risk_reward: 1.14:1 / min 2.5:1'),
     /최소 기준 2.5배보다 낮음/
   );
+  assert.match(
+    humanizeRiskReason('schema_identity_name_mismatch: recommended 현대건설 / official 현대위아'),
+    /종목명-티커 불일치/
+  );
 });
