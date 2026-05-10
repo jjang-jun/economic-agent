@@ -4,6 +4,7 @@ const TELEGRAM_PRIVATE_CHAT_ID = process.env.TELEGRAM_PRIVATE_CHAT_ID
   || process.env.TELEGRAM_SECRET_CHAT_ID
   || process.env.TELEGRAM_AGENT_CHAT_ID
   || process.env.TELEGRAM_PORTFOLIO_CHAT_ID;
+const { officialTickerName } = require('../config/ticker-names');
 
 const TAG_MAP = {
   portfolio: '포트폴리오',
@@ -529,6 +530,11 @@ function formatActionReport(report) {
     const review = item.riskReview || item.risk_review || {};
     const market = item.marketProfile || item.market_profile || {};
     const entryData = item.entry || {};
+    const latestQuote = item.latestQuote || item.latest_quote || {};
+    const displayName = latestQuote.name || market.name || officialTickerName(item.ticker) || item.name || item.ticker;
+    const originalName = displayName && item.name && displayName !== item.name
+      ? ` (추천명 ${item.name})`
+      : '';
     const suggestedAmount = typeof risk.suggestedAmount === 'number' && typeof portfolio.maxNewBuyAmount === 'number'
       ? Math.min(risk.suggestedAmount, portfolio.maxNewBuyAmount)
       : risk.suggestedAmount;
@@ -537,7 +543,6 @@ function formatActionReport(report) {
       && suggestedAmount < risk.suggestedAmount;
     const entryPrice = [risk.entryReferencePrice, entryData.price, market.price]
       .find(value => typeof value === 'number' && Number.isFinite(value) && value > 0) || null;
-    const latestQuote = item.latestQuote || item.latest_quote || {};
     const latestPrice = [latestQuote.price, item.latestPrice, item.latest_price]
       .find(value => typeof value === 'number' && Number.isFinite(value) && value > 0) || null;
     const latestChangePct = typeof item.latestPriceChangePct === 'number'
@@ -566,7 +571,7 @@ function formatActionReport(report) {
       ? `${mode === 'watch' ? '보류' : '차단'}: ${blockers}`
       : (mode === 'watch' ? '보류: 조건 확인 필요' : '판정: 매수 검토 가능');
     return [
-      `▸ <b>${escapeHtml(item.name || item.ticker)}</b> ${escapeHtml(item.ticker || '')}`,
+      `▸ <b>${escapeHtml(displayName)}</b> ${escapeHtml(item.ticker || '')}${escapeHtml(originalName)}`,
       priceLine ? `  ${escapeHtml(priceLine)}` : '',
       [stop, rr].filter(Boolean).length ? `  ${escapeHtml([stop, rr].filter(Boolean).join(' · '))}` : '',
       size ? `  ${escapeHtml(size)}` : '',

@@ -253,6 +253,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 수집기 운영 점검에서 이미 해결된 과거 실패를 분리했다. `stale run cleaned` 계열 redeploy/smoke 실패와 과거 `toAdd` 초기화 버그 실패는 `resolvedFailureRuns`로 따로 보여주고, 성공률·상태·실패 이상치는 조치 필요 실패 기준으로 계산한다. 즉시 알림 실패도 최근 24시간 조치 필요 실패와 과거 실패로 나눈다. 2026-05-10 실조회 기준 최근 7일은 성공 244건, 조치 필요 실패 0건, 정리된 과거 실패 6건, 최근 즉시 알림 실패 0건, 과거 즉시 알림 실패 3건이며 이상치는 없다.
 - 로컬 HTML 대시보드와 서버 `/dashboard`의 수집기 상태 표시도 같은 기준으로 맞췄다. 기존 `Failures`/`실패` 대신 조치 필요 실패, 정리된 과거 실패, 최근/과거 즉시 알림 실패를 나눠 보여준다.
 - 예정 매매 체크리스트를 추가했다. `npm run trade:plan`은 아직 체결되지 않은 매수/매도 계획을 `data/trades/trade-plans.json`과 포트폴리오 payload에 남기고, 일일 행동 리포트는 오늘까지 확인해야 할 계획을 `예정 매매 확인` 섹션에 표시한다. 이후 같은 방향/종목/수량의 `trade:record`가 들어오면 열린 계획을 자동으로 실행 완료 처리한다.
+- 가격/환율 provider 장애 시 포트폴리오 숫자 방어를 보강했다. 환율 또는 현재가 조회가 실패하면 USD 보유 종목을 환율 1로 재계산하지 않고 기존 `fxRate`, `marketValue`, `unrealizedPnl`, `totalAssetValue`를 보존한다. 로컬 포트폴리오는 총자산 57,377,347원, 현금 15,000,000원, 평가손익 3,027,997원 기준으로 복구하고 GitHub Actions secret을 재동기화했다.
 
 ## 다음 작업
 

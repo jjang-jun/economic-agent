@@ -89,3 +89,45 @@ test('formatActionReport shows planned trades as a separate checklist', () => {
   assert.match(message, /30주/);
   assert.match(message, /목표 잔여 170주/);
 });
+
+test('loadOpenTradePlans can include near upcoming plans without showing distant future plans', () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'trade-plan-upcoming-'));
+  const originalRead = fs.readFileSync;
+  const originalWrite = fs.writeFileSync;
+  const originalMkdir = fs.mkdirSync;
+  const originalPortfolioFile = process.env.PORTFOLIO_FILE;
+  const tempFile = path.join(tempDir, 'trade-plans.json');
+  const tempPortfolioFile = path.join(tempDir, 'portfolio.json');
+
+  fs.readFileSync = (file, ...args) => originalRead(file === tradePlan.PLAN_FILE ? tempFile : file, ...args);
+  fs.writeFileSync = (file, ...args) => originalWrite(file === tradePlan.PLAN_FILE ? tempFile : file, ...args);
+  fs.mkdirSync = (dir, ...args) => originalMkdir(dir === path.dirname(tradePlan.PLAN_FILE) ? tempDir : dir, ...args);
+  process.env.PORTFOLIO_FILE = tempPortfolioFile;
+
+  try {
+    tradePlan.saveTradePlans([
+      tradePlan.buildTradePlan({ side: 'sell', ticker: 'DRAM', quantity: 30, plannedDate: '2026-05-11' }),
+      tradePlan.buildTradePlan({ side: 'sell', ticker: 'NFLX', quantity: 1, plannedDate: '2026-05-13' }),
+    ]);
+
+    const dueOnly = tradePlan.loadOpenTradePlans({
+      today: '2026-05-10',
+      includePortfolio: false,
+    });
+    const upcoming = tradePlan.loadOpenTradePlans({
+      today: '2026-05-10',
+      upcomingDays: 1,
+      includePortfolio: false,
+    });
+
+    assert.equal(dueOnly.length, 0);
+    assert.deepEqual(upcoming.map(plan => plan.ticker), ['DRAM']);
+  } finally {
+    fs.readFileSync = originalRead;
+    fs.writeFileSync = originalWrite;
+    fs.mkdirSync = originalMkdir;
+    if (originalPortfolioFile === undefined) delete process.env.PORTFOLIO_FILE;
+    else process.env.PORTFOLIO_FILE = originalPortfolioFile;
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});

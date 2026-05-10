@@ -85,3 +85,41 @@ test('enrichPortfolio preserves manual unrealized PnL amount overrides', async (
   assert.equal(portfolio.positions[1].unrealizedPnl, 2239016);
   assert.equal(portfolio.unrealizedPnl, 2082314);
 });
+
+test('enrichPortfolio preserves USD valuation fields when FX and quote fetches fail', async () => {
+  const portfolio = await enrichPortfolio({
+    cashAmount: 15000000,
+    investedAmount: 42377347,
+    totalAssetValue: 57377347,
+    unrealizedPnl: 3027997,
+    unrealizedPnlPct: 7.75,
+    positions: [
+      {
+        name: 'DRAM',
+        ticker: 'DRAM',
+        symbol: 'DRAM',
+        currency: 'USD',
+        quantity: 200,
+        avgPrice: 44.28,
+        currentPrice: 52.79,
+        fxRate: 1394,
+        costBasis: 12344064,
+        marketValue: 14725084,
+        unrealizedPnl: 2239016,
+        unrealizedPnlPct: 17.3,
+      },
+    ],
+  }, {
+    fetcher: async () => null,
+  });
+
+  assert.equal(portfolio.positions[0].fxRate, 1394);
+  assert.equal(portfolio.positions[0].marketValue, 14725084);
+  assert.equal(portfolio.positions[0].costBasis, 12344064);
+  assert.equal(portfolio.positions[0].unrealizedPnl, 2239016);
+  assert.equal(portfolio.positions[0].unrealizedPnlPct, 17.3);
+  assert.equal(portfolio.investedAmount, 42377347);
+  assert.equal(portfolio.totalAssetValue, 57377347);
+  assert.equal(portfolio.unrealizedPnl, 3027997);
+  assert.equal(portfolio.unrealizedPnlPct, 7.75);
+});

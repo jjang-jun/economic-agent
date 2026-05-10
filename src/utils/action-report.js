@@ -147,11 +147,16 @@ async function enrichRecommendationsWithLatestPrices(recommendations = [], portf
     return {
       ...recommendation,
       latestQuote: {
+        name: quote.name || '',
         price: quote.price,
         currency: quote.currency || '',
         source: quote.source || '',
         marketTime: quote.marketTime || null,
         priceType: quote.priceType || 'current',
+      },
+      marketProfile: {
+        ...(recommendation.marketProfile || recommendation.market_profile || {}),
+        ...(quote.name ? { name: quote.name } : {}),
       },
       latestPrice: quote.price,
       latestPriceChangePct: latestPriceChangePct({ ...recommendation, latestQuote: quote }),

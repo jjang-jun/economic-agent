@@ -54,6 +54,18 @@ function syncOpenPlansToPortfolio(plans) {
   }
 }
 
+function addKstDays(date, days) {
+  const base = new Date(`${date}T00:00:00+09:00`);
+  if (!Number.isFinite(base.getTime())) return date;
+  base.setUTCDate(base.getUTCDate() + days);
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(base);
+}
+
 function normalizeSide(side) {
   const value = String(side || '').toLowerCase();
   if (['buy', 'sell'].includes(value)) return value;
@@ -108,12 +120,15 @@ function upsertTradePlan(input) {
 
 function loadOpenTradePlans(options = {}) {
   const today = options.today || getKSTDate();
+  const throughDate = typeof options.upcomingDays === 'number' && options.upcomingDays > 0
+    ? addKstDays(today, options.upcomingDays)
+    : today;
   const plans = options.includePortfolio === false
     ? loadTradePlans()
     : mergeTradePlans(loadPortfolioTradePlans(), loadTradePlans());
   return plans
     .filter(plan => (plan.status || 'open') === 'open')
-    .filter(plan => options.includeFuture || !plan.plannedDate || String(plan.plannedDate) <= String(today))
+    .filter(plan => options.includeFuture || !plan.plannedDate || String(plan.plannedDate) <= String(throughDate))
     .sort((a, b) => String(a.plannedDate).localeCompare(String(b.plannedDate)));
 }
 

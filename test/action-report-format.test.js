@@ -163,6 +163,86 @@ test('formatActionReport defaults non-Korean prices to USD when currency is omit
   assert.match(message, /손절 \$474.03/);
 });
 
+test('formatActionReport uses official quote name before stale recommendation name', () => {
+  const message = formatActionReport({
+    date: '2026-05-10',
+    portfolio: { totalAssetValue: 60000000, cashAmount: 10000000, cashRatio: 0.17, positionCount: 1 },
+    newBuyCandidates: [],
+    watchOnlyCandidates: [{
+      name: '현대건설',
+      ticker: '011210.KS',
+      marketProfile: { name: '현대위아', price: 90500, currency: 'KRW' },
+      riskProfile: {
+        suggestedAmount: 1000000,
+        entryReferencePrice: 90500,
+        stopLossPrice: 83260,
+        riskReward: 0.88,
+      },
+      riskReview: {
+        action: 'watch_only',
+        blockers: ['risk_reward: 0.88 < required 2.5'],
+      },
+    }],
+    holdCandidates: [],
+    reduceCandidates: [],
+    sellCandidates: [],
+    plannedTrades: [],
+  });
+
+  assert.match(message, /<b>현대위아<\/b> 011210.KS \(추천명 현대건설\)/);
+  assert.doesNotMatch(message, /<b>현대건설<\/b> 011210.KS/);
+});
+
+test('formatActionReport corrects known stale ticker names even without a fresh quote', () => {
+  const message = formatActionReport({
+    date: '2026-05-10',
+    portfolio: { totalAssetValue: 60000000, cashAmount: 10000000, cashRatio: 0.17, positionCount: 1 },
+    newBuyCandidates: [],
+    watchOnlyCandidates: [{
+      name: '현대건설',
+      ticker: '011210.KS',
+      riskProfile: {
+        suggestedAmount: 1000000,
+        entryReferencePrice: 90500,
+        stopLossPrice: 83260,
+        riskReward: 0.88,
+      },
+      riskReview: {
+        action: 'watch_only',
+        blockers: ['risk_reward: 0.88 < required 2.5'],
+      },
+    }],
+    holdCandidates: [],
+    reduceCandidates: [],
+    sellCandidates: [],
+    plannedTrades: [],
+  });
+
+  assert.match(message, /<b>현대위아<\/b> 011210.KS \(추천명 현대건설\)/);
+});
+
+test('enrichRecommendationsWithLatestPrices carries official quote name into action report', async () => {
+  const recommendations = await enrichRecommendationsWithLatestPrices([
+    {
+      name: '현대건설',
+      ticker: '011210.KS',
+      signal: 'bullish',
+      createdAt: new Date().toISOString(),
+      riskProfile: { entryReferencePrice: 90500 },
+    },
+  ], { positions: [] }, {
+    fetcher: async () => ({
+      name: '현대위아',
+      price: 90500,
+      currency: 'KRW',
+      source: 'test-price',
+    }),
+  });
+
+  assert.equal(recommendations[0].latestQuote.name, '현대위아');
+  assert.equal(recommendations[0].marketProfile.name, '현대위아');
+});
+
 test('buildActionReport enforces sector limits on buys and holdings', () => {
   const report = buildActionReport({
     portfolio: {

@@ -23,7 +23,7 @@ async function main() {
   const report = buildActionReport({
     recommendations: enrichedRecommendations,
     portfolio,
-    plannedTrades: loadOpenTradePlans(),
+    plannedTrades: loadOpenTradePlans({ upcomingDays: 1 }),
   });
   const file = saveActionReport(report);
 
