@@ -83,7 +83,7 @@ function getWholeSharePlan({ ticker, amount, entryPrice }) {
 
 function formatQuantity(value) {
   if (typeof value !== 'number' || !Number.isFinite(value)) return '';
-  return Number.isInteger(value) ? `${value.toLocaleString('ko-KR')}주` : `${round(value, 4)}주`;
+  return Number.isInteger(value) ? `${value.toLocaleString('ko-KR')}주` : `${round(value, 2)}주`;
 }
 
 function formatRegime(regime, score) {
@@ -493,6 +493,13 @@ async function sendStockReport(report) {
 
 function formatActionReport(report) {
   const portfolio = report.portfolio || {};
+  const counts = {
+    buy: (report.newBuyCandidates || []).length,
+    watch: (report.watchOnlyCandidates || []).length,
+    hold: (report.holdCandidates || []).length,
+    reduce: (report.reduceCandidates || []).length,
+    sell: (report.sellCandidates || []).length,
+  };
   const portfolioLines = [
     portfolio.totalAssetValue ? `총자산 ${formatKRW(portfolio.totalAssetValue)}` : '',
     typeof portfolio.cashAmount === 'number' ? `현금 ${formatKRW(portfolio.cashAmount)} (${Math.round((portfolio.cashRatio || 0) * 100)}%)` : '',
@@ -500,7 +507,16 @@ function formatActionReport(report) {
     `보유 ${portfolio.positionCount || 0}개`,
   ].filter(Boolean).map(item => `▸ ${escapeHtml(item)}`);
 
-  const formatRecommendation = item => {
+  const summaryTable = [
+    '구분       건수',
+    `매수후보   ${String(counts.buy).padStart(2, ' ')}`,
+    `관찰       ${String(counts.watch).padStart(2, ' ')}`,
+    `보유       ${String(counts.hold).padStart(2, ' ')}`,
+    `축소       ${String(counts.reduce).padStart(2, ' ')}`,
+    `매도       ${String(counts.sell).padStart(2, ' ')}`,
+  ].join('\n');
+
+  const formatRecommendation = (item, mode = 'candidate') => {
     const risk = item.riskProfile || item.risk_profile || {};
     const review = item.riskReview || item.risk_review || {};
     const market = item.marketProfile || item.market_profile || {};
@@ -525,20 +541,29 @@ function formatActionReport(report) {
       : (entryPrice && expectedLossPct ? entryPrice * (1 - expectedLossPct / 100) : null);
     const sharePlan = getWholeSharePlan({ ticker: item.ticker, amount: suggestedAmount, entryPrice });
     const priceCurrency = risk.currency || entryData.currency || market.currency || latestQuote.currency || (isKoreanStockTicker(item.ticker) ? 'KRW' : 'USD');
-    const entry = entryPrice ? ` · 기준가(추천시) ${formatAssetPrice(entryPrice, priceCurrency)}` : '';
+    const entry = entryPrice ? `추천 ${formatAssetPrice(entryPrice, priceCurrency)}` : '';
     const latest = latestPrice
-      ? ` · 현재가 ${formatAssetPrice(latestPrice, latestQuote.currency || priceCurrency)}${typeof latestChangePct === 'number' ? ` (${latestChangePct >= 0 ? '+' : ''}${formatPct(latestChangePct)})` : ''}`
+      ? `현재 ${formatAssetPrice(latestPrice, latestQuote.currency || priceCurrency)}${typeof latestChangePct === 'number' ? ` (${latestChangePct >= 0 ? '+' : ''}${formatPct(latestChangePct)})` : ''}`
       : '';
-    const stop = stopPrice ? ` · 손절 기준 ${formatAssetPrice(stopPrice, priceCurrency)}` : '';
-    const original = wasCapped ? `원안 ${formatKRW(risk.suggestedAmount)} → ` : '';
+    const priceLine = [latest, entry].filter(Boolean).join(' · ');
+    const stop = stopPrice ? `손절 ${formatAssetPrice(stopPrice, priceCurrency)}` : '';
     const size = sharePlan?.shares === 0
-      ? ` · 매수 보류: ${sharePlan.note}${wasCapped ? ` 원안은 ${formatKRW(risk.suggestedAmount)}이나 1회 상한 ${formatKRW(suggestedAmount)}을 적용했습니다.` : ''}`
+      ? `제안: 매수 보류 - ${sharePlan.note}${wasCapped ? ` 원안 ${formatKRW(risk.suggestedAmount)}, 1회 상한 ${formatKRW(suggestedAmount)} 적용.` : ''}`
       : sharePlan
-      ? ` · 제안 ${original}${formatQuantity(sharePlan.shares)} / ${formatKRW(sharePlan.amount)}${wasCapped ? ' (1회 상한 적용)' : ''}`
-      : (suggestedAmount ? ` · 제안 ${original}${formatKRW(suggestedAmount)}${wasCapped ? ' (1회 상한 적용)' : ''}` : '');
-    const rr = risk.riskReward ? ` · 손익비 ${risk.riskReward}:1` : '';
+      ? `제안: ${formatQuantity(sharePlan.shares)} / ${formatKRW(sharePlan.amount)}${wasCapped ? ` (원안 ${formatKRW(risk.suggestedAmount)}, 1회 상한)` : ''}`
+      : (suggestedAmount ? `제안: ${formatKRW(suggestedAmount)}${wasCapped ? ` (원안 ${formatKRW(risk.suggestedAmount)}, 1회 상한)` : ''}` : '');
+    const rr = risk.riskReward ? `손익비 ${risk.riskReward}:1` : '';
     const blockers = (review.blockers || []).slice(0, 1).map(explainRiskBlocker).join(', ');
-    return `▸ ${escapeHtml(item.name || item.ticker)} ${escapeHtml(item.ticker || '')}${entry}${latest}${stop}${size}${rr}${blockers ? ` · 차단 ${escapeHtml(blockers)}` : ''}`;
+    const decision = blockers
+      ? `${mode === 'watch' ? '보류' : '차단'}: ${blockers}`
+      : (mode === 'watch' ? '보류: 조건 확인 필요' : '판정: 매수 검토 가능');
+    return [
+      `▸ <b>${escapeHtml(item.name || item.ticker)}</b> ${escapeHtml(item.ticker || '')}`,
+      priceLine ? `  ${escapeHtml(priceLine)}` : '',
+      [stop, rr].filter(Boolean).length ? `  ${escapeHtml([stop, rr].filter(Boolean).join(' · '))}` : '',
+      size ? `  ${escapeHtml(size)}` : '',
+      `  ${escapeHtml(decision)}`,
+    ].filter(Boolean).join('\n');
   };
 
   const formatPosition = (item, action = 'hold') => {
@@ -549,7 +574,7 @@ function formatActionReport(report) {
     const reasons = (item.actionReasons || []).slice(0, 2).join(', ');
     const evidence = (item.actionEvidence || []).slice(0, 3).join(', ');
     const currency = item.priceCurrency || item.currency || (isKoreanStockTicker(item.ticker) ? 'KRW' : 'USD');
-    const currentPrice = typeof item.currentPrice === 'number' ? ` · 현재가 ${formatAssetPrice(item.currentPrice, currency)}` : '';
+    const currentPrice = typeof item.currentPrice === 'number' ? `현재 ${formatAssetPrice(item.currentPrice, currency)}` : '';
     const stopLossPct = typeof item.stopLossPct === 'number'
       ? item.stopLossPct
       : (typeof item.actionStopLossPct === 'number' ? item.actionStopLossPct : null);
@@ -561,12 +586,18 @@ function formatActionReport(report) {
     const stopPlan = item.actionStopPlan || {};
     const stopLabel = stopPlan.trailingApplied ? '수익보호 손절가' : '참고 손절가';
     const stopPrice = stopReferencePrice
-      ? ` · ${stopLabel} ${formatAssetPrice(stopReferencePrice, currency)}`
+      ? `${stopLabel} ${formatAssetPrice(stopReferencePrice, currency)}`
       : '';
     const trim = action === 'reduce' ? formatTrimSuggestion(item) : '';
-    const reasonText = reasons ? ` · 판단 ${escapeHtml(reasons)}` : '';
-    const evidenceText = evidence ? ` · 근거 ${escapeHtml(evidence)}` : '';
-    return `▸ ${escapeHtml(item.name || item.ticker)}${currentPrice}${pnl}${weight}${stopPrice}${trim}${reasonText}${evidenceText}`;
+    const positionLine = [currentPrice, pnl.replace(/^ · /, ''), weight.replace(/^ · /, '')].filter(Boolean).join(' · ');
+    const stopLine = [stopPrice, trim.replace(/^ · /, '')].filter(Boolean).join(' · ');
+    return [
+      `▸ <b>${escapeHtml(item.name || item.ticker)}</b>`,
+      positionLine ? `  ${escapeHtml(positionLine)}` : '',
+      stopLine ? `  ${escapeHtml(stopLine)}` : '',
+      reasons ? `  판단: ${escapeHtml(reasons)}` : '',
+      evidence ? `  근거: ${escapeHtml(evidence)}` : '',
+    ].filter(Boolean).join('\n');
   };
 
   function formatTrimSuggestion(item) {
@@ -574,6 +605,8 @@ function formatActionReport(report) {
     const quantity = typeof item.quantity === 'number' ? item.quantity : null;
     const value = typeof item.marketValue === 'number' ? item.marketValue : null;
     const currentPrice = typeof item.currentPrice === 'number' ? item.currentPrice : null;
+    const fxRate = typeof item.fxRate === 'number' && Number.isFinite(item.fxRate) && item.fxRate > 0 ? item.fxRate : 1;
+    const priceInPortfolioCurrency = currentPrice ? currentPrice * fxRate : null;
     const weight = typeof item.weight === 'number' ? item.weight : null;
     const maxPositionRatio = typeof portfolio.maxPositionRatio === 'number' ? portfolio.maxPositionRatio : null;
 
@@ -584,10 +617,10 @@ function formatActionReport(report) {
       return ` · 축소안 ${formatKRW(plan.amount)} 매도`;
     }
 
-    if (quantity && currentPrice && weight && maxPositionRatio && weight > maxPositionRatio) {
+    if (quantity && priceInPortfolioCurrency && weight && maxPositionRatio && weight > maxPositionRatio) {
       const targetValue = (portfolio.totalAssetValue || 0) * maxPositionRatio;
       const reduceValue = Math.max(0, value - targetValue);
-      const shares = isKoreanStockTicker(item.ticker) ? Math.ceil(reduceValue / currentPrice) : reduceValue / currentPrice;
+      const shares = isKoreanStockTicker(item.ticker) ? Math.ceil(reduceValue / priceInPortfolioCurrency) : reduceValue / priceInPortfolioCurrency;
       if (shares > 0) return ` · 축소안 ${formatQuantity(Math.min(shares, quantity))} 매도`;
     }
 
@@ -605,10 +638,14 @@ function formatActionReport(report) {
       `⏰ ${escapeHtml(report.date)}`,
     ].join('\n'),
     [
+      '<b>한눈에 보기</b>',
+      `<pre>${escapeHtml(summaryTable)}</pre>`,
+    ].join('\n'),
+    [
       '<b>읽는 법</b>',
-      '▸ 신규 매수 후보는 조건을 통과한 종목입니다.',
-      '▸ 관찰 후보는 관심은 있지만 지금 매수는 보류한다는 뜻입니다.',
-      '▸ 손절 기준은 손실을 제한하기 위해 다시 점검할 가격입니다.',
+      '▸ 추천=추천 당시 기준가, 현재=리포트 생성 시점 가격입니다.',
+      '▸ 관찰은 관심은 있지만 지금 매수는 보류한다는 뜻입니다.',
+      '▸ 손절은 손실 제한을 위해 다시 점검할 가격입니다.',
     ].join('\n'),
     [
       '<b>1. 포트폴리오</b>',
@@ -616,23 +653,23 @@ function formatActionReport(report) {
     ].join('\n'),
     [
       '<b>2. 지금 살 수 있는 후보</b>',
-      (report.newBuyCandidates || []).map(formatRecommendation).join('\n') || '▸ 없음',
+      (report.newBuyCandidates || []).map(item => formatRecommendation(item, 'candidate')).join('\n\n') || '▸ 없음',
     ].join('\n'),
     [
       '<b>3. 관심은 있지만 보류</b>',
-      (report.watchOnlyCandidates || []).map(formatRecommendation).join('\n') || '▸ 없음',
+      (report.watchOnlyCandidates || []).map(item => formatRecommendation(item, 'watch')).join('\n\n') || '▸ 없음',
     ].join('\n'),
     [
       '<b>4. 그대로 보유</b>',
-      (report.holdCandidates || []).slice(0, 5).map(item => formatPosition(item, 'hold')).join('\n') || '▸ 없음',
+      (report.holdCandidates || []).slice(0, 5).map(item => formatPosition(item, 'hold')).join('\n\n') || '▸ 없음',
     ].join('\n'),
     [
       '<b>5. 일부 줄일 후보</b>',
-      (report.reduceCandidates || []).map(item => formatPosition(item, 'reduce')).join('\n') || '▸ 없음',
+      (report.reduceCandidates || []).map(item => formatPosition(item, 'reduce')).join('\n\n') || '▸ 없음',
     ].join('\n'),
     [
       '<b>6. 전량 매도 후보</b>',
-      (report.sellCandidates || []).map(item => formatPosition(item, 'sell')).join('\n') || '▸ 없음',
+      (report.sellCandidates || []).map(item => formatPosition(item, 'sell')).join('\n\n') || '▸ 없음',
     ].join('\n'),
     '<i>자동 주문이 아닙니다. 실제 매매 전 손절선, 유동성, 당일 수급을 다시 확인하세요.</i>',
   ];

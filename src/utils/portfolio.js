@@ -117,6 +117,9 @@ function valuePosition(position, quote, fxRates = {}) {
   const manualPnlPct = typeof position.manualPnlPct === 'number'
     ? position.manualPnlPct
     : null;
+  const manualUnrealizedPnl = typeof position.unrealizedPnl === 'number'
+    ? position.unrealizedPnl
+    : null;
   const manualCurrentPrice = manualPnlPct !== null && avgPrice !== null
     ? avgPrice * (1 + manualPnlPct / 100)
     : null;
@@ -127,7 +130,9 @@ function valuePosition(position, quote, fxRates = {}) {
   const fxRate = getFxRate(currency, fxRates);
   const costBasis = quantity !== null && avgPrice !== null ? quantity * avgPrice * fxRate : null;
   const marketValue = quantity !== null && typeof currentPrice === 'number' ? quantity * currentPrice * fxRate : null;
-  const unrealizedPnl = marketValue !== null && costBasis !== null ? marketValue - costBasis : null;
+  const unrealizedPnl = manualUnrealizedPnl !== null
+    ? manualUnrealizedPnl
+    : (marketValue !== null && costBasis !== null ? marketValue - costBasis : null);
   const unrealizedPnlPct = manualPnlPct !== null
     ? manualPnlPct
     : (unrealizedPnl !== null && costBasis
@@ -155,14 +160,15 @@ function valuePosition(position, quote, fxRates = {}) {
   };
 }
 
-async function enrichPortfolio(portfolio = loadPortfolio()) {
-  const usdKrw = await fetchCurrentPrice('KRW=X');
+async function enrichPortfolio(portfolio = loadPortfolio(), options = {}) {
+  const fetcher = options.fetcher || fetchCurrentPrice;
+  const usdKrw = await fetcher('KRW=X');
   const fxRates = {
     USDKRW: typeof usdKrw?.price === 'number' ? usdKrw.price : 1,
   };
   const valuedPositions = await Promise.all((portfolio.positions || []).map(async position => {
     const quote = position.symbol || position.ticker
-      ? await fetchCurrentPrice(position.symbol || position.ticker)
+      ? await fetcher(position.symbol || position.ticker)
       : null;
     return valuePosition(position, quote, fxRates);
   }));
@@ -175,7 +181,9 @@ async function enrichPortfolio(portfolio = loadPortfolio()) {
   ), 0);
   const cashAmount = typeof portfolio.cashAmount === 'number' ? portfolio.cashAmount : 0;
   const totalAssetValue = cashAmount + investedAmount;
-  const unrealizedPnl = investedAmount - costBasis;
+  const unrealizedPnl = valuedPositions.reduce((sum, position) => (
+    sum + (typeof position.unrealizedPnl === 'number' ? position.unrealizedPnl : 0)
+  ), 0);
   const positions = valuedPositions.map(position => ({
     ...position,
     weight: totalAssetValue && typeof position.marketValue === 'number'

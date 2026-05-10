@@ -37,10 +37,13 @@ test('formatActionReport renders Korean buy candidates as whole shares with entr
   });
 
   assert.match(message, /읽는 법/);
-  assert.match(message, /기준가\(추천시\) 171,000원/);
-  assert.match(message, /현재가 168,000원 \(-1.7%\)/);
-  assert.match(message, /손절 기준 159,030원/);
-  assert.match(message, /제안 원안 2,966,738원 → 5주 \/ 855,000원 \(1회 상한 적용\)/);
+  assert.match(message, /한눈에 보기/);
+  assert.match(message, /<pre>구분       건수/);
+  assert.match(message, /매수후보\s+1/);
+  assert.match(message, /추천 171,000원/);
+  assert.match(message, /현재 168,000원 \(-1.7%\)/);
+  assert.match(message, /손절 159,030원/);
+  assert.match(message, /제안: 5주 \/ 855,000원 \(원안 2,966,738원, 1회 상한\)/);
 });
 
 test('formatActionReport explains hold evidence and reduce amount', () => {
@@ -88,7 +91,7 @@ test('formatActionReport explains hold evidence and reduce amount', () => {
 
   assert.match(message, /VGT/);
   assert.match(message, /수익보호 손절가 \$473.8/);
-  assert.match(message, /근거 현재 손익 18.9%, 비중 8%, 손절 기준 -8% 미도달/);
+  assert.match(message, /근거: 현재 손익 18.9%, 비중 8%, 손절 기준 -8% 미도달/);
   assert.match(message, /넷플릭스/);
   assert.match(message, /축소안/);
   assert.match(message, /매도/);
@@ -122,11 +125,11 @@ test('formatActionReport blocks Korean candidates when one share exceeds suggest
     sellCandidates: [],
   });
 
-  assert.match(message, /기준가\(추천시\) 1,654,000원/);
-  assert.match(message, /현재가 1,686,000원 \(\+1.9%\)/);
-  assert.match(message, /손절 기준 1,571,300원/);
-  assert.match(message, /매수 보류: 1주 매수에 필요한 금액 1,654,000원보다 제안금액이 작습니다/);
-  assert.match(message, /원안은 2,966,738원이나 1회 상한 1,000,000원을 적용했습니다/);
+  assert.match(message, /추천 1,654,000원/);
+  assert.match(message, /현재 1,686,000원 \(\+1.9%\)/);
+  assert.match(message, /손절 1,571,300원/);
+  assert.match(message, /제안: 매수 보류 - 1주 매수에 필요한 금액 1,654,000원보다 제안금액이 작습니다/);
+  assert.match(message, /원안 2,966,738원, 1회 상한 1,000,000원 적용/);
 });
 
 test('formatActionReport defaults non-Korean prices to USD when currency is omitted', () => {
@@ -156,8 +159,8 @@ test('formatActionReport defaults non-Korean prices to USD when currency is omit
     sellCandidates: [],
   });
 
-  assert.match(message, /기준가\(추천시\) \$515.25/);
-  assert.match(message, /손절 기준 \$474.03/);
+  assert.match(message, /추천 \$515.25/);
+  assert.match(message, /손절 \$474.03/);
 });
 
 test('buildActionReport enforces sector limits on buys and holdings', () => {
@@ -287,4 +290,32 @@ test('classifyPosition applies trailing stop and rebalance trim plans', () => {
   assert.equal(report.reduceCandidates[0].actionStopPrice, 120.9);
   assert.equal(report.reduceCandidates[0].actionStopPlan.trailingApplied, true);
   assert.equal(report.reduceCandidates[0].actionTrimPlan.amount, 1000000);
+});
+
+test('classifyPosition converts USD prices before calculating trim shares', () => {
+  const report = buildActionReport({
+    portfolio: {
+      totalAssetValue: 60000000,
+      cashAmount: 1000000,
+      maxPositionRatio: 0.2,
+      maxSectorRatio: 0.8,
+      stopLossPct: -7,
+      positions: [{
+        name: 'DRAM',
+        ticker: 'DRAM',
+        sector: 'semiconductor',
+        quantity: 200,
+        currentPrice: 50,
+        fxRate: 1400,
+        marketValue: 14000000,
+        weight: 0.23,
+        unrealizedPnlPct: 17.3,
+      }],
+    },
+    recommendations: [],
+  });
+
+  assert.equal(report.reduceCandidates.length, 1);
+  assert.equal(report.reduceCandidates[0].actionTrimPlan.amount, 2000000);
+  assert.equal(Math.round(report.reduceCandidates[0].actionTrimPlan.quantity), 29);
 });

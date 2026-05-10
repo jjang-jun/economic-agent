@@ -36,6 +36,15 @@ function positionValue(position, totalAssetValue = 0) {
   return 0;
 }
 
+function positionPriceInPortfolioCurrency(position = {}) {
+  const currentPrice = typeof position.currentPrice === 'number' ? position.currentPrice : null;
+  if (!currentPrice) return null;
+  const fxRate = typeof position.fxRate === 'number' && Number.isFinite(position.fxRate) && position.fxRate > 0
+    ? position.fxRate
+    : 1;
+  return currentPrice * fxRate;
+}
+
 function round(value, digits = 2) {
   if (typeof value !== 'number' || !Number.isFinite(value)) return null;
   const factor = 10 ** digits;
@@ -269,8 +278,9 @@ function buildTrimPlan(position, portfolio, portfolioContext, reasons = []) {
     ? Math.max(...candidates.map(candidate => candidate.amount || 0))
     : 0;
   const boundedAmount = Math.min(value, Math.max(0, amount));
-  const quantityToSell = quantity && currentPrice && boundedAmount > 0
-    ? (isKoreanTicker(position.ticker) ? Math.ceil(boundedAmount / currentPrice) : boundedAmount / currentPrice)
+  const priceInPortfolioCurrency = positionPriceInPortfolioCurrency(position);
+  const quantityToSell = quantity && priceInPortfolioCurrency && boundedAmount > 0
+    ? (isKoreanTicker(position.ticker) ? Math.ceil(boundedAmount / priceInPortfolioCurrency) : boundedAmount / priceInPortfolioCurrency)
     : null;
 
   return {

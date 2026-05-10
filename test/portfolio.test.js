@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { normalizePortfolio } = require('../src/utils/portfolio');
+const { enrichPortfolio, normalizePortfolio } = require('../src/utils/portfolio');
 
 test('normalizePortfolio preserves manual PnL percent override', () => {
   const portfolio = normalizePortfolio({
@@ -46,4 +46,42 @@ test('normalizePortfolio preserves valuation fields for stored portfolios', () =
   assert.equal(position.priceSource, 'quote');
   assert.equal(position.quoteSource, 'FMP');
   assert.equal(position.fxRate, 1390);
+});
+
+test('enrichPortfolio preserves manual unrealized PnL amount overrides', async () => {
+  const portfolio = await enrichPortfolio({
+    cashAmount: 1000000,
+    positions: [
+      {
+        name: 'Netflix',
+        ticker: 'NFLX',
+        symbol: 'NFLX',
+        currency: 'USD',
+        quantity: 22,
+        avgPrice: 90.87,
+        currentPrice: 87.33,
+        unrealizedPnl: -156702,
+      },
+      {
+        name: 'DRAM',
+        ticker: 'DRAM',
+        symbol: 'DRAM',
+        currency: 'USD',
+        quantity: 200,
+        avgPrice: 44.28,
+        unrealizedPnl: 2239016,
+      },
+    ],
+  }, {
+    fetcher: async symbol => {
+      if (symbol === 'KRW=X') return { price: 1400, currency: 'KRW', source: 'test' };
+      if (symbol === 'DRAM') return { price: 50, currency: 'USD', source: 'test' };
+      return { price: 87.33, currency: 'USD', source: 'test' };
+    },
+  });
+
+  assert.equal(portfolio.positions[0].currentPrice, 87.33);
+  assert.equal(portfolio.positions[0].unrealizedPnl, -156702);
+  assert.equal(portfolio.positions[1].unrealizedPnl, 2239016);
+  assert.equal(portfolio.unrealizedPnl, 2082314);
 });
