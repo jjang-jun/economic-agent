@@ -141,10 +141,15 @@ function valuePosition(position, quote, fxRates = {}) {
   const fxRate = getFxRate(currency, fxRates, position.fxRate);
   const canValue = typeof fxRate === 'number' && Number.isFinite(fxRate);
   const hasQuotePrice = typeof quote?.price === 'number' && Number.isFinite(quote.price);
-  const costBasis = existingCostBasis !== null && !hasQuotePrice
+  const preserveManualValuation = existingMarketValue !== null && (
+    position.priceSource === 'manual'
+    || position.quoteSource === 'manual'
+    || typeof position.currentPrice === 'number'
+  );
+  const costBasis = existingCostBasis !== null && (!hasQuotePrice || preserveManualValuation)
     ? existingCostBasis
     : (canValue && quantity !== null && avgPrice !== null ? quantity * avgPrice * fxRate : existingCostBasis);
-  const marketValue = existingMarketValue !== null && !hasQuotePrice
+  const marketValue = existingMarketValue !== null && (!hasQuotePrice || preserveManualValuation)
     ? existingMarketValue
     : (canValue && quantity !== null && typeof currentPrice === 'number' ? quantity * currentPrice * fxRate : existingMarketValue);
   const unrealizedPnl = manualUnrealizedPnl !== null
@@ -152,7 +157,7 @@ function valuePosition(position, quote, fxRates = {}) {
     : (marketValue !== null && costBasis !== null ? marketValue - costBasis : null);
   const unrealizedPnlPct = manualPnlPct !== null
     ? manualPnlPct
-    : (existingPnlPct !== null && !hasQuotePrice
+    : (existingPnlPct !== null && (!hasQuotePrice || preserveManualValuation)
     ? existingPnlPct
     : (unrealizedPnl !== null && costBasis
     ? round((unrealizedPnl / costBasis) * 100)
@@ -199,7 +204,7 @@ async function enrichPortfolio(portfolio = loadPortfolio(), options = {}) {
     sum + (typeof position.costBasis === 'number' ? position.costBasis : 0)
   ), 0);
   const cashAmount = typeof portfolio.cashAmount === 'number' ? portfolio.cashAmount : 0;
-  const hasFreshValuation = Boolean(fxRates.USDKRW) || valuedPositions.some(position => position.priceSource === 'quote');
+  const hasFreshValuation = valuedPositions.some(position => position.priceSource === 'quote');
   const totalAssetValue = hasFreshValuation || typeof portfolio.totalAssetValue !== 'number'
     ? cashAmount + investedAmount
     : portfolio.totalAssetValue;

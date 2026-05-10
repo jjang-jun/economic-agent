@@ -123,3 +123,42 @@ test('enrichPortfolio preserves USD valuation fields when FX and quote fetches f
   assert.equal(portfolio.unrealizedPnl, 3027997);
   assert.equal(portfolio.unrealizedPnlPct, 7.75);
 });
+
+test('enrichPortfolio preserves manual USD valuation even when FX refresh succeeds', async () => {
+  const portfolio = await enrichPortfolio({
+    cashAmount: 15000000,
+    investedAmount: 42377347,
+    totalAssetValue: 57377347,
+    unrealizedPnl: 3027997,
+    unrealizedPnlPct: 7.75,
+    positions: [
+      {
+        name: 'DRAM',
+        ticker: 'DRAM',
+        symbol: 'DRAM',
+        currency: 'USD',
+        quantity: 200,
+        avgPrice: 44.28,
+        currentPrice: 52.79,
+        priceSource: 'manual',
+        quoteSource: 'manual',
+        fxRate: 1394,
+        costBasis: 13252868,
+        marketValue: 15491884,
+        unrealizedPnl: 2239016,
+        unrealizedPnlPct: 17.3,
+      },
+    ],
+  }, {
+    fetcher: async symbol => {
+      if (symbol === 'KRW=X') return { price: 1410, currency: 'KRW', source: 'test' };
+      return { price: 55, currency: 'USD', source: 'test' };
+    },
+  });
+
+  assert.equal(portfolio.positions[0].marketValue, 15491884);
+  assert.equal(portfolio.positions[0].costBasis, 13252868);
+  assert.equal(portfolio.positions[0].unrealizedPnl, 2239016);
+  assert.equal(portfolio.positions[0].unrealizedPnlPct, 17.3);
+  assert.equal(portfolio.totalAssetValue, 57377347);
+});
