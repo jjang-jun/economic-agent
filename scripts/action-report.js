@@ -18,6 +18,15 @@ function shouldSkipTelegram(argv = process.argv) {
   return argv.includes('--noTelegram') || argv.includes('--no-telegram');
 }
 
+function isPlanRelevantToPortfolio(plan = {}, portfolio = {}) {
+  if (plan.side !== 'sell') return true;
+  const positions = portfolio.positions || [];
+  return positions.some(position => (
+    (plan.ticker && position.ticker === plan.ticker)
+    || (plan.symbol && position.symbol === plan.symbol)
+  ));
+}
+
 async function main() {
   const [recommendations, storedPortfolio] = await Promise.all([
     loadRecommendations(),
@@ -32,7 +41,8 @@ async function main() {
   const report = buildActionReport({
     recommendations: enrichedRecommendations,
     portfolio,
-    plannedTrades: loadOpenTradePlans({ upcomingDays: 1 }),
+    plannedTrades: loadOpenTradePlans({ upcomingDays: 1 })
+      .filter(plan => isPlanRelevantToPortfolio(plan, portfolio)),
     momentumCandidates,
   });
   const file = saveActionReport(report);
@@ -57,5 +67,6 @@ if (require.main === module) {
 
 module.exports = {
   hasFlag,
+  isPlanRelevantToPortfolio,
   shouldSkipTelegram,
 };

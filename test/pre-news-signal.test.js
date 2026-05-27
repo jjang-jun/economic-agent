@@ -174,3 +174,28 @@ test('formatPreNewsSignalReport explains candidates in Korean', async () => {
   assert.match(message, /거래량 1.6배/);
   assert.match(message, /공시·뉴스 확인 전 전액 진입 금지/);
 });
+
+test('formatPreNewsSignalReport formats global candidate prices in USD', () => {
+  const message = formatPreNewsSignalReport({
+    date: '2026-05-27',
+    universeCount: 1,
+    candidates: [{
+      symbol: 'MU',
+      ticker: 'MU',
+      name: 'Micron Technology',
+      action: 'pre_news_candidate',
+      sourceLabel: '관심',
+      score: 5,
+      reasons: ['당일 급등 +19.93%'],
+      warnings: [],
+      marketProfile: {
+        price: 900.81,
+        currency: 'USD',
+      },
+    }],
+    watch: [],
+  });
+
+  assert.match(message, /현재가 \$900.81/);
+  assert.doesNotMatch(message, /900\.81원/);
+});

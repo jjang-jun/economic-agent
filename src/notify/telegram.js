@@ -830,7 +830,8 @@ async function sendTimingAlertReport(report) {
 
 function formatPreNewsSignal(signal) {
   const market = signal.marketProfile || {};
-  const price = typeof market.price === 'number' ? `현재가 ${formatPrice(market.price)}` : '';
+  const currency = market.currency || (isKoreanStockTicker(signal.ticker) ? 'KRW' : 'USD');
+  const price = typeof market.price === 'number' ? `현재가 ${formatAssetPrice(market.price, currency)}` : '';
   const volume = typeof market.volumeRatio20d === 'number' ? `거래량 ${market.volumeRatio20d}배` : '';
   const rs = typeof market.relativeStrength20d === 'number' ? `20일 상대강도 ${market.relativeStrength20d}%p` : '';
   const ma = typeof market.distanceFromMa20Pct === 'number' ? `20일선 대비 ${market.distanceFromMa20Pct}%` : '';

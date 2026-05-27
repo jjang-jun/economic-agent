@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { shouldSkipTelegram } = require('../scripts/action-report');
+const { isPlanRelevantToPortfolio, shouldSkipTelegram } = require('../scripts/action-report');
 
 test('action report workflow notifies private Telegram on failure', () => {
   const workflow = fs.readFileSync(path.join(__dirname, '..', '.github', 'workflows', 'action-report.yml'), 'utf8');
@@ -18,4 +18,19 @@ test('action report script accepts both noTelegram flag spellings', () => {
   assert.equal(shouldSkipTelegram(['node', 'scripts/action-report.js', '--noTelegram']), true);
   assert.equal(shouldSkipTelegram(['node', 'scripts/action-report.js', '--no-telegram']), true);
   assert.equal(shouldSkipTelegram(['node', 'scripts/action-report.js']), false);
+});
+
+test('action report hides stale sell plans for positions no longer held', () => {
+  assert.equal(isPlanRelevantToPortfolio(
+    { side: 'sell', ticker: 'DRAM', symbol: 'DRAM' },
+    { positions: [{ ticker: 'MU', symbol: 'MU' }] },
+  ), false);
+  assert.equal(isPlanRelevantToPortfolio(
+    { side: 'sell', ticker: 'MU', symbol: 'MU' },
+    { positions: [{ ticker: 'MU', symbol: 'MU' }] },
+  ), true);
+  assert.equal(isPlanRelevantToPortfolio(
+    { side: 'buy', ticker: 'DRAM', symbol: 'DRAM' },
+    { positions: [] },
+  ), true);
 });
