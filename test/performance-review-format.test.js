@@ -111,6 +111,17 @@ test('formatPerformanceReview explains recommendation and execution metrics in p
       ],
       failures: [],
     },
+    performanceLearning: {
+      rules: {
+        minRiskReward: 2.5,
+        requireStop: true,
+        requireEntryTimingApproval: true,
+      },
+      actions: ['최근 손익비 부족 실패가 있어 최소 손익비를 일시적으로 0.5 상향합니다.'],
+    },
+    improvementActions: [
+      '실행하지 않은 추천의 성과가 실제 매수한 추천보다 높습니다. 다음 주에는 매수 후보를 임의로 건너뛰지 말고, 계좌 한도 때문에 못 산 경우 계획매매로 남깁니다.',
+    ],
     notes: ['실제 거래 중 추천과 연결되지 않은 비중이 높습니다.'],
   });
 
@@ -141,6 +152,10 @@ test('formatPerformanceReview explains recommendation and execution metrics in p
   assert.match(message, /KRX 3건 · 공공데이터 4건 · KIS 대체 사용 1건/);
   assert.match(message, /로컬 리서치/);
   assert.match(message, /삼성전자\(005930\): 2026-05-01~2026-05-08 기간 수익률 4.2%, 기간 중 최대 하락폭 -2.1%, 5거래일/);
+  assert.match(message, /다음 개선 액션/);
+  assert.match(message, /다음 추천에 적용할 학습 룰/);
+  assert.match(message, /최소 손익비: 2.5:1/);
+  assert.match(message, /매수 후보를 임의로 건너뛰지 말고/);
   assert.match(message, /추천 수익률은 실제 계좌 수익률이 아닙니다/);
   assert.match(message, /다이제스트 처리: 전송완료 3건 · 대기 4건 · 실패 0건/);
   assert.match(message, /조치 필요 실패: 0건 · 정리된 과거 실패 1건/);

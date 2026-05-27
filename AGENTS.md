@@ -64,6 +64,7 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - `scripts/performance-review.js`: writes weekly/monthly recommendation-vs-trade performance reviews
 - `scripts/model-performance-readiness.js`: reads Supabase mirrors and reports model/prompt sample readiness for recommendation performance
 - `scripts/dashboard.js`: generates ignored local HTML dashboard from `data/supabase/*.json`
+- `watchlist.domesticMomentum`: domestic leaders monitored for price/volume momentum even when same-day news recommendations are absent
 - `src/sources/`: RSS, DART, BOK, FRED integrations
 - `src/sources/dart-api.js`: OpenDART disclosure fetcher, optional `DART_API_KEY`
 - `src/sources/yahoo-finance.js`: Yahoo chart quote fetcher for recommendation performance tracking and 5/20 day trend fields
@@ -82,14 +83,17 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - `src/utils/recommendation-log.js`: stores stock signals and evaluates returns against KOSPI benchmark when available
 - `src/utils/risk-reviewer.js`: rule-based risk manager for recommendation factor pass/fail and blockers
 - `src/utils/timing-alert.js`: builds KOSPI/KOSDAQ premarket watchlists and intraday entry alerts from recent recommendations and moving-average timing data
-- `src/utils/pre-news-signal.js`: low-cost public-data pre-news detector for holdings, recent domestic recommendations, and watchlist leaders
+- `src/utils/pre-news-signal.js`: low-cost public-data pre-news detector for holdings, recent recommendations, and domestic/global watchlist leaders
 - `src/utils/performance-review.js`: summarizes recommendation and trade performance over weekly/monthly windows
 - `src/utils/local-research-worker.js`: optional monthly review sidecar for local Python OHLCV research; disabled unless `LOCAL_RESEARCH_WORKER_ENABLED=true`
 - `src/utils/trade-log.js`: stores actual manual trade executions in ignored local data and Supabase
 - `src/utils/decision-engine.js`: rule-based market regime, index trend scoring, and action guardrails
-- Market regime can include tags such as `OVERHEATED`, `CONCENTRATED_LEADERSHIP`, `SEMICONDUCTOR_LEADERSHIP`, and `MOMENTUM_ALLOWED`. Treat these as risk controls, not pure buy signals.
+- Market regime can include tags such as `OVERHEATED`, `CONCENTRATED_LEADERSHIP`, `SEMICONDUCTOR_LEADERSHIP`, `AI_SEMICONDUCTOR_CYCLE`, `GROWTH_CONCENTRATION`, and `MOMENTUM_ALLOWED`. Treat these as risk controls, not pure buy signals.
 - Stock recommendations should be framed as expected-value trades. Prefer risk/reward, stop-loss width, invalidation, suggested amount, and account weight over plain buy/sell wording.
+- `action:report` should also surface strong domestic/global price movers from `watchlist.domesticMomentum` and `watchlist.globalMomentum` as `가격 모멘텀 관찰`, even when they are not fresh AI/news recommendations. Treat these as watch candidates unless risk/timing rules approve a proper recommendation.
+- For existing holdings, sharp price momentum should be routed to add/trim review rather than hidden because the ticker is already held. High-profit 급등 holdings should prioritize trailing stop and partial profit lock; smaller profitable holdings can become conditional add or pullback-wait candidates.
 - Recommended stocks can include `market_profile` with relative strength, volume ratio, and average turnover. Liquidity and relative strength filters should reduce tradeability, not just decorate the report.
+- Recent performance review learning can tighten recommendation rules through `performanceLearning`: repeated low risk/reward failures raise the effective minimum risk/reward, and drawdown/stop issues can require explicit stop and entry-timing approval.
 - `market_profile` also tracks 20d/60d highs and distance from the 20d high. For momentum candidates, being far below the 20d high should reduce tradeability.
 - `market_profile.entryTiming` tracks 5d/20d moving-average alignment, 20d moving-average distance/slope, breakout/pullback status, and should block chase entries even when AI text is bullish.
 - Recommendations should include `risk_review` before persistence. Treat blockers as a reason to mark a stock watch-only even when AI text sounds bullish.
@@ -107,7 +111,7 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - `supabase/migrations/`: Postgres schema migrations for long-term history
 - `scripts/push-supabase.js`, `scripts/pull-supabase.js`: Supabase CLI push and local history mirror scripts
 - `scripts/import-local-history.js`: uploads existing ignored `data/*.json` history into Supabase after schema creation
-- `.github/workflows/`: collector, five digest schedules, stock report, timing alert, pre-news signal, portfolio snapshot, recommendation evaluation, and trade performance schedules
+- `.github/workflows/`: collector, five digest schedules, stock report, timing alert, pre-news signal, portfolio snapshot, recommendation evaluation, collector/price ops checks, and trade performance schedules. Collector ops runs at 12:05 and 23:50 KST to catch daytime collection gaps.
 - `docs/README.md`: docs index and folder roles
 - `docs/AGENT_HARNESS.md`: Codex/sub-agent long-running task contract, verification loop, and documentation cleanup rules
 - `docs/PROGRESS.md`: human-readable development progress and current operating context

@@ -3,6 +3,15 @@ const { selectRows } = require('./persistence');
 const DOMESTIC_OFFICIAL_EOD_SOURCES = ['krx-openapi', 'data-go-kr'];
 const DOMESTIC_EOD_FALLBACK_SOURCES = ['kis-rest'];
 const FALLBACK_SOURCES = ['naver-finance', 'yahoo-finance'];
+const GLOBAL_FALLBACK_SOURCES = ['yahoo-finance'];
+
+function isDomesticTicker(ticker) {
+  return /^\d{6}$/.test(String(ticker || '').trim());
+}
+
+function isDomesticSnapshot(row = {}) {
+  return row.market === 'KR' || row.currency === 'KRW' || isDomesticTicker(row.ticker || row.symbol);
+}
 
 function round(value, digits = 2) {
   if (typeof value !== 'number' || !Number.isFinite(value)) return null;
@@ -55,6 +64,10 @@ function summarizePriceSourceQuality(rows = [], options = {}) {
   const officialEodRows = eodRows.filter(row => DOMESTIC_OFFICIAL_EOD_SOURCES.includes(row.source));
   const kisEodRows = eodRows.filter(row => DOMESTIC_EOD_FALLBACK_SOURCES.includes(row.source));
   const fallbackRows = rows.filter(row => FALLBACK_SOURCES.includes(row.source));
+  const domesticFallbackRows = fallbackRows.filter(isDomesticSnapshot);
+  const globalRows = rows.filter(row => !isDomesticSnapshot(row));
+  const globalFallbackRows = globalRows.filter(row => GLOBAL_FALLBACK_SOURCES.includes(row.source));
+  const globalCurrentFallbackRows = globalFallbackRows.filter(row => row.price_type === 'current');
   const staleRows = rows.filter(row => isStaleSnapshot(row, now));
   const sourceRows = Object.entries(bySource)
     .sort((a, b) => b[1] - a[1])
@@ -70,13 +83,15 @@ function summarizePriceSourceQuality(rows = [], options = {}) {
     });
 
   const fallbackRatePct = rows.length ? round((fallbackRows.length / rows.length) * 100) : null;
+  const domesticFallbackRatePct = rows.length ? round((domesticFallbackRows.length / rows.length) * 100) : null;
+  const globalFallbackRatePct = globalRows.length ? round((globalFallbackRows.length / globalRows.length) * 100) : null;
   const officialEodRatePct = eodRows.length ? round((officialEodRows.length / eodRows.length) * 100) : null;
   const healthLabel = (() => {
     if (rows.length === 0) return 'empty';
     const failedAttempts = attempts.filter(row => row.status === 'failed');
     const completedAttempts = attempts.filter(row => ['success', 'empty', 'failed'].includes(row.status));
     if (completedAttempts.length >= 5 && failedAttempts.length / completedAttempts.length > 0.3) return 'warn';
-    if (fallbackRatePct !== null && fallbackRatePct > 50) return 'warn';
+    if (domesticFallbackRatePct !== null && domesticFallbackRatePct > 50) return 'warn';
     if (eodRows.length > 0 && officialEodRatePct !== null && officialEodRatePct < 50) return 'warn';
     if (staleRows.length > Math.max(3, rows.length * 0.2)) return 'warn';
     return 'ok';
@@ -99,6 +114,11 @@ function summarizePriceSourceQuality(rows = [], options = {}) {
     fallback: {
       total: fallbackRows.length,
       ratePct: fallbackRatePct,
+      domesticTotal: domesticFallbackRows.length,
+      domesticRatePct: domesticFallbackRatePct,
+      globalTotal: globalFallbackRows.length,
+      globalRatePct: globalFallbackRatePct,
+      globalCurrentTotal: globalCurrentFallbackRows.length,
       naver: bySource['naver-finance'] || 0,
       yahoo: bySource['yahoo-finance'] || 0,
     },
@@ -168,6 +188,7 @@ function buildPriceSourceQualityAnomalies(summary = {}, options = {}) {
   const maxEmptyRatePct = options.maxEmptyRatePct ?? Number(process.env.PRICE_PROVIDER_MAX_EMPTY_RATE_PCT || 90);
   const minAttempts = options.minAttempts ?? Number(process.env.PRICE_PROVIDER_MIN_ATTEMPTS || 5);
   const maxFallbackRatePct = options.maxFallbackRatePct ?? Number(process.env.PRICE_PROVIDER_MAX_FALLBACK_RATE_PCT || 80);
+  const maxGlobalFallbackRatePct = options.maxGlobalFallbackRatePct ?? Number(process.env.PRICE_PROVIDER_MAX_GLOBAL_FALLBACK_RATE_PCT || 95);
   const maxStaleSnapshots = options.maxStaleSnapshots ?? Number(process.env.PRICE_PROVIDER_MAX_STALE_SNAPSHOTS || 3);
   const attempts = summary.attempts || {};
   const anomalies = [];
@@ -186,8 +207,11 @@ function buildPriceSourceQualityAnomalies(summary = {}, options = {}) {
       anomalies.push(`${provider.provider} 실패율 ${provider.failureRatePct}% (${provider.failed}/${provider.count})`);
     }
   }
-  if (typeof summary.fallback?.ratePct === 'number' && summary.fallback.ratePct > maxFallbackRatePct) {
-    anomalies.push(`Naver/Yahoo fallback 비중 ${summary.fallback.ratePct}%`);
+  if (typeof summary.fallback?.domesticRatePct === 'number' && summary.fallback.domesticRatePct > maxFallbackRatePct) {
+    anomalies.push(`국내 Naver/Yahoo fallback 비중 ${summary.fallback.domesticRatePct}%`);
+  }
+  if (typeof summary.fallback?.globalRatePct === 'number' && summary.fallback.globalRatePct > maxGlobalFallbackRatePct) {
+    anomalies.push(`해외 Yahoo fallback 비중 ${summary.fallback.globalRatePct}%`);
   }
   if ((summary.staleSnapshots || 0) > maxStaleSnapshots) {
     anomalies.push(`오래된 가격 스냅샷 ${summary.staleSnapshots}건`);
@@ -200,6 +224,8 @@ function buildPriceProviderDecision(summary = {}) {
   const attempts = summary.attempts || {};
   const minAttempts = 5;
   const fallbackRate = summary.fallback?.ratePct;
+  const domesticFallbackRate = summary.fallback?.domesticRatePct;
+  const globalFallbackRate = summary.fallback?.globalRatePct;
   const officialEodRate = summary.officialEod?.ratePct;
   const failureRate = attempts.failureRatePct;
   const emptyRate = attempts.emptyRatePct;
@@ -220,12 +246,13 @@ function buildPriceProviderDecision(summary = {}) {
       reasons,
     };
   }
-  if (typeof fallbackRate === 'number' && fallbackRate >= 60) {
-    reasons.push(`fallback 가격 비중 ${fallbackRate}%`);
+  if (typeof domesticFallbackRate === 'number' && domesticFallbackRate >= 60) {
+    reasons.push(`국내 fallback 가격 비중 ${domesticFallbackRate}%`);
+    if (summary.fallback?.naver) reasons.push(`Naver 사용 ${summary.fallback.naver}건`);
     if (summary.fallback?.yahoo) reasons.push(`Yahoo 사용 ${summary.fallback.yahoo}건`);
     return {
-      action: 'consider_paid_data',
-      label: '해외/글로벌 가격 API 보강 검토',
+      action: 'improve_domestic_data',
+      label: '국내 가격 provider 우선순위/키 점검',
       reasons,
     };
   }
@@ -242,6 +269,18 @@ function buildPriceProviderDecision(summary = {}) {
     return {
       action: 'monitor',
       label: 'fallback 탐색 정상 범위, 추세 모니터링',
+      reasons,
+    };
+  }
+  if (
+    typeof globalFallbackRate === 'number'
+    && globalFallbackRate >= 95
+    && (summary.fallback?.globalCurrentTotal || 0) >= minAttempts
+  ) {
+    reasons.push(`해외 Yahoo 현재가 사용 ${summary.fallback.globalCurrentTotal}건`);
+    return {
+      action: 'monitor_global_fallback',
+      label: '해외 실시간 가격 API는 필요 시 보강',
       reasons,
     };
   }

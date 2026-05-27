@@ -35,6 +35,13 @@ async function analyzeStocks(articles, indicators) {
       `Investor flow (${flow.market}, ${flow.unit}): foreign ${flow.latest.foreign}, institution ${flow.latest.institution}, individual ${flow.latest.individual}, 5d foreign ${flow.sums5d?.foreign}, 5d institution ${flow.sums5d?.institution}`
     );
   }
+  if (indicators.marketThemes?.length > 0) {
+    indicatorInfo.push('Market themes:');
+    for (const theme of indicators.marketThemes.slice(0, 4)) {
+      indicatorInfo.push(`- ${theme.label} (${theme.phase}, strength ${theme.strength}): ${(theme.evidence || []).join(' / ')}`);
+      if (theme.playbook?.length) indicatorInfo.push(`  Playbook: ${theme.playbook.join('; ')}`);
+    }
+  }
   const reportContext = buildReportContext({
     dailySummaries: indicators.recentDailySummaries || [],
     stockReports: indicators.recentStockReports || [],
@@ -112,6 +119,7 @@ Rules:
 - Use low conviction if the evidence is only indirect or macro-level
 - Do not invent ticker codes
 - Avoid unconditional buy/sell wording; frame outputs as candidates gated by market regime and risk
+- Explicitly connect recommendations to current economic/market themes such as AI capex, semiconductor cycles, USD/KRW, rates, oil, and growth-stock concentration when relevant
 - In a strong but overheated market, prefer trend-following candidates only when they have direct AI/semiconductor/infrastructure linkage, strong relative strength, sufficient liquidity, and foreign/institution support
 - Penalize vague theme stocks, weak relative-strength stocks, large one-day chase entries, and recommendations without an invalidation or stop-loss condition
 - For aggressive candidates, mention split-entry and the condition that would invalidate the setup

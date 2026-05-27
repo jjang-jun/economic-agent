@@ -135,6 +135,7 @@ function buildMarketProfile(quote, benchmark) {
     symbol: quote.symbol,
     name: quote.name || '',
     price: quote.price,
+    currency: quote.currency,
     changePercent: quote.changePercent,
     return5dPct: quote.return5dPct,
     return20dPct: quote.return20dPct,

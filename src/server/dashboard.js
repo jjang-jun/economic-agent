@@ -98,6 +98,7 @@ async function loadDashboardData() {
     collectorRuns,
     alertEvents,
     priceSnapshots,
+    priceProviderAttempts,
     performanceReviews,
   ] = await Promise.all([
     fetchDashboardRows('financial_freedom_goals', {
@@ -140,6 +141,11 @@ async function loadDashboardData() {
       order: 'collected_at.desc',
       limit: '500',
     }),
+    fetchDashboardRows('price_provider_attempts', {
+      select: '*',
+      order: 'attempted_at.desc',
+      limit: '500',
+    }),
     fetchDashboardRows('performance_reviews', {
       select: '*',
       order: 'created_at.desc',
@@ -154,7 +160,7 @@ async function loadDashboardData() {
     recommendations,
     evaluations,
     collectorOps: summarizeCollectorOps(collectorRuns, alertEvents),
-    priceQuality: summarizePriceSourceQuality(priceSnapshots),
+    priceQuality: summarizePriceSourceQuality(priceSnapshots, { attempts: priceProviderAttempts }),
     performanceReview: performanceReviews[0] || null,
     generatedAt: new Date().toISOString(),
   };

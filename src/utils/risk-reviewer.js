@@ -14,20 +14,31 @@ function reviewStock(stock, decision = {}) {
   const earnings = fundamental.earnings || {};
   const marketRegime = decision.market?.regime || 'UNKNOWN';
   const marketTags = decision.market?.tags || [];
+  const learning = decision.performanceLearning || {};
+  const learningRules = learning.rules || {};
   const factors = [];
   const blockers = [];
   const warnings = [];
 
   addFactor(factors, 'market_regime', !['RISK_OFF', 'PANIC'].includes(marketRegime), marketRegime);
-  const minRiskReward = positionSize.regimePolicy?.minRiskReward || STRATEGY_POLICY.recommendationRules.minRiskReward;
+  const minRiskReward = Math.max(
+    positionSize.regimePolicy?.minRiskReward || STRATEGY_POLICY.recommendationRules.minRiskReward,
+    learningRules.minRiskReward || 0
+  );
   addFactor(factors, 'risk_reward', typeof profile.riskReward === 'number' && profile.riskReward >= minRiskReward, profile.riskReward ? `${profile.riskReward}:1 / min ${minRiskReward}:1` : 'missing');
   addFactor(factors, 'stop_width', typeof profile.expectedLossPct === 'number' && profile.expectedLossPct <= STRATEGY_POLICY.recommendationRules.maxStopLossPct, profile.expectedLossPct ? `${profile.expectedLossPct}%` : 'missing');
   addFactor(factors, 'liquidity', market.liquid !== false, market.averageTurnover20d ? `${Math.round(market.averageTurnover20d).toLocaleString('ko-KR')} KRW` : 'missing');
   addFactor(factors, 'relative_strength', market.relativeStrength20d === null || market.relativeStrength20d === undefined || market.relativeStrength20d >= 0, typeof market.relativeStrength20d === 'number' ? `${market.relativeStrength20d}%p` : 'missing');
   addFactor(factors, 'momentum', market.near20dHigh !== false, typeof market.distanceFrom20dHighPct === 'number' ? `${market.distanceFrom20dHighPct}% from 20d high` : 'missing');
   addFactor(factors, 'entry_timing', timing.approved !== false, timing.label || timing.action || 'missing');
+  if (learningRules.requireEntryTimingApproval === true) {
+    addFactor(factors, 'learning_entry_timing', timing.approved === true, timing.label || timing.action || 'missing');
+  }
   addFactor(factors, 'position_size', Boolean(profile.suggestedAmount), profile.suggestedAmount ? `${profile.suggestedAmount.toLocaleString('ko-KR')} KRW` : 'missing');
   addFactor(factors, 'active_trading', fundamental.isActivelyTrading !== false, fundamental.isActivelyTrading === false ? 'inactive' : (fundamental.source || 'n/a'));
+  if (learningRules.requireStop === true) {
+    addFactor(factors, 'learning_stop_required', Boolean(profile.expectedLossPct || profile.stopLossPrice), profile.expectedLossPct ? `${profile.expectedLossPct}%` : 'missing');
+  }
 
   for (const factor of factors) {
     if (!factor.passed) blockers.push(`${factor.name}: ${factor.detail}`);
@@ -44,6 +55,9 @@ function reviewStock(stock, decision = {}) {
   }
   if (marketTags.includes('CONCENTRATED_LEADERSHIP')) {
     warnings.push('대형주 쏠림: 주변 테마 추격 금지');
+  }
+  for (const action of learning.actions || []) {
+    warnings.push(`성과학습: ${action}`);
   }
   if (!profile.invalidation) {
     warnings.push('무효화 조건 누락');

@@ -5,7 +5,12 @@ const {
   buildPriceSourceQualityAnomalies,
   buildPriceProviderDecision,
 } = require('../src/utils/price-source-quality');
-const { parseArgs, formatSummary } = require('../scripts/price-provider-ops-report');
+const {
+  getKSTClock,
+  parseArgs,
+  formatSummary,
+  shouldSendScheduledOpsReport,
+} = require('../scripts/price-provider-ops-report');
 
 test('summarizePriceSourceQuality separates official EOD and fallback sources', () => {
   const summary = summarizePriceSourceQuality([
@@ -33,6 +38,10 @@ test('summarizePriceSourceQuality separates official EOD and fallback sources', 
   assert.equal(summary.kisEodFallback, 1);
   assert.equal(summary.fallback.total, 2);
   assert.equal(summary.fallback.ratePct, 40);
+  assert.equal(summary.fallback.domesticTotal, 1);
+  assert.equal(summary.fallback.domesticRatePct, 20);
+  assert.equal(summary.fallback.globalTotal, 1);
+  assert.equal(summary.fallback.globalRatePct, 100);
   assert.equal(summary.attempts.total, 3);
   assert.equal(summary.attempts.failed, 1);
   assert.equal(summary.attempts.failureRatePct, 33.33);
@@ -43,7 +52,7 @@ test('summarizePriceSourceQuality separates official EOD and fallback sources', 
 test('buildPriceSourceQualityAnomalies flags provider failures and fallback overuse', () => {
   const anomalies = buildPriceSourceQualityAnomalies({
     totalSnapshots: 10,
-    fallback: { ratePct: 60 },
+    fallback: { ratePct: 60, domesticRatePct: 60 },
     staleSnapshots: 4,
     attempts: {
       total: 10,
@@ -65,28 +74,54 @@ test('buildPriceSourceQualityAnomalies flags provider failures and fallback over
   assert.deepEqual(anomalies, [
     '가격 provider 실패율 40% (4/10)',
     'kis-rest 실패율 60% (3/5)',
-    'Naver/Yahoo fallback 비중 60%',
+    '국내 Naver/Yahoo fallback 비중 60%',
     '오래된 가격 스냅샷 4건',
   ]);
 });
 
-test('buildPriceProviderDecision explains when paid data should be considered', () => {
+test('buildPriceProviderDecision treats global Yahoo current quotes as monitoring unless failures exist', () => {
   const decision = buildPriceProviderDecision({
     totalSnapshots: 100,
-    fallback: { ratePct: 65, yahoo: 60 },
+    fallback: {
+      ratePct: 65,
+      domesticRatePct: 0,
+      globalRatePct: 100,
+      globalCurrentTotal: 60,
+      yahoo: 60,
+    },
     officialEod: { ratePct: 100 },
     attempts: { failureRatePct: 0, emptyRatePct: 75 },
   });
 
-  assert.equal(decision.action, 'consider_paid_data');
-  assert.equal(decision.label, '해외/글로벌 가격 API 보강 검토');
-  assert.ok(decision.reasons.includes('fallback 가격 비중 65%'));
+  assert.equal(decision.action, 'monitor_global_fallback');
+  assert.equal(decision.label, '해외 실시간 가격 API는 필요 시 보강');
+  assert.ok(decision.reasons.includes('해외 Yahoo 현재가 사용 60건'));
+});
+
+test('buildPriceProviderDecision prioritizes domestic fallback over global Yahoo usage', () => {
+  const decision = buildPriceProviderDecision({
+    totalSnapshots: 100,
+    fallback: {
+      ratePct: 65,
+      domesticRatePct: 65,
+      globalRatePct: 100,
+      globalCurrentTotal: 60,
+      naver: 40,
+      yahoo: 25,
+    },
+    officialEod: { ratePct: 100 },
+    attempts: { failureRatePct: 0, emptyRatePct: 20 },
+  });
+
+  assert.equal(decision.action, 'improve_domestic_data');
+  assert.equal(decision.label, '국내 가격 provider 우선순위/키 점검');
+  assert.ok(decision.reasons.includes('국내 fallback 가격 비중 65%'));
 });
 
 test('buildPriceProviderDecision prioritizes failures over fallback usage', () => {
   const decision = buildPriceProviderDecision({
     totalSnapshots: 10,
-    fallback: { ratePct: 90 },
+    fallback: { ratePct: 90, domesticRatePct: 90 },
     officialEod: { ratePct: 100 },
     attempts: { total: 10, failureRatePct: 40, emptyRatePct: 0 },
   });
@@ -107,8 +142,8 @@ test('price provider ops summary includes provider decision and anomalies', () =
     totalSnapshots: 10,
     tickerCount: 3,
     officialEod: { ratePct: 40 },
-    fallback: { ratePct: 63 },
-    providerDecision: { label: '해외/글로벌 가격 API 보강 검토' },
+    fallback: { ratePct: 63, domesticRatePct: 10, globalRatePct: 100 },
+    providerDecision: { label: '해외 실시간 가격 API는 필요 시 보강' },
     attempts: {
       total: 5,
       success: 3,
@@ -123,6 +158,34 @@ test('price provider ops summary includes provider decision and anomalies', () =
   }, ['Naver/Yahoo fallback 비중 63%']);
 
   assert.match(message, /가격 Provider 점검/);
-  assert.match(message, /판단: 해외\/글로벌 가격 API 보강 검토/);
-  assert.match(message, /Naver\/Yahoo fallback 비중 63%/);
+  assert.match(message, /판단: 해외 실시간 가격 API는 필요 시 보강/);
+  assert.match(message, /국내 fallback: 10%/);
+  assert.match(message, /해외 Yahoo: 100%/);
+});
+
+test('price provider ops skips delayed scheduled sends outside quiet-hours window', () => {
+  assert.equal(
+    shouldSendScheduledOpsReport(new Date('2026-05-11T14:55:00.000Z'), { GITHUB_EVENT_NAME: 'schedule' }),
+    true,
+  );
+  assert.equal(
+    shouldSendScheduledOpsReport(new Date('2026-05-11T17:14:00.000Z'), { GITHUB_EVENT_NAME: 'schedule' }),
+    false,
+  );
+  assert.equal(
+    shouldSendScheduledOpsReport(new Date('2026-05-11T17:14:00.000Z'), {
+      GITHUB_EVENT_NAME: 'schedule',
+      PRICE_PROVIDER_ALLOW_OFF_HOURS: '1',
+    }),
+    true,
+  );
+});
+
+test('getKSTClock formats KST label', () => {
+  assert.deepEqual(getKSTClock(new Date('2026-05-11T17:14:00.000Z')), {
+    hour: 2,
+    minute: 14,
+    minutes: 134,
+    label: '02:14 KST',
+  });
 });

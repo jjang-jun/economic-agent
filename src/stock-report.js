@@ -10,11 +10,12 @@ const { saveDailySummary } = require('./utils/daily-summary');
 const { archiveScoredArticles, loadScoredArticles, getKSTDate } = require('./utils/article-archive');
 const { logRecommendations } = require('./utils/recommendation-log');
 const { fetchMarketSnapshot } = require('./utils/market-snapshot');
-const { buildDecisionContextWithQuotes } = require('./utils/decision-engine');
+const { buildDecisionContextWithQuotes, detectMarketThemes } = require('./utils/decision-engine');
 const { applyRecommendationRisk } = require('./utils/recommendation-risk');
 const { applyRecommendationMarketData } = require('./utils/recommendation-market');
 const { applyRiskReview } = require('./utils/risk-reviewer');
 const { applyRecommendationSchemaValidation } = require('./utils/recommendation-schema');
+const { loadLatestPerformanceLearning } = require('./utils/performance-learning');
 const { savePortfolioSnapshot } = require('./utils/portfolio');
 const {
   persistArticles,
@@ -92,6 +93,8 @@ async function main() {
     return;
   }
 
+  indicators.marketThemes = detectMarketThemes({ articles: scored, indicators });
+
   // AI로 종목 분석 (하루 1회만 AI 사용)
   const report = await analyzeStocks(scored, indicators);
   if (!report) {
@@ -99,6 +102,7 @@ async function main() {
     return;
   }
   report.decision = await buildDecisionContextWithQuotes({ articles: scored, indicators });
+  report.decision.performanceLearning = await loadLatestPerformanceLearning();
   if (report.decision.portfolio) {
     savePortfolioSnapshot(report.decision.portfolio);
     await persistPortfolioSnapshot(report.decision.portfolio);

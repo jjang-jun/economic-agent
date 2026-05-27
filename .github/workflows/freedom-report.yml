@@ -5,8 +5,8 @@ permissions:
 
 on:
   schedule:
-    # KST 16:20 = UTC 07:20 (월~금), portfolio snapshot 직후
-    - cron: '20 7 * * 1-5'
+    # KST Friday 16:20 = UTC 07:20. Daily portfolio snapshots still run separately.
+    - cron: '20 7 * * 5'
   workflow_dispatch:
 
 concurrency:

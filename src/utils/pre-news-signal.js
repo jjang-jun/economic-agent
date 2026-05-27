@@ -18,18 +18,21 @@ function isRecent(recommendation, days = 7, now = new Date()) {
   return Boolean(created && now.getTime() - created <= days * 24 * 60 * 60 * 1000);
 }
 
-function normalizeDomesticSymbol(value = '') {
+function normalizeUniverseSymbol(value = '') {
   const raw = String(value || '').trim();
-  if (!isDomesticTicker(raw)) return '';
-  return normalizeYahooSymbol(raw);
+  if (!raw) return '';
+  if (isDomesticTicker(raw)) return normalizeYahooSymbol(raw);
+  if (raw.startsWith('^') || raw.includes('=') || raw.includes('/')) return '';
+  if (!/^[A-Z][A-Z0-9.-]{0,9}$/i.test(raw)) return '';
+  return raw.toUpperCase();
 }
 
 function addUniverseItem(map, item = {}) {
-  const symbol = normalizeDomesticSymbol(item.symbol || item.ticker || '');
+  const symbol = normalizeUniverseSymbol(item.symbol || item.ticker || '');
   if (!symbol) return;
   const existing = map.get(symbol) || {
     symbol,
-    ticker: symbol.slice(0, 6),
+    ticker: isDomesticTicker(symbol) ? symbol.slice(0, 6) : symbol,
     name: '',
     sources: [],
     recommendationIds: [],
@@ -70,8 +73,20 @@ function buildPreNewsUniverse({ recommendations = [], portfolio = {}, watchlist 
   const domesticWatchlist = [
     ...(watchlist.preopen || []),
     ...(watchlist.close || []),
+    ...(watchlist.domesticMomentum || []),
   ].filter(item => isDomesticTicker(item.symbol));
   for (const item of domesticWatchlist.slice(0, maxWatchlist)) {
+    addUniverseItem(map, {
+      name: item.name,
+      ticker: item.symbol,
+      source: 'watchlist',
+    });
+  }
+
+  const globalWatchlist = [
+    ...(watchlist.globalMomentum || []),
+  ].filter(item => normalizeUniverseSymbol(item.symbol) && !isDomesticTicker(item.symbol));
+  for (const item of globalWatchlist.slice(0, maxWatchlist)) {
     addUniverseItem(map, {
       name: item.name,
       ticker: item.symbol,
@@ -95,6 +110,18 @@ function scorePreNewsSignal(item, marketProfile = {}) {
   const reasons = [];
   const warnings = [];
   let score = 0;
+
+  if (typeof marketProfile.changePercent === 'number') {
+    if (marketProfile.changePercent >= 10) {
+      score += 5;
+      reasons.push(`당일 급등 +${marketProfile.changePercent}%`);
+    } else if (marketProfile.changePercent >= 5) {
+      score += 3;
+      reasons.push(`당일 강세 +${marketProfile.changePercent}%`);
+    } else if (marketProfile.changePercent <= -5) {
+      warnings.push(`당일 급락 ${marketProfile.changePercent}%`);
+    }
+  }
 
   if (marketProfile.breakout20d) {
     score += 2;

@@ -10,7 +10,7 @@ test('freedom report workflow sends private Telegram status after portfolio snap
   );
 
   assert.match(workflow, /name: Freedom Report \(경제적 자유 상태\)/);
-  assert.match(workflow, /cron: '20 7 \* \* 1-5'/);
+  assert.match(workflow, /cron: '20 7 \* \* 5'/);
   assert.match(workflow, /concurrency:\n  group: economic-agent-freedom-report\n  cancel-in-progress: false/);
   assert.match(workflow, /timeout-minutes: 10/);
   assert.match(workflow, /run: npm run freedom:report -- --telegram/);

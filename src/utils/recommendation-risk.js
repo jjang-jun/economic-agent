@@ -23,6 +23,7 @@ function firstNumber(...values) {
 
 function normalizeRecommendationRisk(stock, decision) {
   const portfolio = decision?.portfolio || {};
+  const learningRules = decision?.performanceLearning?.rules || {};
   const totalAssetValue = portfolio.totalAssetValue || portfolio.summary?.totalAssetValue || null;
   const marketProfile = stock.market_profile || stock.marketProfile || {};
 
@@ -69,6 +70,10 @@ function normalizeRecommendationRisk(stock, decision) {
     expectedLossPct,
     riskReward,
   });
+  const minRiskReward = Math.max(
+    positionSize.regimePolicy.minRiskReward || STRATEGY_POLICY.recommendationRules.minRiskReward,
+    learningRules.minRiskReward || 0
+  );
 
   const maxWeightPct = typeof portfolio.maxPositionRatio === 'number'
     ? round(portfolio.maxPositionRatio * 100)
@@ -83,7 +88,7 @@ function normalizeRecommendationRisk(stock, decision) {
     : null;
   const tradeable = Boolean(
     riskReward !== null
-    && riskReward >= positionSize.regimePolicy.minRiskReward
+    && riskReward >= minRiskReward
     && expectedLossPct > 0
     && expectedLossPct <= STRATEGY_POLICY.recommendationRules.maxStopLossPct
     && positionSize.suggestedAmount
@@ -107,6 +112,11 @@ function normalizeRecommendationRisk(stock, decision) {
     maxWeightPct,
     invalidation: stock.invalidation || stock.invalidation_condition || stock.stop_condition || stock.risk || '',
     positionSize,
+    performanceLearning: {
+      minRiskReward,
+      requireStop: learningRules.requireStop === true,
+      requireEntryTimingApproval: learningRules.requireEntryTimingApproval === true,
+    },
     relativeStrengthPass,
     liquidityPass,
     momentumPass,

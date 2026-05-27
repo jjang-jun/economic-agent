@@ -237,6 +237,7 @@ function buildDashboard(options = {}) {
   const collectorRuns = readTable('collector_runs', dataDir);
   const alertEvents = readTable('alert_events', dataDir);
   const priceSnapshots = readTable('price_snapshots', dataDir);
+  const priceProviderAttempts = readTable('price_provider_attempts', dataDir);
   const latestPortfolio = portfolio[0] || {};
   const latestFlow = investorFlows[0] || {};
   const latestRecommendations = recommendations.slice(0, 12);
@@ -250,7 +251,7 @@ function buildDashboard(options = {}) {
   const missed = lab.missedRecommendationQuality || {};
   const evalSummary = buildEvaluationSummary(evaluations);
   const collectorOps = summarizeCollectorOps(collectorRuns, alertEvents);
-  const priceQuality = summarizePriceSourceQuality(priceSnapshots);
+  const priceQuality = summarizePriceSourceQuality(priceSnapshots, { attempts: priceProviderAttempts });
   const freedom = readJson(freedomFile) || {};
   const freedomGoal = freedom.goal || {};
   const progress = typeof freedom.targetProgressPct === 'number' ? Math.max(0, Math.min(100, freedom.targetProgressPct)) : 0;
@@ -380,10 +381,12 @@ function buildDashboard(options = {}) {
         ${metric('KRX', `${priceQuality.officialEod.krx}건`)}
         ${metric('Data.go.kr', `${priceQuality.officialEod.dataGoKr}건`)}
         ${metric('KIS EOD fallback', `${priceQuality.kisEodFallback}건`)}
-        ${metric('Naver/Yahoo fallback', priceQuality.fallback.ratePct !== null ? `${priceQuality.fallback.ratePct}%` : 'n/a')}
+        ${metric('Domestic fallback', priceQuality.fallback.domesticRatePct !== null ? `${priceQuality.fallback.domesticRatePct}%` : 'n/a')}
+        ${metric('Global Yahoo', priceQuality.fallback.globalRatePct !== null ? `${priceQuality.fallback.globalRatePct}%` : 'n/a')}
+        ${metric('Provider failures', priceQuality.attempts.failureRatePct !== null ? `${priceQuality.attempts.failureRatePct}%` : 'n/a')}
         ${metric('Stale Suspect', `${priceQuality.staleSnapshots}건`)}
       </div>
-      <p class="muted">가격 품질은 Supabase 미러의 price_snapshots 기준입니다. 최신 상태는 npm run db:pull 이후 다시 생성해야 합니다.</p>
+      <p class="muted">가격 품질은 Supabase 미러의 price_snapshots와 price_provider_attempts 기준입니다. 최신 상태는 npm run db:pull 이후 다시 생성해야 합니다.</p>
     </section>
     <section class="panel">
       <h2>Behavior Warnings</h2>

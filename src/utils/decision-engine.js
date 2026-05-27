@@ -51,6 +51,75 @@ function formatEok(value) {
   return `${Math.round(value).toLocaleString('ko-KR')}억원`;
 }
 
+function articleText(article = {}) {
+  return [
+    article.title,
+    article.titleKo,
+    article.title_ko,
+    article.summary,
+    article.reason,
+    ...(article.sectors || []),
+  ].filter(Boolean).join(' ');
+}
+
+function countThemeMentions(articles = [], patterns = []) {
+  return articles.reduce((count, article) => {
+    const text = articleText(article);
+    return count + (patterns.some(pattern => pattern.test(text)) ? 1 : 0);
+  }, 0);
+}
+
+function detectMarketThemes({ articles = [], indicators = {} } = {}) {
+  const snapshot = indicators.marketSnapshot || [];
+  const semiconductorTrend = getTrendSignal(snapshot, ['SOXX', 'NVDA', 'AMD', 'MU', 'TSM']);
+  const aiMentions = countThemeMentions(articles, [
+    /AI|artificial intelligence|인공지능/i,
+    /HBM|DRAM|메모리|반도체|semiconductor|chip/i,
+    /데이터센터|data center|GPU/i,
+  ]);
+  const themes = [];
+
+  if (semiconductorTrend.strong >= 4 || aiMentions >= 2) {
+    themes.push({
+      id: 'AI_SEMICONDUCTOR_CYCLE',
+      label: 'AI/반도체 사이클',
+      phase: semiconductorTrend.weak >= 3 ? 'volatile' : 'momentum',
+      strength: Math.min(5, Math.max(1, semiconductorTrend.strong + Math.min(aiMentions, 2))),
+      evidence: [
+        semiconductorTrend.details.length ? `반도체/AI 바스켓: ${semiconductorTrend.details.join(', ')}` : '',
+        aiMentions ? `AI·HBM·반도체 뉴스 ${aiMentions}건` : '',
+      ].filter(Boolean),
+      playbook: [
+        '핵심 수혜주 중심으로만 접근',
+        '급등일 추격보다 눌림/분할 진입 우선',
+        '20일 상대강도와 거래량이 꺾이면 추가매수 중단',
+      ],
+    });
+  }
+
+  const concentration = getTrendSignal(snapshot, ['QQQ', 'SOXX']);
+  const spy = findSnapshot(snapshot, 'SPY');
+  if (
+    concentration.strong >= 3
+    && typeof spy?.return20dPct === 'number'
+    && concentration.details.length > 0
+  ) {
+    themes.push({
+      id: 'GROWTH_CONCENTRATION',
+      label: '성장주/테크 쏠림',
+      phase: 'concentrated',
+      strength: Math.min(5, concentration.strong),
+      evidence: concentration.details,
+      playbook: [
+        '지수 상승을 전체 시장 강세로 과대해석하지 않기',
+        '주변 테마주는 신규 매수보다 관찰',
+      ],
+    });
+  }
+
+  return themes;
+}
+
 function scoreInvestorFlow(flow) {
   if (!flow?.latest) return { score: 0, reasons: [] };
 
@@ -245,6 +314,19 @@ function scoreMarketRegime({ articles, indicators }) {
   score += investorFlow.score;
   reasons.push(...investorFlow.reasons);
 
+  const themes = detectMarketThemes({ articles, indicators });
+  for (const theme of themes) {
+    if (theme.id === 'AI_SEMICONDUCTOR_CYCLE') {
+      tags.push('AI_SEMICONDUCTOR_CYCLE');
+      if (theme.phase === 'momentum') score += 1;
+      reasons.push(`${theme.label}: ${theme.evidence.join(' / ')}`);
+    }
+    if (theme.id === 'GROWTH_CONCENTRATION') {
+      tags.push('GROWTH_CONCENTRATION');
+      warnings.push(`${theme.label}: 지수 상승이 일부 대형 성장주에 집중될 수 있음`);
+    }
+  }
+
   const uniqueTags = [...new Set(tags)];
   if (score >= 2 && uniqueTags.includes('OVERHEATED')) {
     uniqueTags.push('MOMENTUM_ALLOWED');
@@ -253,6 +335,7 @@ function scoreMarketRegime({ articles, indicators }) {
   const base = { score, reasons, sentiment, tags: uniqueTags, warnings };
   return {
     regime: classifyMarketRegime({ score, tags: uniqueTags, vixPrice: vix?.price }),
+    themes,
     ...base,
   };
 }
@@ -323,6 +406,8 @@ function buildActions(market, portfolio) {
   const aggressiveChecks = [
     tags.includes('OVERHEATED') ? '급등 당일 전액 진입 금지, 최소 3회 분할 진입' : '',
     tags.includes('SEMICONDUCTOR_LEADERSHIP') ? '반도체/AI 핵심주와 직접 수혜주만 공격 후보로 제한' : '',
+    tags.includes('AI_SEMICONDUCTOR_CYCLE') ? 'AI/반도체 사이클은 보유 핵심주 피라미딩과 수익보호를 함께 점검' : '',
+    tags.includes('GROWTH_CONCENTRATION') ? '테크 쏠림 구간: 비주도 성장주는 신규 매수 제외' : '',
     tags.includes('CONCENTRATED_LEADERSHIP') ? '주변 테마주 추격 금지, 지수보다 약한 종목은 제외' : '',
     tags.includes('NEGATIVE_PRICE_REACTION') ? '호재에도 가격 반응이 약한 장: 신규 매수보다 관찰 우선' : '',
     tags.includes('OIL_SHOCK') ? '유가 급등 구간: 운송/화학/소비재 마진 부담과 인플레이션 재점검' : '',
@@ -444,4 +529,5 @@ module.exports = {
   formatKRW,
   scoreInvestorFlow,
   getTrendSignal,
+  detectMarketThemes,
 };

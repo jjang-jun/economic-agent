@@ -107,6 +107,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 추천 종목별 20일/60일 고점, 20일 고점 대비 거리, 20일 돌파 여부 추가. 공격형 후보는 20일 고점에서 3% 이내인 종목만 거래 가능 후보로 유지.
 - 추천 종목별 진입 타이밍 프로필 추가. 5일선/20일선 정렬, 20일선 대비 이격, 20일선 기울기, 거래량 확인, 20일 고점 돌파/눌림목 여부를 계산하고 추격매수 또는 20일선 하회 후보는 `entry_timing` 차단 사유로 매수 보류 처리.
 - 장전/장중 매매 타이밍 알림을 추가했다. 최근 국내주식 추천을 기준으로 08:45 KST 장전 후보표를 보내고, 장중에는 돌파/눌림목 조건이 충족된 후보만 중복 없이 Telegram private 채널로 알린다.
+- 타이밍 알림 실행 시각 가드를 추가했다. GitHub Actions schedule이 1시간 이상 지연돼도 `premarket` 스텝이 10:25 KST처럼 장중에 도착하면 제목을 장전으로 보내지 않고 실제 KST 시각 기준으로 장중 모드로 자동 전환한다. 장 종료 뒤 실행되면 전송을 건너뛴다.
 - 무료/저비용 `pre-news:signal` 엔진을 추가했다. 보유 종목, 최근 국내 추천, 워치리스트 대표주만 15분 간격으로 감시해 거래량 증가, 20일 고점 돌파/근접, 5일선·20일선 정렬, KOSPI 대비 상대강도 개선을 점수화하고 기사 전 선행 후보가 생겼을 때만 Telegram private 채널로 보낸다.
 - `npm run trade:performance`와 `trade-performance.yml` 추가. 실제 매매 기록의 현재가 기준 평가손익, 추천 연결 여부, 거래 수를 별도 리포트로 계산.
 - `keywords.js`를 시장/종목/공시 목적별 설정으로 분리하고, 기존 import 호환을 위해 통합 facade로 유지. 개인 관심사성 키워드는 투자 필터에서 제거하고 `interests.js` relevance 용도로 분리.
@@ -123,6 +124,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - AI 종목 분석 프롬프트에 외부 기사 데이터는 신뢰할 수 없는 입력이며 기사 속 지시문을 무시하라는 prompt injection 방어 규칙 추가.
 - 5분 뉴스 수집 workflow에 concurrency를 적용해 중복 실행/캐시 충돌 가능성을 완화.
 - `npm run action:report`와 `action-report.yml` 추가. 최근 추천과 현재 포트폴리오를 합쳐 신규 매수/관찰/보유/축소/매도 후보를 토큰 비용 없이 분리하고 Telegram으로 발송.
+- `action:report`에 `가격 모멘텀 관찰` 섹션을 추가했다. 최근 뉴스 기반 추천이 없더라도 `watchlist.domesticMomentum` 대표주에서 20일 고점 근접, 거래량 증가, 상대강도 개선이 잡히면 별도 관찰 후보로 보여준다. 과열 이격은 `추격 금지` 경고로 표시한다.
 - `freedom-engine.js`와 `npm run freedom:report` 추가. 월 생활비, 목표 인출률, 월 저축액, 현재 순자산 기준으로 목표 순자산, 달성률, 예상 달성 시점, 하락 스트레스 지연 기간을 계산.
 - 월간 성과 리뷰와 로컬 대시보드가 최신 `data/freedom/freedom-status.json`을 표시하도록 연결.
 - 대화형 Agent 플랫폼 방향 확정. Telegram은 대화 UI, GitHub Actions는 정기 루틴, 별도 Node.js Agent Server는 webhook/질의응답/승인 처리, Supabase는 포트폴리오와 대화 상태의 기준 저장소로 둠. 상세 설계는 `docs/AGENT_PLATFORM.md`.
@@ -200,9 +202,13 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 추천 생성 AI 버전 추적을 추가했다. 종목 분석 리포트와 추천 로그에 `aiMetadata`를 저장하고, Supabase `recommendations`에 `ai_provider`, `ai_model`, `prompt_version`, `ai_metadata`를 별도 컬럼으로 남긴다. 주간/월간 성과 리뷰는 프롬프트/모델 조합별 승률과 평균 추천 수익률을 분리 표시한다.
 - Telegram 승인 흐름 smoke 실패 알림을 추가했다. `telegram-smoke-actions.yml`에서 smoke 단계가 실패하면 `notify:workflow-failure`가 private Telegram으로 워크플로우명, 작업명, 브랜치, 커밋, GitHub Actions 로그 링크를 보낸다.
 - 가격 provider 운영 알림을 추가했다. `price-provider:ops-report`는 최근 provider 호출 실패율, 빈 응답률, fallback 비중, 오래된 가격 스냅샷을 점검하고 기준 초과 시 private Telegram으로 보낸다. GitHub Actions `price-provider-ops-report.yml`은 평일 23:55 KST에 실행된다. fallback 탐색 과정의 빈 응답은 정상적으로 발생할 수 있어 경보 기준을 90%로 둔다.
+- 가격 provider 운영 알림에 야간 전송 가드를 추가했다. GitHub Actions가 크게 지연돼 02:14 KST처럼 새벽에 실행되면 운영 점검 메시지는 Telegram 전송을 건너뛰고 로그만 남긴다. 필요하면 `PRICE_PROVIDER_ALLOW_OFF_HOURS=1`로 강제 전송할 수 있다.
 - 운영 알림 end-to-end를 확인했다. `notify:workflow-failure` dry-run은 private Telegram 전송에 성공했고, 가격 provider 점검은 의도적으로 낮춘 기준에서 private Telegram 경보 전송이 성공했다. Action Report workflow는 수동 실행에서 리포트 저장과 Telegram 전송까지 성공했다.
 - 프롬프트/모델별 추천 성과에 최소 표본 기준을 추가했다. 주간/월간 성과 리뷰는 모델별 평가 건수가 5건 미만이면 `표본 부족`으로 표시해, Claude Sonnet 전환 효과를 성급하게 판단하지 않도록 한다.
-- 가격 provider 운영 판단을 추가했다. 가격 점검과 주간/월간 성과 리뷰가 실패율, 공식 EOD 비중, fallback 비중을 보고 `현재 구조 유지`, `API 장애 점검`, `해외/글로벌 가격 API 보강 검토` 같은 행동 판단을 함께 표시한다.
+- 가격 provider 운영 판단을 보정했다. 가격 점검과 주간/월간 성과 리뷰가 실패율, 공식 EOD 비중, 국내 fallback 비중, 해외 Yahoo 현재가 사용률을 분리해 보고, 해외 Yahoo 현재가 비중만 높을 때는 장애성 `해외/글로벌 가격 API 보강 검토` 대신 `해외 실시간 가격 API는 필요 시 보강`으로 모니터링한다. `npm run db:pull`도 `price_provider_attempts` 미러를 함께 생성한다.
+- 공백 감지와 자체 개선 루프를 보강했다. Collector Ops는 마지막 성공 시각과 경과분을 추적해 수집 성공이 45분 이상 비면 `stale`로 경고하고, workflow를 12:05 KST에도 추가 실행한다. Agent Server `/health`는 시작 시각과 uptime을 반환하고 요청별 상태/소요시간 로그를 남긴다. 주간/월간 성과 리뷰는 점검 메모와 별도로 `다음 개선 액션`을 만들어 놓친 추천의 성과, 손익비 실패 반복, 손절 기준 누락, 운영 공백/가격 provider 경고를 행동 항목으로 Telegram에 표시한다.
+- 성과 리뷰 학습을 다음 종목 추천에 환류하도록 했다. `performance-learning`이 최신 주간/월간 리뷰에서 손익비 실패, 큰 낙폭/손절 문제, 손절 기준 누락, 실행 연결 문제를 읽어 `performanceLearning.rules`를 만들고, 장마감 종목 분석의 `decision`에 붙인다. `recommendation-risk`와 `risk-reviewer`는 이 룰을 반영해 최소 손익비를 일시 상향하거나 손절/진입 타이밍 미승인 후보를 `watch_only`로 내린다.
+- Telegram 소음 관리를 위해 반복성 private 리포트 빈도를 낮췄다. 경제적 자유 상태와 실제 거래 성과 workflow는 평일 매일 대신 금요일 1회로 조정하고, 일일 포트폴리오 스냅샷과 추천 성과 평가는 기존처럼 운영 데이터 갱신 위주로 유지한다.
 - 일일 행동 리포트에 포트폴리오 섹터 한도 강제 적용을 추가했다. 이미 특정 섹터가 `maxSectorRatio`를 초과하면 같은 섹터 신규 추천은 매수 후보가 아니라 관찰 후보로 내려가고, 해당 섹터 보유 종목은 축소 후보로 표시된다.
 - 보유 종목 손절/익절/리밸런싱 규칙을 보강했다. 일일 행동 리포트는 평단 기준 손절가와 수익 구간의 추적 손절가 중 더 보수적인 값을 표시하고, 종목/섹터 한도 초과 또는 이익 잠금 후보는 초과분/25% 기준 축소 수량을 계산해 보여준다.
 - 브리핑/리포트 입력 데이터의 DB 조회 경로를 보강했다. Supabase `daily_summaries`, `stock_reports` 로더를 추가하고 다이제스트/장마감 종목 분석 프롬프트에 최근 저장 요약과 최근 종목 리포트의 압축 컨텍스트를 함께 넣어 시장 레짐과 이전 후보 맥락을 이어간다.
@@ -254,6 +260,8 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 로컬 HTML 대시보드와 서버 `/dashboard`의 수집기 상태 표시도 같은 기준으로 맞췄다. 기존 `Failures`/`실패` 대신 조치 필요 실패, 정리된 과거 실패, 최근/과거 즉시 알림 실패를 나눠 보여준다.
 - 예정 매매 체크리스트를 추가했다. `npm run trade:plan`은 아직 체결되지 않은 매수/매도 계획을 `data/trades/trade-plans.json`과 포트폴리오 payload에 남기고, 일일 행동 리포트는 오늘까지 확인해야 할 계획을 `예정 매매 확인` 섹션에 표시한다. 이후 같은 방향/종목/수량의 `trade:record`가 들어오면 열린 계획을 자동으로 실행 완료 처리한다.
 - 가격/환율 provider 장애 시 포트폴리오 숫자 방어를 보강했다. 환율 또는 현재가 조회가 실패하면 USD 보유 종목을 환율 1로 재계산하지 않고 기존 `fxRate`, `marketValue`, `unrealizedPnl`, `totalAssetValue`를 보존한다. 로컬 포트폴리오는 총자산 57,377,347원, 현금 15,000,000원, 평가손익 3,027,997원 기준으로 복구하고 GitHub Actions secret을 재동기화했다.
+- 해외 보유/관심 종목 모멘텀 누락을 보강했다. `watchlist.globalMomentum`에 MU/GOOGL/NVDA/AMD/TSM/AVGO를 추가하고, 기사 없이 당일 급등이 포착된 해외 개별주도 `pre-news:signal`과 `action:report` 가격 모멘텀 후보가 되도록 했다. 이미 보유 중인 종목은 신규 매수 후보에서 사라지는 대신 `추가매수/수익보호 점검`으로 분리해 눌림 대기, 조건부 추가매수, 고수익 일부 이익 잠금 판단을 표시한다.
+- 경제/시장 테마 감지를 추가했다. `decision-engine`은 시장 스냅샷과 기사에서 `AI_SEMICONDUCTOR_CYCLE`, `GROWTH_CONCENTRATION`을 감지해 장마감 종목 분석 프롬프트와 레짐 태그에 반영한다. AI 데이터센터/HBM/DRAM 기사와 SOXX/NVDA/MU/AMD/TSM 강세가 동시에 나타나면 AI/반도체 사이클을 별도 테마로 보고, 급등일 추격보다 눌림·분할 진입과 수익보호를 우선하는 playbook을 붙인다.
 
 ## 다음 작업
 

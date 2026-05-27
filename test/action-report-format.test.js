@@ -1,7 +1,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { formatActionReport } = require('../src/notify/telegram');
-const { buildActionReport, enrichRecommendationsWithLatestPrices } = require('../src/utils/action-report');
+const {
+  buildActionReport,
+  buildMarketMomentumCandidates,
+  enrichRecommendationsWithLatestPrices,
+} = require('../src/utils/action-report');
 
 test('formatActionReport renders Korean buy candidates as whole shares with entry and stop', () => {
   const message = formatActionReport({
@@ -40,10 +44,121 @@ test('formatActionReport renders Korean buy candidates as whole shares with entr
   assert.match(message, /한눈에 보기/);
   assert.match(message, /<pre>구분       건수/);
   assert.match(message, /매수후보\s+1/);
+  assert.match(message, /모멘텀\s+0/);
   assert.match(message, /추천 171,000원/);
   assert.match(message, /현재 168,000원 \(-1.7%\)/);
   assert.match(message, /손절 159,030원/);
   assert.match(message, /제안: 5주 \/ 855,000원 \(원안 2,966,738원, 1회 상한\)/);
+});
+
+test('formatActionReport renders momentum watch candidates separately', () => {
+  const message = formatActionReport({
+    date: '2026-05-13',
+    portfolio: {
+      totalAssetValue: 60000000,
+      cashAmount: 15000000,
+      cashRatio: 0.25,
+      positionCount: 1,
+      maxNewBuyAmount: 1000000,
+      maxPositionRatio: 0.15,
+    },
+    newBuyCandidates: [],
+    watchOnlyCandidates: [],
+    momentumWatchCandidates: [{
+      name: '현대차',
+      ticker: '005380',
+      action: 'watch',
+      sourceLabel: '관심',
+      reasons: ['20일 고점 근접', '거래량 1.9배', '5일선이 20일선 위'],
+      warnings: ['20일선 대비 26.11% 이격: 추격 금지'],
+      marketProfile: {
+        price: 704000,
+        changePercent: 8.98,
+        distanceFromMa20Pct: 26.11,
+        volumeRatio20d: 1.9,
+        relativeStrength20d: 12.5,
+      },
+    }],
+    holdCandidates: [],
+    reduceCandidates: [],
+    sellCandidates: [],
+  });
+
+  assert.match(message, /가격 모멘텀 관찰/);
+  assert.match(message, /현대차/);
+  assert.match(message, /등락 \+9%/);
+  assert.match(message, /추격 금지/);
+  assert.match(message, /판정: 관찰 \(관심\)/);
+});
+
+test('formatActionReport renders held momentum add checks separately', () => {
+  const report = buildActionReport({
+    portfolio: {
+      totalAssetValue: 70000000,
+      cashAmount: 12000000,
+      cashRatio: 0.17,
+      maxPositionRatio: 0.2,
+      maxNewBuyAmount: 1000000,
+      stopLossPct: 8,
+      positions: [{
+        name: '마이크론 테크놀로지',
+        ticker: 'MU',
+        symbol: 'MU',
+        currency: 'USD',
+        priceCurrency: 'USD',
+        quantity: 10,
+        currentPrice: 744.51,
+        fxRate: 1500,
+        marketValue: 11167650,
+        weight: 0.16,
+        unrealizedPnl: 800000,
+        unrealizedPnlPct: 7.7,
+        changePercent: 15.16,
+      }],
+    },
+    recommendations: [],
+  });
+  const message = formatActionReport(report);
+
+  assert.equal(report.addCandidates.length, 1);
+  assert.match(message, /추가매수\/수익보호 점검/);
+  assert.match(message, /마이크론 테크놀로지/);
+  assert.match(message, /급등 후 눌림 대기/);
+  assert.match(message, /당일 강세 15.16%/);
+});
+
+test('classifyPosition keeps high-profit 급등 holdings in reduce instead of add', () => {
+  const report = buildActionReport({
+    portfolio: {
+      totalAssetValue: 70000000,
+      cashAmount: 12000000,
+      cashRatio: 0.17,
+      maxPositionRatio: 0.25,
+      maxNewBuyAmount: 1000000,
+      trimProfitPct: 20,
+      stopLossPct: 8,
+      positions: [{
+        name: '마이크론 테크놀로지',
+        ticker: 'MU',
+        symbol: 'MU',
+        currency: 'USD',
+        priceCurrency: 'USD',
+        quantity: 20,
+        currentPrice: 744.51,
+        fxRate: 1500,
+        marketValue: 22335300,
+        weight: 0.19,
+        unrealizedPnl: 4500000,
+        unrealizedPnlPct: 23.8,
+        changePercent: 15.16,
+      }],
+    },
+    recommendations: [],
+  });
+
+  assert.equal(report.addCandidates.length, 0);
+  assert.equal(report.reduceCandidates.length, 1);
+  assert.match(report.reduceCandidates[0].actionEvidence.join(' '), /추가매수보다 눌림 확인 우선/);
 });
 
 test('formatActionReport explains hold evidence and reduce amount', () => {
@@ -219,6 +334,92 @@ test('formatActionReport corrects known stale ticker names even without a fresh 
   });
 
   assert.match(message, /<b>현대위아<\/b> 011210.KS \(추천명 현대건설\)/);
+});
+
+test('buildMarketMomentumCandidates promotes strong domestic watchlist movers without fresh news', async () => {
+  const signals = await buildMarketMomentumCandidates({
+    recommendations: [],
+    portfolio: { positions: [] },
+    watchlist: {
+      preopen: [],
+      close: [],
+      domesticMomentum: [{ symbol: '005380.KS', name: '현대차' }],
+    },
+    fetcher: async () => ({
+      symbol: '005380.KS',
+      name: '현대차',
+      price: 704000,
+      changePercent: 8.98,
+      return5dPct: 15,
+      return20dPct: 28,
+      movingAverage5d: 635800,
+      movingAverage20d: 558225,
+      distanceFromMa5Pct: 10.72,
+      distanceFromMa20Pct: 26.11,
+      ma20Slope5dPct: 4.96,
+      priceAboveMa5: true,
+      priceAboveMa20: true,
+      ma5AboveMa20: true,
+      volumeRatio20d: 1.9,
+      averageTurnover20d: 120000000000,
+      high20d: 710000,
+      high60d: 710000,
+      distanceFrom20dHighPct: -0.85,
+      distanceFrom60dHighPct: -0.85,
+      near20dHigh: true,
+      breakout20d: false,
+    }),
+    benchmarkFetcher: async () => ({ symbol: '^KS11', return5dPct: 2, return20dPct: 8 }),
+  });
+
+  assert.equal(signals.length, 1);
+  assert.equal(signals[0].ticker, '005380');
+  assert.equal(signals[0].action, 'watch');
+  assert.match(signals[0].warnings.join(', '), /추격 금지/);
+});
+
+test('buildMarketMomentumCandidates promotes sharp global watchlist movers without fresh news', async () => {
+  const signals = await buildMarketMomentumCandidates({
+    recommendations: [],
+    portfolio: { positions: [] },
+    watchlist: {
+      preopen: [],
+      close: [],
+      domesticMomentum: [],
+      globalMomentum: [{ symbol: 'MU', name: 'Micron Technology' }],
+    },
+    fetcher: async () => ({
+      symbol: 'MU',
+      name: 'Micron Technology',
+      price: 744.51,
+      changePercent: 15.16,
+    }),
+    benchmarkFetcher: async () => ({ symbol: 'SPY', return5dPct: 1, return20dPct: 3 }),
+  });
+
+  assert.equal(signals.length, 1);
+  assert.equal(signals[0].ticker, 'MU');
+  assert.equal(signals[0].action, 'pre_news_candidate');
+  assert.match(signals[0].reasons.join(', '), /당일 급등/);
+});
+
+test('buildMarketMomentumCandidates excludes existing holdings from new momentum buys', async () => {
+  const signals = await buildMarketMomentumCandidates({
+    recommendations: [],
+    portfolio: { positions: [{ ticker: 'MU', symbol: 'MU', name: 'Micron Technology' }] },
+    watchlist: {
+      preopen: [],
+      close: [],
+      domesticMomentum: [],
+      globalMomentum: [{ symbol: 'MU', name: 'Micron Technology' }],
+    },
+    fetcher: async () => {
+      throw new Error('held symbols should not be fetched as new momentum buys');
+    },
+    benchmarkFetcher: async () => ({ symbol: 'SPY', return5dPct: 1, return20dPct: 3 }),
+  });
+
+  assert.equal(signals.length, 0);
 });
 
 test('enrichRecommendationsWithLatestPrices carries official quote name into action report', async () => {

@@ -11,7 +11,7 @@ const { formatPreNewsSignalReport } = require('../src/notify/telegram');
 
 const now = new Date('2026-05-11T01:05:00.000Z');
 
-test('buildPreNewsUniverse uses holdings, recent recommendations, and domestic watchlist only', () => {
+test('buildPreNewsUniverse uses holdings, recent recommendations, and focused watchlists', () => {
   const universe = buildPreNewsUniverse({
     now,
     portfolio: {
@@ -44,12 +44,15 @@ test('buildPreNewsUniverse uses holdings, recent recommendations, and domestic w
     watchlist: {
       preopen: [{ symbol: '005930.KS', name: '삼성전자' }, { symbol: 'SPY', name: 'S&P 500 ETF' }],
       close: [{ symbol: '000660.KS', name: 'SK하이닉스' }],
+      globalMomentum: [{ symbol: 'MU', name: 'Micron Technology' }],
     },
   });
 
-  assert.deepEqual(universe.map(item => item.symbol).sort(), ['000660.KS', '005930.KS', '396500.KS']);
+  assert.deepEqual(universe.map(item => item.symbol).sort(), ['000660.KS', '005930.KS', '396500.KS', 'MU', 'NVDA']);
   assert.ok(universe.find(item => item.symbol === '005930.KS').sources.includes('recent_recommendation'));
   assert.ok(universe.find(item => item.symbol === '396500.KS').sources.includes('holding'));
+  assert.ok(universe.find(item => item.symbol === 'NVDA').sources.includes('recent_recommendation'));
+  assert.ok(universe.find(item => item.symbol === 'MU').sources.includes('watchlist'));
 });
 
 test('scorePreNewsSignal promotes public price and volume strength', () => {
@@ -77,6 +80,23 @@ test('scorePreNewsSignal promotes public price and volume strength', () => {
   assert.equal(signal.originalName, '삼성전자');
   assert.ok(signal.score >= 5);
   assert.ok(signal.reasons.some(item => item.includes('20일 고점 돌파')));
+});
+
+test('scorePreNewsSignal promotes sharp same-day global moves even when technical history is sparse', () => {
+  const signal = scorePreNewsSignal({
+    symbol: 'MU',
+    ticker: 'MU',
+    name: 'Micron Technology',
+    sources: ['watchlist'],
+  }, {
+    name: 'Micron Technology',
+    price: 744.51,
+    changePercent: 15.16,
+  });
+
+  assert.equal(signal.action, 'pre_news_candidate');
+  assert.equal(signal.score, 5);
+  assert.ok(signal.reasons.some(item => item.includes('당일 급등')));
 });
 
 test('buildPreNewsSignalReport filters duplicates after alert state', async () => {

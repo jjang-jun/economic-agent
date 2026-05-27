@@ -10,6 +10,8 @@ function readWorkflow(name) {
 test('collector ops workflow notifies private Telegram on failure', () => {
   const workflow = readWorkflow('collector-ops-report.yml');
 
+  assert.match(workflow, /5 3 \* \* 1-5/);
+  assert.match(workflow, /50 14 \* \* 1-5/);
   assert.match(workflow, /name: Build and send collector ops report/);
   assert.match(workflow, /name: Notify private chat on failure/);
   assert.match(workflow, /if: failure\(\)/);
@@ -26,4 +28,3 @@ test('price provider ops workflow notifies private Telegram on failure', () => {
   assert.match(workflow, /npm run notify:workflow-failure -- "Price Provider Ops Report \(가격 데이터 점검\)" "Build and send price provider ops report"/);
   assert.match(workflow, /GITHUB_RUN_URL:/);
 });
-

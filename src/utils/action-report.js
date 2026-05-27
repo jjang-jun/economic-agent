@@ -1,7 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 const { getKSTDate } = require('./article-archive');
-const { fetchCurrentPrice, normalizeYahooSymbol } = require('../sources/price-provider');
+const { fetchBenchmarkQuote, fetchCurrentPrice, normalizeYahooSymbol } = require('../sources/price-provider');
+const WATCHLIST = require('../config/watchlist');
+const { buildMarketProfile, fetchRecommendationQuote } = require('./recommendation-market');
+const { buildPreNewsUniverse, scorePreNewsSignal } = require('./pre-news-signal');
 
 const ACTION_REPORT_DIR = path.join(__dirname, '..', '..', 'data', 'action-reports');
 
@@ -164,6 +167,44 @@ async function enrichRecommendationsWithLatestPrices(recommendations = [], portf
   });
 }
 
+function hasSameRecommendationItem(collection = [], ticker = '') {
+  return (collection || []).some(item => String(item.ticker || '').replace(/\.K[QS]$/i, '') === String(ticker || '').replace(/\.K[QS]$/i, ''));
+}
+
+async function buildMarketMomentumCandidates({
+  recommendations = [],
+  portfolio = {},
+  watchlist = WATCHLIST,
+  now = new Date(),
+  fetcher = fetchRecommendationQuote,
+  benchmarkFetcher = fetchBenchmarkQuote,
+  maxCandidates = 5,
+} = {}) {
+  const universe = buildPreNewsUniverse({ recommendations, portfolio, watchlist, now });
+  const benchmark = await benchmarkFetcher();
+  const positions = portfolio.positions || [];
+  const signals = [];
+
+  for (const item of universe) {
+    if ((positions || []).some(position => sameHolding(position, item))) continue;
+    const quote = await fetcher(item.symbol);
+    if (!quote) continue;
+    const marketProfile = buildMarketProfile(quote, benchmark);
+    const signal = scorePreNewsSignal(item, marketProfile);
+    if (signal.action === 'ignore') continue;
+    signals.push(signal);
+  }
+
+  return signals
+    .filter(item => item.score >= 4)
+    .sort((a, b) => (
+      b.score - a.score
+      || ((b.marketProfile?.relativeStrength20d || 0) - (a.marketProfile?.relativeStrength20d || 0))
+      || ((b.marketProfile?.volumeRatio20d || 0) - (a.marketProfile?.volumeRatio20d || 0))
+    ))
+    .slice(0, maxCandidates);
+}
+
 function recommendationSuggestedAmount(recommendation = {}, portfolio = {}) {
   const risk = recommendation.riskProfile || recommendation.risk_profile || {};
   if (typeof risk.suggestedAmount !== 'number') return null;
@@ -295,6 +336,59 @@ function buildTrimPlan(position, portfolio, portfolioContext, reasons = []) {
   };
 }
 
+function buildAddPlan(position, portfolio, portfolioContext) {
+  const currentPrice = typeof position.currentPrice === 'number' ? position.currentPrice : null;
+  const weight = typeof position.weight === 'number' ? position.weight : null;
+  const pnlPct = typeof position.unrealizedPnlPct === 'number' ? position.unrealizedPnlPct : null;
+  const changePercent = typeof position.changePercent === 'number' ? position.changePercent : null;
+  const return5dPct = typeof position.return5dPct === 'number' ? position.return5dPct : null;
+  const return20dPct = typeof position.return20dPct === 'number' ? position.return20dPct : null;
+  const maxPositionRatio = typeof portfolio.maxPositionRatio === 'number' ? portfolio.maxPositionRatio : null;
+  const cashAmount = typeof portfolio.cashAmount === 'number' ? portfolio.cashAmount : 0;
+  const maxNewBuyAmount = typeof portfolio.maxNewBuyAmount === 'number'
+    ? portfolio.maxNewBuyAmount
+    : cashAmount * 0.25;
+  const reasons = [];
+  const blockers = [];
+
+  if (changePercent !== null && changePercent >= 5) reasons.push(`당일 강세 ${changePercent}%`);
+  if (return5dPct !== null && return5dPct >= 5) reasons.push(`5일 수익률 ${return5dPct}%`);
+  if (return20dPct !== null && return20dPct >= 10) reasons.push(`20일 수익률 ${return20dPct}%`);
+
+  if (reasons.length === 0) blockers.push('가격 모멘텀 부족');
+  if (pnlPct !== null && pnlPct < 0) blockers.push(`보유 손익 ${pnlPct}%로 물타기 금지`);
+  if (cashAmount <= 0) blockers.push('현금 부족');
+  if (weight !== null && maxPositionRatio !== null && weight >= maxPositionRatio * 0.9) {
+    blockers.push(`종목 비중 ${Math.round(weight * 100)}%로 한도 근접`);
+  }
+  if (position.sector && portfolioContext.overweightSectors?.has(position.sector)) {
+    const sectorWeight = portfolioContext.overweightSectors.get(position.sector);
+    blockers.push(`${position.sector} 섹터 비중 ${Math.round(sectorWeight * 100)}%로 추가매수 제한`);
+  }
+
+  const totalAssetValue = portfolioContext.totalAssetValue;
+  const currentValue = positionValue(position, totalAssetValue);
+  const targetValue = maxPositionRatio && totalAssetValue
+    ? Math.max(0, totalAssetValue * Math.min(maxPositionRatio * 0.75, maxPositionRatio) - currentValue)
+    : maxNewBuyAmount;
+  const amount = Math.round(Math.max(0, Math.min(maxNewBuyAmount, cashAmount * 0.25, targetValue || maxNewBuyAmount)));
+  const quantity = currentPrice && amount > 0
+    ? (isKoreanTicker(position.ticker) ? Math.floor(amount / currentPrice) : amount / (currentPrice * (position.fxRate || 1)))
+    : null;
+  const chaseRisk = changePercent !== null && changePercent >= 8;
+  const action = chaseRisk ? 'wait_pullback' : 'conditional_add';
+
+  return {
+    eligible: blockers.length === 0 && amount > 0,
+    action,
+    label: action === 'wait_pullback' ? '급등 후 눌림 대기' : '조건부 추가매수',
+    amount,
+    quantity: quantity && quantity > 0 ? quantity : null,
+    reasons,
+    blockers,
+  };
+}
+
 function buildNewBuyCandidates(recommendations, portfolio) {
   const positions = portfolio.positions || [];
   const portfolioContext = buildPortfolioLimitContext(portfolio);
@@ -373,6 +467,9 @@ function classifyPosition(position, portfolio, portfolioContext = buildPortfolio
     reasons.push(`수익률 ${pnlPct}%로 일부 이익 잠금 후보`);
     evidence.push(`수익률 ${pnlPct}% >= 이익잠금 기준 ${trimProfitPct}%`);
   }
+  if (position.changePercent !== null && position.changePercent !== undefined && position.changePercent >= 8) {
+    evidence.push(`당일 급등 ${position.changePercent}%: 추가매수보다 눌림 확인 우선`);
+  }
   if (return5dPct !== null && return5dPct <= -5) {
     reasons.push(`5일 수익률 ${return5dPct}%로 단기 약세`);
     evidence.push(`5일 수익률 ${return5dPct}%`);
@@ -383,6 +480,7 @@ function classifyPosition(position, portfolio, portfolioContext = buildPortfolio
   }
 
   const stopPlan = buildStopPlan(position, portfolio, stopLossPct);
+  const addPlan = buildAddPlan(position, portfolio, portfolioContext);
 
   if (stopPlan.trailingApplied) {
     evidence.push(`수익 보호 손절가 ${round(stopPlan.stopPrice, 0)?.toLocaleString('ko-KR')}`);
@@ -396,6 +494,22 @@ function classifyPosition(position, portfolio, portfolioContext = buildPortfolio
       stopLossPct,
       stopPlan,
       trimPlan: buildTrimPlan(position, portfolio, portfolioContext, reasons),
+      addPlan,
+    };
+  }
+
+  if (addPlan.eligible) {
+    return {
+      action: 'add',
+      reasons: [addPlan.label, ...addPlan.reasons],
+      evidence: [
+        ...evidence,
+        `추가매수 한도 ${Math.round(addPlan.amount).toLocaleString('ko-KR')}원`,
+      ],
+      stopLossPct,
+      stopPlan,
+      trimPlan: buildTrimPlan(position, portfolio, portfolioContext, reasons),
+      addPlan,
     };
   }
 
@@ -411,11 +525,12 @@ function classifyPosition(position, portfolio, portfolioContext = buildPortfolio
     stopLossPct,
     stopPlan,
     trimPlan: buildTrimPlan(position, portfolio, portfolioContext, reasons),
+    addPlan,
   };
 }
 
 function buildPositionActions(portfolio) {
-  const groups = { hold: [], reduce: [], sell: [] };
+  const groups = { add: [], hold: [], reduce: [], sell: [] };
   const portfolioContext = buildPortfolioLimitContext(portfolio);
   for (const position of portfolio.positions || []) {
     const result = classifyPosition(position, portfolio, portfolioContext);
@@ -427,13 +542,19 @@ function buildPositionActions(portfolio) {
       actionStopPrice: result.stopPlan?.stopPrice ?? null,
       actionStopPlan: result.stopPlan,
       actionTrimPlan: result.trimPlan,
+      actionAddPlan: result.addPlan,
     });
   }
   return groups;
 }
 
-function buildActionReport({ recommendations, portfolio, plannedTrades = [] }) {
+function buildActionReport({ recommendations, portfolio, plannedTrades = [], momentumCandidates = [] }) {
   const positionActions = buildPositionActions(portfolio);
+  const newBuyCandidates = buildNewBuyCandidates(recommendations, portfolio);
+  const watchOnlyCandidates = buildWatchOnlyCandidates(recommendations, portfolio);
+  const momentumWatchCandidates = (momentumCandidates || [])
+    .filter(item => !hasSameRecommendationItem(newBuyCandidates, item.ticker))
+    .filter(item => !hasSameRecommendationItem(watchOnlyCandidates, item.ticker));
   return {
     id: `${getKSTDate()}:action-report`,
     date: getKSTDate(),
@@ -450,8 +571,10 @@ function buildActionReport({ recommendations, portfolio, plannedTrades = [] }) {
       maxNewBuyRatio: portfolio.maxNewBuyRatio,
       maxPositionRatio: portfolio.maxPositionRatio,
     },
-    newBuyCandidates: buildNewBuyCandidates(recommendations, portfolio),
-    watchOnlyCandidates: buildWatchOnlyCandidates(recommendations, portfolio),
+    newBuyCandidates,
+    watchOnlyCandidates,
+    momentumWatchCandidates,
+    addCandidates: positionActions.add,
     holdCandidates: positionActions.hold,
     reduceCandidates: positionActions.reduce,
     sellCandidates: positionActions.sell,
@@ -469,6 +592,7 @@ function saveActionReport(report) {
 module.exports = {
   ACTION_REPORT_DIR,
   buildActionReport,
+  buildMarketMomentumCandidates,
   buildNewBuyCandidates,
   buildWatchOnlyCandidates,
   buildPositionActions,

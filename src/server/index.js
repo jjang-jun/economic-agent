@@ -5,6 +5,7 @@ const { handleDashboardRequest } = require('./dashboard');
 const { runNewsCollector } = require('../jobs/run-news-collector');
 
 const PORT = Number(process.env.PORT || process.env.AGENT_PORT || 3000);
+const STARTED_AT = new Date().toISOString();
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -39,11 +40,21 @@ function buildVersionPayload() {
   };
 }
 
+function buildHealthPayload() {
+  return {
+    ok: true,
+    service: 'economic-agent',
+    mode: 'agent-server',
+    startedAt: STARTED_AT,
+    uptimeSeconds: Math.floor(process.uptime()),
+  };
+}
+
 async function requestHandler(req, res) {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
 
   if (req.method === 'GET' && url.pathname === '/health') {
-    sendJson(res, 200, { ok: true, service: 'economic-agent', mode: 'agent-server' });
+    sendJson(res, 200, buildHealthPayload());
     return;
   }
 
@@ -88,6 +99,10 @@ async function requestHandler(req, res) {
 
 function startServer() {
   const server = http.createServer((req, res) => {
+    const started = Date.now();
+    res.on('finish', () => {
+      console.log(`[AgentServer] ${req.method} ${req.url} -> ${res.statusCode} ${Date.now() - started}ms`);
+    });
     requestHandler(req, res).catch(err => {
       console.error(`[AgentServer] 요청 실패: ${err.message}`);
       sendJson(res, 500, { ok: false, error: 'internal error' });
@@ -107,4 +122,5 @@ module.exports = {
   startServer,
   requestHandler,
   buildVersionPayload,
+  buildHealthPayload,
 };

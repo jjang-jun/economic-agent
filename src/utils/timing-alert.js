@@ -6,6 +6,9 @@ const { fetchBenchmarkQuote, normalizeYahooSymbol, isDomesticTicker } = require(
 
 const TIMING_ALERT_DIR = path.join(__dirname, '..', '..', 'data', 'timing-alerts');
 const TIMING_ALERT_STATE_FILE = path.join(TIMING_ALERT_DIR, 'state.json');
+const PREMARKET_START_MINUTES = 8 * 60 + 35;
+const MARKET_OPEN_MINUTES = 9 * 60;
+const MARKET_CLOSE_MINUTES = 15 * 60 + 30;
 
 function toTime(value) {
   const time = new Date(value || 0).getTime();
@@ -50,6 +53,35 @@ function round(value, digits = 2) {
   if (typeof value !== 'number' || !Number.isFinite(value)) return null;
   const factor = 10 ** digits;
   return Math.round(value * factor) / factor;
+}
+
+function getKSTClock(now = new Date()) {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  const parts = formatter.formatToParts(now);
+  const hour = Number(parts.find(part => part.type === 'hour')?.value || 0);
+  const minute = Number(parts.find(part => part.type === 'minute')?.value || 0);
+  return {
+    hour,
+    minute,
+    minutes: hour * 60 + minute,
+    label: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')} KST`,
+  };
+}
+
+function getTimingSession(now = new Date()) {
+  const clock = getKSTClock(now);
+  if (clock.minutes >= PREMARKET_START_MINUTES && clock.minutes < MARKET_OPEN_MINUTES) {
+    return { session: 'premarket', clock };
+  }
+  if (clock.minutes >= MARKET_OPEN_MINUTES && clock.minutes < MARKET_CLOSE_MINUTES) {
+    return { session: 'intraday', clock };
+  }
+  return { session: 'closed', clock };
 }
 
 function buildTimingConditions(entryTiming = {}) {
@@ -231,6 +263,8 @@ function markTimingAlertsSent(report, state = loadTimingAlertState()) {
 
 module.exports = {
   TIMING_ALERT_STATE_FILE,
+  getKSTClock,
+  getTimingSession,
   buildTimingAlertReport,
   classifyTimingCandidate,
   selectTimingRecommendations,

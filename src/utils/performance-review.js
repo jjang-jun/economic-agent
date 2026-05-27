@@ -11,6 +11,7 @@ const { buildBehaviorReview } = require('./behavior-reviewer');
 const { buildCollectorOpsSummary } = require('./collector-ops');
 const { buildPriceSourceQualitySummary } = require('./price-source-quality');
 const { buildLocalResearchSummary } = require('./local-research-worker');
+const { buildPerformanceLearningFromReview } = require('./performance-learning');
 
 const REVIEW_DIR = path.join(__dirname, '..', '..', 'data', 'performance-reviews');
 
@@ -43,6 +44,29 @@ function summarizeRecommendations(recommendations) {
     ? round(evaluated.reduce((sum, item) => sum + item.latest.evaluation.signalReturnPct, 0) / evaluated.length)
     : null;
   const avgAlpha = evaluated.filter(item => typeof item.latest.evaluation.alphaPct === 'number');
+
+  const notes = buildNotes(recommendationSummary, tradeSummary, behaviorReview, collectorOps, priceSourceQuality, backtestResearch);
+  const baseReview = {
+    id: `${getKSTDate()}:${period}`,
+    period,
+    recommendationSummary,
+    tradeSummary,
+    performanceLab,
+    behaviorReview,
+    collectorOps,
+    priceSourceQuality,
+  };
+  const performanceLearning = buildPerformanceLearningFromReview(baseReview);
+  const improvementActions = buildImprovementActions({
+    recommendationSummary,
+    tradeSummary,
+    behaviorReview,
+    collectorOps,
+    priceSourceQuality,
+    performanceLearning,
+    performanceLab,
+    notes,
+  });
 
   return {
     total: recommendations.length,
@@ -148,10 +172,62 @@ async function buildPerformanceReview(period = 'weekly') {
     behaviorReview,
     collectorOps,
     priceSourceQuality,
+    performanceLearning,
     backtestResearch,
     freedomStatus,
-    notes: buildNotes(recommendationSummary, tradeSummary, behaviorReview, collectorOps, priceSourceQuality, backtestResearch),
+    notes,
+    improvementActions,
   };
+}
+
+function buildImprovementActions({
+  recommendationSummary = {},
+  tradeSummary = {},
+  behaviorReview = {},
+  collectorOps = {},
+  priceSourceQuality = {},
+  performanceLab = {},
+  performanceLearning = {},
+} = {}) {
+  const actions = [];
+  const missed = performanceLab.missedRecommendationQuality || {};
+  const executed = performanceLab.executedRecommendationQuality || {};
+  const failures = performanceLab.failureAnalysis || [];
+  const executionGap = performanceLab.executionGap || {};
+
+  if (
+    typeof missed.avgSignalReturnPct === 'number'
+    && typeof executed.avgSignalReturnPct === 'number'
+    && missed.avgSignalReturnPct - executed.avgSignalReturnPct >= 2
+    && (executionGap.missedEvaluatedRecommendations || 0) >= 2
+  ) {
+    actions.push('실행하지 않은 추천의 성과가 실제 매수한 추천보다 높습니다. 다음 주에는 매수 후보를 임의로 건너뛰지 말고, 계좌 한도 때문에 못 산 경우 계획매매로 남깁니다.');
+  }
+  if (tradeSummary.linkedRatePct !== null && tradeSummary.linkedRatePct < 70) {
+    actions.push('실제 매수는 추천 ID와 연결해 기록합니다. 추천 외 매수는 행동 리뷰에서 별도 검토 대상으로 남깁니다.');
+  }
+  const lowRiskRewardFailure = failures.find(item => item.reason === 'low_risk_reward' && item.count > 0);
+  if (lowRiskRewardFailure) {
+    actions.push('손익비 부족이 실패 원인으로 반복됩니다. 신규 추천은 최소 손익비와 손절가가 모두 계산된 후보만 매수 검토 후보로 유지합니다.');
+  }
+  if ((behaviorReview.recommendationHygiene?.missingStop || 0) > 0) {
+    actions.push('손절 기준이 없는 bullish 추천은 저장하더라도 매수 후보가 아니라 관찰 후보로 낮춥니다.');
+  }
+  if (recommendationSummary.winRatePct !== null && recommendationSummary.winRatePct < 50) {
+    actions.push('추천 승률이 낮습니다. 다음 추천에서는 기사 호재보다 가격 반응, 거래량, 20일선 위치를 우선 확인합니다.');
+  }
+  if (collectorOps.staleSuccess || (collectorOps.healthLabel === 'stale')) {
+    actions.push('수집기 마지막 성공이 오래됐습니다. Cloud Run Scheduler와 GitHub 백업 수집 workflow를 먼저 확인합니다.');
+  }
+  if (priceSourceQuality.healthLabel === 'warn') {
+    const decision = priceSourceQuality.providerDecision?.label || '가격 provider 경고';
+    actions.push(`${decision}: 국내 fallback, 공식 EOD 비중, provider 실패율 중 어느 항목이 경고인지 분리해서 조치합니다.`);
+  }
+  for (const action of performanceLearning.actions || []) {
+    actions.push(`다음 추천 룰 반영: ${action}`);
+  }
+
+  return [...new Set(actions)].slice(0, 6);
 }
 
 function buildNotes(recommendationSummary, tradeSummary, behaviorReview = {}, collectorOps = {}, priceSourceQuality = {}, backtestResearch = null) {
@@ -206,4 +282,5 @@ module.exports = {
   savePerformanceReview,
   summarizeRecommendations,
   summarizeTrades,
+  buildImprovementActions,
 };

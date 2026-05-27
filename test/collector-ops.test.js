@@ -9,6 +9,8 @@ test('summarizeCollectorOps reports run health and pending alerts', () => {
       status: 'success',
       trigger_source: 'cloud_scheduler',
       lookback_minutes: 30,
+      started_at: '2026-05-10T11:30:00.000Z',
+      finished_at: '2026-05-10T11:31:00.000Z',
       new_article_count: 10,
       immediate_alert_count: 2,
       digest_buffer_count: 4,
@@ -42,6 +44,8 @@ test('summarizeCollectorOps reports run health and pending alerts', () => {
   assert.equal(summary.alertEvents.pendingDigest, 2);
   assert.equal(summary.alertEvents.sentCatchUp, 1);
   assert.equal(summary.alertEvents.pendingCatchUp, 1);
+  assert.equal(summary.lastSuccessAt, '2026-05-10T11:31:00.000Z');
+  assert.equal(summary.minutesSinceLastSuccess, 29);
   assert.equal(summary.healthLabel, 'failed');
 });
 
@@ -51,6 +55,8 @@ test('summarizeCollectorOps separates historical immediate alert failures', () =
       status: 'success',
       trigger_source: 'cloud_scheduler',
       lookback_minutes: 240,
+      started_at: '2026-05-10T11:30:00.000Z',
+      finished_at: '2026-05-10T11:31:00.000Z',
     },
   ], [
     { alert_type: 'immediate', status: 'failed', created_at: '2026-05-07T00:00:00.000Z' },
@@ -68,6 +74,8 @@ test('summarizeCollectorOps separates resolved stale smoke failures from actiona
       status: 'success',
       trigger_source: 'cloud_scheduler',
       lookback_minutes: 30,
+      started_at: '2026-05-10T11:30:00.000Z',
+      finished_at: '2026-05-10T11:31:00.000Z',
     },
     {
       status: 'failed',
@@ -81,7 +89,7 @@ test('summarizeCollectorOps separates resolved stale smoke failures from actiona
       lookback_minutes: 30,
       error_message: "Cannot access 'toAdd' before initialization",
     },
-  ], []);
+  ], [], { now: '2026-05-10T12:00:00.000Z' });
 
   assert.equal(summary.failedRuns, 2);
   assert.equal(summary.actionableFailedRuns, 0);
@@ -95,7 +103,10 @@ test('summarizeCollectorOps marks empty run windows explicitly', () => {
 
   assert.equal(summary.totalRuns, 0);
   assert.equal(summary.healthLabel, 'empty');
-  assert.deepEqual(buildCollectorOpsAnomalies(summary), ['최근 수집 실행 기록이 없습니다']);
+  assert.deepEqual(buildCollectorOpsAnomalies(summary), [
+    '최근 수집 실행 기록이 없습니다',
+    '최근 성공한 수집 실행이 없습니다',
+  ]);
 });
 
 test('summarizeCollectorOps treats expected off-hours as idle', () => {
@@ -120,6 +131,9 @@ test('buildCollectorOpsAnomalies flags unhealthy collector state', () => {
     failedRuns: 1,
     successRatePct: 80,
     maxLookbackMinutes: 120,
+    lastSuccessAt: '2026-05-10T10:00:00.000Z',
+    minutesSinceLastSuccess: 95,
+    staleSuccessMinutes: 45,
     alertEvents: {
       failedImmediate: 1,
       actionableFailedImmediate: 1,
@@ -130,6 +144,7 @@ test('buildCollectorOpsAnomalies flags unhealthy collector state', () => {
   }, { maxPendingCatchUp: 0 });
 
   assert.deepEqual(anomalies, [
+    '마지막 성공 후 95분 경과',
     '조치 필요 수집 실패 1건',
     '수집 성공률 80%',
     '최근 즉시 알림 실패 1건',
@@ -138,6 +153,24 @@ test('buildCollectorOpsAnomalies flags unhealthy collector state', () => {
     'catch-up 대기 2건',
     '최대 lookback 120분',
   ]);
+});
+
+test('summarizeCollectorOps marks stale collector success during expected window', () => {
+  const summary = summarizeCollectorOps([
+    {
+      status: 'success',
+      trigger_source: 'cloud_scheduler',
+      started_at: '2026-05-10T10:00:00.000Z',
+      finished_at: '2026-05-10T10:01:00.000Z',
+    },
+  ], [], {
+    now: '2026-05-10T12:00:00.000Z',
+    staleSuccessMinutes: 45,
+  });
+
+  assert.equal(summary.healthLabel, 'stale');
+  assert.equal(summary.minutesSinceLastSuccess, 119);
+  assert.deepEqual(buildCollectorOpsAnomalies(summary), ['마지막 성공 후 119분 경과']);
 });
 
 test('collector ops args support noTelegram and explicit days', () => {
@@ -166,6 +199,7 @@ test('collector ops summary includes anomalies and alert counts', () => {
 
   assert.match(message, /수집기 운영 점검/);
   assert.match(message, /성공 4\/5/);
+  assert.match(message, /마지막 성공: 없음/);
   assert.match(message, /조치 필요 실패 1/);
   assert.match(message, /즉시알림 실패: 최근 0/);
   assert.match(message, /알림대기: digest 2 · catch-up 1/);

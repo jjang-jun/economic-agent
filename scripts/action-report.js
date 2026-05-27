@@ -1,7 +1,12 @@
 const { loadRecommendations } = require('../src/utils/recommendation-log');
 const { loadPortfolio, enrichPortfolio } = require('../src/utils/portfolio');
 const { loadStoredPortfolio } = require('../src/utils/portfolio-store');
-const { buildActionReport, enrichRecommendationsWithLatestPrices, saveActionReport } = require('../src/utils/action-report');
+const {
+  buildActionReport,
+  buildMarketMomentumCandidates,
+  enrichRecommendationsWithLatestPrices,
+  saveActionReport,
+} = require('../src/utils/action-report');
 const { loadOpenTradePlans } = require('../src/utils/trade-plan');
 const { sendActionReport, formatActionReport } = require('../src/notify/telegram');
 
@@ -20,15 +25,20 @@ async function main() {
   ]);
   const portfolio = await enrichPortfolio(storedPortfolio || loadPortfolio());
   const enrichedRecommendations = await enrichRecommendationsWithLatestPrices(recommendations, portfolio);
+  const momentumCandidates = await buildMarketMomentumCandidates({
+    recommendations: enrichedRecommendations,
+    portfolio,
+  });
   const report = buildActionReport({
     recommendations: enrichedRecommendations,
     portfolio,
     plannedTrades: loadOpenTradePlans({ upcomingDays: 1 }),
+    momentumCandidates,
   });
   const file = saveActionReport(report);
 
   console.log(`[행동리포트] 저장: ${file}`);
-  console.log(`[행동리포트] 신규 ${report.newBuyCandidates.length}건, 관찰 ${report.watchOnlyCandidates.length}건, 보유 ${report.holdCandidates.length}건, 축소 ${report.reduceCandidates.length}건, 매도 ${report.sellCandidates.length}건`);
+  console.log(`[행동리포트] 신규 ${report.newBuyCandidates.length}건, 관찰 ${report.watchOnlyCandidates.length}건, 모멘텀 ${report.momentumWatchCandidates.length}건, 보유 ${report.holdCandidates.length}건, 축소 ${report.reduceCandidates.length}건, 매도 ${report.sellCandidates.length}건`);
 
   if (shouldSkipTelegram()) {
     console.log(formatActionReport(report));

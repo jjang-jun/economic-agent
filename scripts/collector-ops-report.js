@@ -43,10 +43,14 @@ function formatSummary(summary, anomalies) {
   const historicalAlerts = summary.alertEvents?.historicalFailedImmediate
     ? ` · 과거 실패 ${summary.alertEvents.historicalFailedImmediate}`
     : '';
+  const lastSuccess = summary.lastSuccessAt
+    ? `${summary.lastSuccessAt}${typeof summary.minutesSinceLastSuccess === 'number' ? ` · ${summary.minutesSinceLastSuccess}분 전` : ''}`
+    : '없음';
   return [
     `${alert} <b>수집기 운영 점검</b>`,
     `상태: ${summary.healthLabel || 'n/a'}`,
     `실행: 성공 ${summary.successfulRuns ?? 0}/${summary.completedRuns ?? summary.totalRuns ?? 0} · 조치 필요 실패 ${summary.actionableFailedRuns ?? summary.failedRuns ?? 0}${resolved}`,
+    `마지막 성공: ${lastSuccess}`,
     `성공률: ${summary.successRatePct ?? 'n/a'}% · 최대 lookback ${summary.maxLookbackMinutes ?? 'n/a'}분`,
     `기사: 신규 ${summary.totalNewArticles ?? 0}건 · 즉시 ${summary.totalImmediateAlerts ?? 0}건 · digest ${summary.totalDigestBuffered ?? 0}건`,
     `즉시알림 실패: 최근 ${summary.alertEvents?.actionableFailedImmediate ?? summary.alertEvents?.failedImmediate ?? 0}${historicalAlerts}`,

@@ -5,6 +5,8 @@ permissions:
 
 on:
   schedule:
+    # KST 12:05 = UTC 03:05. 장중 수집 공백을 당일에 감지한다.
+    - cron: '5 3 * * 1-5'
     # KST 23:50 = UTC 14:50
     - cron: '50 14 * * 1-5'
   workflow_dispatch:

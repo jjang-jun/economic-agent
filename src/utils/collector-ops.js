@@ -51,6 +51,14 @@ function toTime(value) {
   return Number.isFinite(time) ? time : 0;
 }
 
+function latestIso(rows = [], field) {
+  const times = rows
+    .map(row => toTime(row?.[field]))
+    .filter(time => time > 0);
+  if (times.length === 0) return null;
+  return new Date(Math.max(...times)).toISOString();
+}
+
 function isResolvedCollectorFailure(run = {}) {
   const message = String(run.error_message || '').toLowerCase();
   const trigger = String(run.trigger_source || '').toLowerCase();
@@ -66,6 +74,7 @@ function summarizeCollectorOps(runs = [], alerts = [], options = {}) {
   const now = options.now ? new Date(options.now).getTime() : Date.now();
   const expectedRuns = options.expectedRuns !== false;
   const recentAlertFailureMs = (options.recentAlertFailureHours ?? 24) * 60 * 60 * 1000;
+  const staleSuccessMinutes = options.staleSuccessMinutes ?? Number(process.env.COLLECTOR_STALE_SUCCESS_MINUTES || 45);
   const completed = runs.filter(run => run.status !== 'running');
   const success = runs.filter(run => run.status === 'success');
   const failed = runs.filter(run => run.status === 'failed');
@@ -84,12 +93,20 @@ function summarizeCollectorOps(runs = [], alerts = [], options = {}) {
     return created && now - created <= recentAlertFailureMs;
   });
   const historicalFailedImmediateAlerts = failedImmediateAlerts.filter(alert => !recentFailedImmediateAlerts.includes(alert));
+  const lastRunAt = latestIso(runs, 'started_at') || latestIso(runs, 'finished_at');
+  const lastSuccessAt = latestIso(success, 'finished_at') || latestIso(success, 'started_at');
+  const minutesSinceLastSuccess = lastSuccessAt
+    ? Math.floor((now - new Date(lastSuccessAt).getTime()) / 60000)
+    : null;
+  const staleSuccess = expectedRuns
+    && (lastSuccessAt === null || (minutesSinceLastSuccess !== null && minutesSinceLastSuccess > staleSuccessMinutes));
 
   const healthLabel = runs.length === 0
     ? (expectedRuns ? 'empty' : 'idle')
+    : (staleSuccess ? 'stale'
     : (actionableFailures.length > 0
       ? (success.length > actionableFailures.length ? 'warn' : 'failed')
-      : 'ok');
+      : 'ok'));
 
   return {
     totalRuns: runs.length,
@@ -107,6 +124,11 @@ function summarizeCollectorOps(runs = [], alerts = [], options = {}) {
     totalNewArticles: sum(runs, run => run.new_article_count),
     totalImmediateAlerts: sum(runs, run => run.immediate_alert_count),
     totalDigestBuffered: sum(runs, run => run.digest_buffer_count),
+    lastRunAt,
+    lastSuccessAt,
+    minutesSinceLastSuccess,
+    staleSuccessMinutes,
+    staleSuccess,
     alertEvents: {
       total: alerts.length,
       sentImmediate: alertByTypeStatus['immediate:sent'] || 0,
@@ -143,10 +165,25 @@ function buildCollectorOpsAnomalies(summary = {}, options = {}) {
   const maxPendingCatchUp = options.maxPendingCatchUp ?? 20;
   const maxFailedImmediate = options.maxFailedImmediate ?? 0;
   const maxLookbackMinutes = options.maxLookbackMinutes ?? 90;
+  const maxMinutesSinceLastSuccess = options.maxMinutesSinceLastSuccess ?? summary.staleSuccessMinutes ?? 45;
   const anomalies = [];
 
   if ((summary.totalRuns || 0) === 0 && summary.expectedRuns !== false) {
     anomalies.push('최근 수집 실행 기록이 없습니다');
+  }
+  if (
+    summary.expectedRuns !== false
+    && (
+      summary.lastSuccessAt === null
+      || (
+        typeof summary.minutesSinceLastSuccess === 'number'
+        && summary.minutesSinceLastSuccess > maxMinutesSinceLastSuccess
+      )
+    )
+  ) {
+    anomalies.push(summary.lastSuccessAt
+      ? `마지막 성공 후 ${summary.minutesSinceLastSuccess}분 경과`
+      : '최근 성공한 수집 실행이 없습니다');
   }
   const actionableFailedRuns = summary.actionableFailedRuns ?? summary.failedRuns ?? 0;
   if (actionableFailedRuns > maxFailedRuns) {

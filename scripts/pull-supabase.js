@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { execFileSync } = require('child_process');
+const { spawnSync } = require('child_process');
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.SUPABASE_PROJECT_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -20,6 +20,7 @@ const TABLES = [
   'performance_reviews',
   'market_snapshots',
   'price_snapshots',
+  'price_provider_attempts',
   'investor_flows',
   'decision_contexts',
   'collector_runs',
@@ -58,16 +59,26 @@ function sqlString(value) {
 }
 
 function writeSqlite(table, rows) {
-  execFileSync('sqlite3', [DB_FILE, `create table if not exists ${table} (id text primary key, row_json text not null);`]);
-  execFileSync('sqlite3', [DB_FILE, `delete from ${table};`]);
-
+  const statements = [
+    `create table if not exists ${table} (id text primary key, row_json text not null);`,
+    'begin;',
+    `delete from ${table};`,
+  ];
   for (const row of rows) {
     const id = row.id || row.date || `${table}:${Math.random()}`;
     const json = JSON.stringify(row);
-    execFileSync('sqlite3', [
-      DB_FILE,
-      `insert or replace into ${table} (id, row_json) values (${sqlString(id)}, ${sqlString(json)});`,
-    ]);
+    statements.push(`insert or replace into ${table} (id, row_json) values (${sqlString(id)}, ${sqlString(json)});`);
+  }
+  statements.push('commit;');
+
+  const result = spawnSync('sqlite3', [DB_FILE], {
+    input: statements.join('\n'),
+    encoding: 'utf8',
+    maxBuffer: 20 * 1024 * 1024,
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(`sqlite3 ${table}: ${result.stderr || `exit ${result.status}`}`);
   }
 }
 
