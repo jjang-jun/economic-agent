@@ -19,6 +19,40 @@ function getHeaders(prefer = 'resolution=merge-duplicates') {
   return headers;
 }
 
+async function buildHttpError(res) {
+  const body = await res.text();
+  const contentType = res.headers?.get?.('content-type') || '';
+  const err = new Error(summarizeHttpError(res.status, body, contentType));
+  err.status = res.status;
+  err.body = body;
+  return err;
+}
+
+function summarizeHttpError(status, body = '', contentType = '') {
+  const raw = String(body || '').trim();
+  if (!raw) return `${status}`;
+
+  if (contentType.includes('application/json')) {
+    try {
+      const parsed = JSON.parse(raw);
+      const message = parsed.message || parsed.error_description || parsed.error || parsed.hint || raw;
+      return `${status} ${String(message).replace(/\s+/g, ' ').slice(0, 240)}`;
+    } catch (_) {
+      return `${status} ${raw.replace(/\s+/g, ' ').slice(0, 240)}`;
+    }
+  }
+
+  const cloudflareMatch = raw.match(/Error code\s+(\d+)/i);
+  if (cloudflareMatch) return `${status} Cloudflare ${cloudflareMatch[1]}`;
+
+  const titleMatch = raw.match(/<title[^>]*>(.*?)<\/title>/is);
+  if (titleMatch) {
+    return `${status} ${titleMatch[1].replace(/\s+/g, ' ').trim().slice(0, 200)}`;
+  }
+
+  return `${status} ${raw.replace(/\s+/g, ' ').slice(0, 240)}`;
+}
+
 async function upsert(table, rows, onConflict) {
   if (!isPersistenceEnabled() || !rows || rows.length === 0) return { saved: 0 };
 
@@ -32,8 +66,7 @@ async function upsert(table, rows, onConflict) {
       body: JSON.stringify(rows),
     });
     if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`${res.status} ${body}`);
+      throw await buildHttpError(res);
     }
     return { saved: rows.length };
   } catch (err) {
@@ -57,8 +90,7 @@ async function deleteRows(table, filterParams = {}) {
       headers: getHeaders('return=minimal'),
     });
     if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`${res.status} ${body}`);
+      throw await buildHttpError(res);
     }
     return { deleted: 1 };
   } catch (err) {
@@ -83,8 +115,7 @@ async function patchRows(table, filterParams, payload) {
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`${res.status} ${body}`);
+      throw await buildHttpError(res);
     }
     return { saved: 1 };
   } catch (err) {
@@ -108,8 +139,7 @@ async function selectRows(table, params = {}) {
       headers: getHeaders(''),
     });
     if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`${res.status} ${body}`);
+      throw await buildHttpError(res);
     }
     return { rows: await res.json() };
   } catch (err) {
@@ -809,4 +839,5 @@ module.exports = {
   persistAlertEvents,
   loadBufferedDigestArticles,
   loadAlertEventsForArticles,
+  summarizeHttpError,
 };

@@ -45,29 +45,6 @@ function summarizeRecommendations(recommendations) {
     : null;
   const avgAlpha = evaluated.filter(item => typeof item.latest.evaluation.alphaPct === 'number');
 
-  const notes = buildNotes(recommendationSummary, tradeSummary, behaviorReview, collectorOps, priceSourceQuality, backtestResearch);
-  const baseReview = {
-    id: `${getKSTDate()}:${period}`,
-    period,
-    recommendationSummary,
-    tradeSummary,
-    performanceLab,
-    behaviorReview,
-    collectorOps,
-    priceSourceQuality,
-  };
-  const performanceLearning = buildPerformanceLearningFromReview(baseReview);
-  const improvementActions = buildImprovementActions({
-    recommendationSummary,
-    tradeSummary,
-    behaviorReview,
-    collectorOps,
-    priceSourceQuality,
-    performanceLearning,
-    performanceLab,
-    notes,
-  });
-
   return {
     total: recommendations.length,
     evaluated: evaluated.length,
@@ -160,7 +137,7 @@ async function buildPerformanceReview(period = 'weekly') {
   if (freedomStatus) saveFreedomStatus(freedomStatus);
   if (freedomStatus) await persistFinancialFreedomGoal(freedomStatus);
 
-  return {
+  const baseReview = {
     id: `${getKSTDate()}:${period}`,
     period,
     startDate,
@@ -172,9 +149,31 @@ async function buildPerformanceReview(period = 'weekly') {
     behaviorReview,
     collectorOps,
     priceSourceQuality,
-    performanceLearning,
     backtestResearch,
     freedomStatus,
+  };
+  const performanceLearning = buildPerformanceLearningFromReview(baseReview);
+  const notes = buildNotes(
+    recommendationSummary,
+    tradeSummary,
+    behaviorReview,
+    collectorOps,
+    priceSourceQuality,
+    backtestResearch,
+  );
+  const improvementActions = buildImprovementActions({
+    recommendationSummary,
+    tradeSummary,
+    behaviorReview,
+    collectorOps,
+    priceSourceQuality,
+    performanceLearning,
+    performanceLab,
+  });
+
+  return {
+    ...baseReview,
+    performanceLearning,
     notes,
     improvementActions,
   };
