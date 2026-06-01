@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { summarizeHttpError } = require('../src/utils/persistence');
+const { summarizeHttpError, shouldRetrySupabaseError } = require('../src/utils/persistence');
 
 test('summarizeHttpError keeps Cloudflare HTML errors compact', () => {
   const html = `
@@ -22,4 +22,11 @@ test('summarizeHttpError extracts json message without leaking full body', () =>
   });
 
   assert.equal(summarizeHttpError(401, body, 'application/json'), '401 JWT expired');
+});
+
+test('shouldRetrySupabaseError retries transient statuses only', () => {
+  assert.equal(shouldRetrySupabaseError(Object.assign(new Error('bad gateway'), { status: 502 })), true);
+  assert.equal(shouldRetrySupabaseError(Object.assign(new Error('rate limited'), { status: 429 })), true);
+  assert.equal(shouldRetrySupabaseError(Object.assign(new Error('unauthorized'), { status: 401 })), false);
+  assert.equal(shouldRetrySupabaseError(new Error('network failed')), true);
 });

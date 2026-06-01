@@ -59,6 +59,8 @@ curl https://YOUR_AGENT_URL/version
 
 `/health`는 서버 생존 여부만 확인한다. `/version`은 Cloud Run revision, service name, 선택적으로 `COMMIT_SHA`를 반환하므로 최신 코드가 배포됐는지 확인할 때 사용한다. `/version`이 404라면 아직 2026-05-08 이후 Agent Server 코드가 Cloud Run에 반영되지 않은 상태다.
 
+GitHub Actions의 `deploy-freshness.yml`은 평일 09:20 KST에 `/version`의 `commitSha`와 현재 `main` 커밋을 비교한다. Cloud Run 배포 시 `COMMIT_SHA` 또는 `GITHUB_SHA` 환경변수를 주입해야 정확히 비교할 수 있고, 서버 URL은 repository variable/secret `AGENT_SERVER_URL`로 기본값을 덮어쓸 수 있다.
+
 ## 2. 배포
 
 컨테이너 기반 플랫폼에 배포한다.

@@ -39,6 +39,7 @@ RSS feeds
 - Push Supabase schema: `npm run db:push`
 - Import existing local `data/*.json` history into Supabase: `npm run db:import-local`
 - Pull Supabase history to local JSON/SQLite: `npm run db:pull`
+- Check deployed Agent Server commit freshness: `npm run deploy:freshness`
 - Check dependency vulnerabilities: `npm run security:audit`
 - Test: `npm test`
 
@@ -49,6 +50,8 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - AI digest/report provider: `AI_PROVIDER`, optional `AI_MODEL`, `AI_BASE_URL`, and provider key such as `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GROQ_API_KEY`, or generic `AI_API_KEY`
 - Optional indicators/data: `BOK_API_KEY`, `FRED_API_KEY`, `DART_API_KEY`
 - Optional history store: `SUPABASE_PROJECT_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_DB_PASSWORD` or `SUPABASE_DB_URL` for schema pushes
+- Optional deploy freshness check: `AGENT_SERVER_URL` or `CLOUD_RUN_SERVICE_URL`, with `EXPECTED_DEPLOY_SHA` when running outside GitHub Actions
+- Optional Supabase transient retry tuning: `SUPABASE_RETRY_COUNT`, `SUPABASE_RETRY_DELAY_MS`
 - Optional private portfolio file: `PORTFOLIO_FILE`, defaulting to ignored `data/portfolio.json`
 - Optional private portfolio env for GitHub Actions: `PORTFOLIO_JSON_BASE64` or `PORTFOLIO_JSON`
 - Optional local research worker: `LOCAL_RESEARCH_WORKER_ENABLED=true` enables the monthly review sidecar that calls `scripts/local-backtest-worker.py`; `LOCAL_RESEARCH_WORKER_PROVIDER` and `LOCAL_RESEARCH_MAX_TICKERS` tune provider and ticker count.

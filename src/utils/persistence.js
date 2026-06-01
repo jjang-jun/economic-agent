@@ -9,6 +9,12 @@ function isPersistenceEnabled() {
   return Boolean(SUPABASE_URL && SUPABASE_KEY);
 }
 
+function parseNonNegativeInt(value, fallback) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return fallback;
+  return Math.floor(parsed);
+}
+
 function getHeaders(prefer = 'resolution=merge-duplicates') {
   const headers = {
     apikey: SUPABASE_KEY,
@@ -19,6 +25,10 @@ function getHeaders(prefer = 'resolution=merge-duplicates') {
   return headers;
 }
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function buildHttpError(res) {
   const body = await res.text();
   const contentType = res.headers?.get?.('content-type') || '';
@@ -26,6 +36,37 @@ async function buildHttpError(res) {
   err.status = res.status;
   err.body = body;
   return err;
+}
+
+function shouldRetrySupabaseError(err) {
+  if (!err || typeof err.status !== 'number') return true;
+  return err.status === 408 || err.status === 429 || err.status >= 500;
+}
+
+async function fetchSupabaseWithRetry(url, options = {}) {
+  const retries = parseNonNegativeInt(process.env.SUPABASE_RETRY_COUNT, 1);
+  const baseDelayMs = parseNonNegativeInt(process.env.SUPABASE_RETRY_DELAY_MS, 300);
+  let lastError = null;
+
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      const res = await fetch(url, options);
+      if (res.ok) return res;
+
+      const err = await buildHttpError(res);
+      if (!shouldRetrySupabaseError(err) || attempt >= retries) throw err;
+      lastError = err;
+    } catch (err) {
+      if (!shouldRetrySupabaseError(err) || attempt >= retries) throw err;
+      lastError = err;
+    }
+
+    const delay = baseDelayMs * (2 ** attempt);
+    console.warn(`[DB] Supabase 일시 오류 재시도 ${attempt + 1}/${retries}: ${lastError.message}`);
+    if (delay > 0) await sleep(delay);
+  }
+
+  throw lastError;
 }
 
 function summarizeHttpError(status, body = '', contentType = '') {
@@ -60,14 +101,11 @@ async function upsert(table, rows, onConflict) {
   if (onConflict) url.searchParams.set('on_conflict', onConflict);
 
   try {
-    const res = await fetch(url, {
+    const res = await fetchSupabaseWithRetry(url, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(rows),
     });
-    if (!res.ok) {
-      throw await buildHttpError(res);
-    }
     return { saved: rows.length };
   } catch (err) {
     console.warn(`[DB] ${table} 저장 실패: ${err.message}`);
@@ -85,13 +123,10 @@ async function deleteRows(table, filterParams = {}) {
   }
 
   try {
-    const res = await fetch(url, {
+    await fetchSupabaseWithRetry(url, {
       method: 'DELETE',
       headers: getHeaders('return=minimal'),
     });
-    if (!res.ok) {
-      throw await buildHttpError(res);
-    }
     return { deleted: 1 };
   } catch (err) {
     console.warn(`[DB] ${table} 삭제 실패: ${err.message}`);
@@ -109,14 +144,11 @@ async function patchRows(table, filterParams, payload) {
   }
 
   try {
-    const res = await fetch(url, {
+    await fetchSupabaseWithRetry(url, {
       method: 'PATCH',
       headers: getHeaders('return=minimal'),
       body: JSON.stringify(payload),
     });
-    if (!res.ok) {
-      throw await buildHttpError(res);
-    }
     return { saved: 1 };
   } catch (err) {
     console.warn(`[DB] ${table} 갱신 실패: ${err.message}`);
@@ -135,12 +167,9 @@ async function selectRows(table, params = {}) {
   }
 
   try {
-    const res = await fetch(url, {
+    const res = await fetchSupabaseWithRetry(url, {
       headers: getHeaders(''),
     });
-    if (!res.ok) {
-      throw await buildHttpError(res);
-    }
     return { rows: await res.json() };
   } catch (err) {
     console.warn(`[DB] ${table} 조회 실패: ${err.message}`);
@@ -840,4 +869,5 @@ module.exports = {
   loadBufferedDigestArticles,
   loadAlertEventsForArticles,
   summarizeHttpError,
+  shouldRetrySupabaseError,
 };

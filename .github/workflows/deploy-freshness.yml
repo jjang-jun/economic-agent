@@ -1,0 +1,43 @@
+name: Deploy Freshness Check (서버 배포 최신성 점검)
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+    # KST weekday 09:20 = UTC weekday 00:20
+    - cron: '20 0 * * 1-5'
+  workflow_dispatch:
+
+concurrency:
+  group: economic-agent-deploy-freshness
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - run: npm ci
+      - name: Check deployed server freshness
+        run: npm run deploy:freshness
+        env:
+          AGENT_SERVER_URL: ${{ vars.AGENT_SERVER_URL || secrets.AGENT_SERVER_URL || 'https://economic-agent-179856283367.asia-northeast3.run.app' }}
+          EXPECTED_DEPLOY_SHA: ${{ github.sha }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_PRIVATE_CHAT_ID: ${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}
+          TELEGRAM_SECRET_CHAT_ID: ${{ secrets.TELEGRAM_SECRET_CHAT_ID }}
+      - name: Notify private chat on failure
+        if: failure()
+        run: npm run notify:workflow-failure -- "Deploy Freshness Check (서버 배포 최신성 점검)" "Check deployed server freshness"
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_PRIVATE_CHAT_ID: ${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}
+          TELEGRAM_SECRET_CHAT_ID: ${{ secrets.TELEGRAM_SECRET_CHAT_ID }}
+          GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
