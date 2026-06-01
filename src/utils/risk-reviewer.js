@@ -10,6 +10,7 @@ function reviewStock(stock, decision = {}) {
   const market = stock.market_profile || {};
   const timing = market.entryTiming || market.entry_timing || {};
   const fundamental = stock.fundamental_profile || stock.fundamentalProfile || {};
+  const valuation = stock.valuation_profile || stock.valuationProfile || {};
   const statements = fundamental.statements || {};
   const earnings = fundamental.earnings || {};
   const marketRegime = decision.market?.regime || 'UNKNOWN';
@@ -31,6 +32,7 @@ function reviewStock(stock, decision = {}) {
   addFactor(factors, 'relative_strength', market.relativeStrength20d === null || market.relativeStrength20d === undefined || market.relativeStrength20d >= 0, typeof market.relativeStrength20d === 'number' ? `${market.relativeStrength20d}%p` : 'missing');
   addFactor(factors, 'momentum', market.near20dHigh !== false, typeof market.distanceFrom20dHighPct === 'number' ? `${market.distanceFrom20dHighPct}% from 20d high` : 'missing');
   addFactor(factors, 'entry_timing', timing.approved !== false, timing.label || timing.action || 'missing');
+  addFactor(factors, 'valuation', valuation.action !== 'block', valuation.label || valuation.status || 'missing');
   if (learningRules.requireEntryTimingApproval === true) {
     addFactor(factors, 'learning_entry_timing', timing.approved === true, timing.label || timing.action || 'missing');
   }
@@ -64,6 +66,12 @@ function reviewStock(stock, decision = {}) {
   }
   for (const warning of timing.warnings || []) {
     warnings.push(`진입 타이밍: ${warning}`);
+  }
+  for (const warning of valuation.warnings || []) {
+    warnings.push(`가치평가: ${warning}`);
+  }
+  for (const blocker of valuation.blockers || []) {
+    blockers.push(blocker);
   }
   if (typeof fundamental.marketCapUsd === 'number' && fundamental.marketCapUsd < 1_000_000_000) {
     warnings.push(`미국 소형주: 시가총액 ${Math.round(fundamental.marketCapUsd).toLocaleString('ko-KR')} USD`);

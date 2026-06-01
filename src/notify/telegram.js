@@ -351,6 +351,8 @@ function formatStockReport(report) {
     const fundamental = s.fundamental_profile || {};
     const statements = fundamental.statements || {};
     const earnings = fundamental.earnings || {};
+    const valuation = s.valuation_profile || {};
+    const valuationMetrics = valuation.metrics || {};
     const review = s.risk_review || {};
     const entry = profile.entryReferencePrice ? `기준가(추천시) ${formatPrice(profile.entryReferencePrice)}` : '';
     const stopPrice = profile.stopLossPrice ? `손절 기준 ${formatPrice(profile.stopLossPrice)}` : '';
@@ -391,12 +393,15 @@ function formatStockReport(report) {
     const beta = typeof fundamental.beta === 'number' ? `시장 민감도 ${fundamental.beta}` : '';
     const revenueGrowth = typeof statements.revenueGrowthYoYPct === 'number' ? `매출 전년 대비 ${statements.revenueGrowthYoYPct}%` : '';
     const fcfMargin = typeof statements.freeCashFlowMarginPct === 'number' ? `잉여현금흐름률 ${statements.freeCashFlowMarginPct}%` : '';
+    const valuationText = valuation.label
+      ? `가치평가 ${valuation.label}${typeof valuationMetrics.peRatio === 'number' ? ` · PER ${round(valuationMetrics.peRatio, 1)}배` : ''}${typeof valuationMetrics.priceToSalesRatio === 'number' ? ` · PSR ${round(valuationMetrics.priceToSalesRatio, 1)}배` : ''}`
+      : '';
     const nextEarnings = earnings.nextDate ? `다음 실적 ${earnings.nextDate}` : '';
     const tradeable = review.action === 'watch_only' || profile.tradeable === false ? '매수 보류' : '';
     const invalidation = profile.invalidation ? `\n무효화: ${escapeHtml(profile.invalidation)}` : '';
     const blockers = (review.blockers || []).slice(0, 2).map(item => `\n차단: ${escapeHtml(explainRiskBlocker(item))}`).join('');
     const warnings = (review.warnings || []).slice(0, 1).map(item => `\n주의: ${escapeHtml(item)}`).join('');
-    const riskProfile = [entry, stopPrice, rr, stop, size, timing, ma, rs, volume, high, sector, marketCap, beta, revenueGrowth, fcfMargin, nextEarnings, tradeable].filter(Boolean).join(' · ');
+    const riskProfile = [entry, stopPrice, rr, stop, size, timing, ma, rs, volume, high, sector, marketCap, beta, revenueGrowth, fcfMargin, valuationText, nextEarnings, tradeable].filter(Boolean).join(' · ');
     return `${icon.bar} <b>${escapeHtml(s.name)}</b>${ticker}  [${icon.label}${conviction}]\n└ ${escapeHtml(s.reason)}${riskProfile ? `\n└ ${escapeHtml(riskProfile)}` : ''}${invalidation}${blockers}${warnings}${risk}`;
   });
 

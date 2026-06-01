@@ -13,6 +13,7 @@ const { fetchMarketSnapshot } = require('./utils/market-snapshot');
 const { buildDecisionContextWithQuotes, detectMarketThemes } = require('./utils/decision-engine');
 const { applyRecommendationRisk } = require('./utils/recommendation-risk');
 const { applyRecommendationMarketData } = require('./utils/recommendation-market');
+const { applyValuationProfiles } = require('./utils/valuation-profile');
 const { applyRiskReview } = require('./utils/risk-reviewer');
 const { applyRecommendationSchemaValidation } = require('./utils/recommendation-schema');
 const { loadLatestPerformanceLearning } = require('./utils/performance-learning');
@@ -108,6 +109,7 @@ async function main() {
     await persistPortfolioSnapshot(report.decision.portfolio);
   }
   await applyRecommendationMarketData(report);
+  applyValuationProfiles(report, report.decision);
   applyRecommendationRisk(report, report.decision);
   applyRiskReview(report, report.decision);
   applyRecommendationSchemaValidation(report);

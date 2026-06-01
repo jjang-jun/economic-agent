@@ -85,6 +85,7 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - `src/utils/article-identity.js`: normalized article identity keys for duplicate suppression across RSS/DART, URLs, and titles
 - `src/utils/recommendation-log.js`: stores stock signals and evaluates returns against KOSPI benchmark when available
 - `src/utils/risk-reviewer.js`: rule-based risk manager for recommendation factor pass/fail and blockers
+- `src/utils/valuation-profile.js`: PER/PSR/FCF yield plus growth/quality valuation overlay used by risk review
 - `src/utils/timing-alert.js`: builds KOSPI/KOSDAQ premarket watchlists and intraday entry alerts from recent recommendations and moving-average timing data
 - `src/utils/pre-news-signal.js`: low-cost public-data pre-news detector for holdings, recent recommendations, and domestic/global watchlist leaders
 - `src/utils/performance-review.js`: summarizes recommendation and trade performance over weekly/monthly windows

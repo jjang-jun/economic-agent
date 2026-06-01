@@ -35,7 +35,16 @@ test('buildFmpFundamentalSummary derives growth and FCF margin', () => {
       { freeCashFlow: 18 },
     ],
     ratios: [
-      { grossProfitMargin: 0.5, operatingProfitMargin: 0.25, debtToEquityRatio: 1.2, currentRatio: 1.5, priceToEarningsRatio: 30 },
+      {
+        grossProfitMargin: 0.5,
+        operatingProfitMargin: 0.25,
+        debtToEquityRatio: 1.2,
+        currentRatio: 1.5,
+        priceToEarningsRatio: 30,
+        priceToSalesRatio: 8,
+        priceToFreeCashFlowsRatio: 25,
+        freeCashFlowYield: 0.04,
+      },
     ],
   });
 
@@ -44,6 +53,9 @@ test('buildFmpFundamentalSummary derives growth and FCF margin', () => {
   assert.equal(summary.freeCashFlowMarginPct, 15);
   assert.equal(summary.grossProfitMarginPct, 50);
   assert.equal(summary.debtToEquity, 1.2);
+  assert.equal(summary.priceToSalesRatio, 8);
+  assert.equal(summary.priceToFreeCashFlowRatio, 25);
+  assert.equal(summary.freeCashFlowYieldPct, 4);
 });
 
 test('buildFmpEarningsSummary finds next event and previous EPS surprise', () => {

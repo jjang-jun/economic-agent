@@ -112,3 +112,41 @@ test('reviewStock blocks weak entry timing even when risk reward is high', () =>
   assert.ok(review.blockers.some(item => item.includes('entry_timing')));
   assert.ok(review.warnings.some(item => item.includes('추격매수 위험')));
 });
+
+test('reviewStock blocks candidates rejected by valuation profile', () => {
+  const review = reviewStock({
+    ...baseStock,
+    valuation_profile: {
+      action: 'block',
+      label: '고평가 차단',
+      blockers: ['valuation: 비싼 밸류에이션과 약한 성장/현금흐름이 동시에 확인됨'],
+    },
+    fundamental_profile: {
+      source: 'fmp-profile',
+      isActivelyTrading: true,
+    },
+  }, { market: { regime: 'RISK_ON', tags: [] } });
+
+  assert.equal(review.approved, false);
+  assert.equal(review.action, 'watch_only');
+  assert.ok(review.blockers.some(item => item.includes('valuation')));
+});
+
+test('reviewStock keeps expensive AI semiconductor candidate as warning when valuation allows', () => {
+  const review = reviewStock({
+    ...baseStock,
+    valuation_profile: {
+      action: 'warn',
+      label: '비싼 편',
+      warnings: ['AI/반도체 사이클 프리미엄: 추격보다 눌림/분할 진입 우선'],
+      blockers: [],
+    },
+    fundamental_profile: {
+      source: 'fmp-profile',
+      isActivelyTrading: true,
+    },
+  }, { market: { regime: 'RISK_ON', tags: ['AI_SEMICONDUCTOR_CYCLE'] } });
+
+  assert.equal(review.approved, true);
+  assert.ok(review.warnings.some(item => item.includes('가치평가')));
+});

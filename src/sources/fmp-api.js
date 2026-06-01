@@ -217,6 +217,13 @@ function buildFmpFundamentalSummary({ income = [], cashFlow = [], ratios = [] } 
     debtToEquity: parseNumber(latestRatios.debtToEquityRatio ?? latestRatios.debtEquityRatio),
     currentRatio: parseNumber(latestRatios.currentRatio),
     peRatio: parseNumber(latestRatios.priceToEarningsRatio ?? latestRatios.peRatio),
+    priceToSalesRatio: parseNumber(latestRatios.priceToSalesRatio ?? latestRatios.priceSalesRatio),
+    priceToBookRatio: parseNumber(latestRatios.priceToBookRatio ?? latestRatios.priceBookValueRatio),
+    enterpriseValueMultiple: parseNumber(latestRatios.enterpriseValueMultiple ?? latestRatios.evToEbitda),
+    priceToFreeCashFlowRatio: parseNumber(latestRatios.priceToFreeCashFlowsRatio ?? latestRatios.priceToFreeCashFlowRatio),
+    freeCashFlowYieldPct: parseNumber(latestRatios.freeCashFlowYield) !== null
+      ? round(parseNumber(latestRatios.freeCashFlowYield) * 100, 2)
+      : null,
     source: 'fmp-statements',
   };
 }
