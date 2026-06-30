@@ -38,6 +38,8 @@ jobs:
           SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_RETRY_COUNT: 5
+          SUPABASE_RETRY_DELAY_MS: 1000
 
       - name: Notify private chat on failure
         if: failure()

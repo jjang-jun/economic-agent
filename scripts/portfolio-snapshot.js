@@ -13,11 +13,17 @@ async function main() {
   const snapshot = await enrichPortfolio(sourcePortfolio);
   const file = savePortfolioSnapshot(snapshot);
   await persistPortfolioSnapshot(snapshot);
-  const storeResult = await saveStoredPortfolio(snapshot);
+  let storeResult;
+  try {
+    storeResult = await saveStoredPortfolio(snapshot);
+  } catch (err) {
+    storeResult = { saved: 0, error: err };
+    console.warn(`[포트폴리오] Supabase 원본 동기화 실패: ${err.message}`);
+  }
 
   console.log(`[포트폴리오] 총자산 ${formatKRW(snapshot.totalAssetValue)}, 현금 ${formatKRW(snapshot.cashAmount)}, 평가손익 ${formatKRW(snapshot.unrealizedPnl)} (${snapshot.unrealizedPnlPct ?? 0}%)`);
   console.log(`[포트폴리오] 스냅샷: ${file}`);
-  if (!storeResult.disabled) {
+  if (!storeResult.disabled && !storeResult.error) {
     console.log(`[포트폴리오] Supabase 원본 동기화: positions ${storeResult.positions ?? 0}`);
   }
 }

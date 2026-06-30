@@ -1,0 +1,8 @@
+.git/
+node_modules/
+.env
+data/
+.cache/
+.claude/
+supabase/.temp/
+current-portfolio.md

@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { selectRows, upsertRows } = require('../utils/persistence');
 
 function normalizeKisBaseUrl(url) {
   return String(url || 'https://openapi.koreainvestment.com:9443')
@@ -49,40 +50,27 @@ function canUseRemoteTokenCache() {
   return Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
 }
 
-function remoteTokenHeaders(prefer = '') {
-  const headers = {
-    apikey: SUPABASE_SERVICE_ROLE_KEY,
-    Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-    'Content-Type': 'application/json',
-  };
-  if (prefer) headers.Prefer = prefer;
-  return headers;
-}
-
 async function loadRemoteTokenCache() {
   if (!canUseRemoteTokenCache()) return null;
 
-  try {
-    const url = new URL('/rest/v1/api_token_cache', SUPABASE_URL);
-    url.searchParams.set('provider', `eq.${REMOTE_TOKEN_PROVIDER}`);
-    url.searchParams.set('select', 'access_token,expires_at');
-    url.searchParams.set('limit', '1');
+  const result = await selectRows('api_token_cache', {
+    provider: `eq.${REMOTE_TOKEN_PROVIDER}`,
+    select: 'access_token,expires_at',
+    limit: '1',
+  });
+  if (result.error && !result.skipped) {
+    console.warn(`[KIS] remote token cache 조회 실패: ${result.error.message}`);
+  }
 
-    const res = await fetch(url, { headers: remoteTokenHeaders() });
-    if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
-
-    const [row] = await res.json();
-    const expiresAt = row?.expires_at ? new Date(row.expires_at).getTime() : 0;
-    if (row?.access_token && expiresAt > Date.now() + 60_000) {
-      tokenCache = {
-        accessToken: row.access_token,
-        expiresAt,
-      };
-      saveTokenCache(tokenCache);
-      return tokenCache;
-    }
-  } catch (err) {
-    console.warn(`[KIS] remote token cache 조회 실패: ${err.message}`);
+  const [row] = result.rows || [];
+  const expiresAt = row?.expires_at ? new Date(row.expires_at).getTime() : 0;
+  if (row?.access_token && expiresAt > Date.now() + 60_000) {
+    tokenCache = {
+      accessToken: row.access_token,
+      expiresAt,
+    };
+    saveTokenCache(tokenCache);
+    return tokenCache;
   }
 
   return null;
@@ -91,25 +79,16 @@ async function loadRemoteTokenCache() {
 async function saveRemoteTokenCache(cache) {
   if (!canUseRemoteTokenCache() || !cache?.accessToken || !cache?.expiresAt) return;
 
-  try {
-    const url = new URL('/rest/v1/api_token_cache', SUPABASE_URL);
-    url.searchParams.set('on_conflict', 'provider');
-    const payload = [{
-      provider: REMOTE_TOKEN_PROVIDER,
-      access_token: cache.accessToken,
-      expires_at: new Date(cache.expiresAt).toISOString(),
-      token_type: 'Bearer',
-      updated_at: new Date().toISOString(),
-    }];
-
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: remoteTokenHeaders('resolution=merge-duplicates'),
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
-  } catch (err) {
-    console.warn(`[KIS] remote token cache 저장 실패: ${err.message}`);
+  const payload = [{
+    provider: REMOTE_TOKEN_PROVIDER,
+    access_token: cache.accessToken,
+    expires_at: new Date(cache.expiresAt).toISOString(),
+    token_type: 'Bearer',
+    updated_at: new Date().toISOString(),
+  }];
+  const result = await upsertRows('api_token_cache', payload, 'provider');
+  if (result.error && !result.skipped) {
+    console.warn(`[KIS] remote token cache 저장 실패: ${result.error.message}`);
   }
 }
 

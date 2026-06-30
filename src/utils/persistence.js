@@ -5,6 +5,9 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
   || process.env.SUPABASE_PUBLISHABLE_KEY
   || process.env.SUPABASE_ANON_KEY;
 
+let supabaseCircuitOpenUntil = 0;
+let supabaseCircuitReason = '';
+
 function isPersistenceEnabled() {
   return Boolean(SUPABASE_URL && SUPABASE_KEY);
 }
@@ -27,6 +30,27 @@ function getHeaders(prefer = 'resolution=merge-duplicates') {
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function getCircuitBreakerMs() {
+  return parseNonNegativeInt(process.env.SUPABASE_CIRCUIT_BREAKER_MS, 60_000);
+}
+
+function getSupabaseCircuitError() {
+  if (Date.now() >= supabaseCircuitOpenUntil) return null;
+  const err = new Error(`Supabase persistence temporarily disabled: ${supabaseCircuitReason || 'recent transient failure'}`);
+  err.status = 503;
+  err.circuitOpen = true;
+  return err;
+}
+
+function recordSupabaseFailure(err) {
+  if (!shouldRetrySupabaseError(err)) return;
+  const breakerMs = getCircuitBreakerMs();
+  if (breakerMs <= 0) return;
+  supabaseCircuitOpenUntil = Date.now() + breakerMs;
+  supabaseCircuitReason = err?.message || String(err || 'unknown error');
+  console.warn(`[DB] Supabase persistence ${Math.round(breakerMs / 1000)}초간 일시 중지: ${supabaseCircuitReason}`);
 }
 
 async function buildHttpError(res) {
@@ -96,6 +120,8 @@ function summarizeHttpError(status, body = '', contentType = '') {
 
 async function upsert(table, rows, onConflict) {
   if (!isPersistenceEnabled() || !rows || rows.length === 0) return { saved: 0 };
+  const circuitError = getSupabaseCircuitError();
+  if (circuitError) return { saved: 0, error: circuitError, skipped: true };
 
   const url = new URL(`/rest/v1/${table}`, SUPABASE_URL);
   if (onConflict) url.searchParams.set('on_conflict', onConflict);
@@ -109,12 +135,15 @@ async function upsert(table, rows, onConflict) {
     return { saved: rows.length };
   } catch (err) {
     console.warn(`[DB] ${table} 저장 실패: ${err.message}`);
+    recordSupabaseFailure(err);
     return { saved: 0, error: err };
   }
 }
 
 async function deleteRows(table, filterParams = {}) {
   if (!isPersistenceEnabled()) return { deleted: 0, disabled: true };
+  const circuitError = getSupabaseCircuitError();
+  if (circuitError) return { deleted: 0, error: circuitError, skipped: true };
   const url = new URL(`/rest/v1/${table}`, SUPABASE_URL);
   for (const [key, value] of Object.entries(filterParams || {})) {
     if (value !== undefined && value !== null) {
@@ -130,12 +159,15 @@ async function deleteRows(table, filterParams = {}) {
     return { deleted: 1 };
   } catch (err) {
     console.warn(`[DB] ${table} 삭제 실패: ${err.message}`);
+    recordSupabaseFailure(err);
     return { deleted: 0, error: err };
   }
 }
 
 async function patchRows(table, filterParams, payload) {
   if (!isPersistenceEnabled()) return { saved: 0, disabled: true };
+  const circuitError = getSupabaseCircuitError();
+  if (circuitError) return { saved: 0, error: circuitError, skipped: true };
   const url = new URL(`/rest/v1/${table}`, SUPABASE_URL);
   for (const [key, value] of Object.entries(filterParams || {})) {
     if (value !== undefined && value !== null) {
@@ -152,12 +184,15 @@ async function patchRows(table, filterParams, payload) {
     return { saved: 1 };
   } catch (err) {
     console.warn(`[DB] ${table} 갱신 실패: ${err.message}`);
+    recordSupabaseFailure(err);
     return { saved: 0, error: err };
   }
 }
 
 async function selectRows(table, params = {}) {
   if (!isPersistenceEnabled()) return { rows: null, disabled: true };
+  const circuitError = getSupabaseCircuitError();
+  if (circuitError) return { rows: null, error: circuitError, skipped: true };
 
   const url = new URL(`/rest/v1/${table}`, SUPABASE_URL);
   for (const [key, value] of Object.entries(params)) {
@@ -173,6 +208,7 @@ async function selectRows(table, params = {}) {
     return { rows: await res.json() };
   } catch (err) {
     console.warn(`[DB] ${table} 조회 실패: ${err.message}`);
+    recordSupabaseFailure(err);
     return { rows: null, error: err };
   }
 }

@@ -265,13 +265,18 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 가격/환율 provider 장애 시 포트폴리오 숫자 방어를 보강했다. 환율 또는 현재가 조회가 실패하면 USD 보유 종목을 환율 1로 재계산하지 않고 기존 `fxRate`, `marketValue`, `unrealizedPnl`, `totalAssetValue`를 보존한다. 로컬 포트폴리오는 총자산 57,377,347원, 현금 15,000,000원, 평가손익 3,027,997원 기준으로 복구하고 GitHub Actions secret을 재동기화했다.
 - 해외 보유/관심 종목 모멘텀 누락을 보강했다. `watchlist.globalMomentum`에 MU/GOOGL/NVDA/AMD/TSM/AVGO를 추가하고, 기사 없이 당일 급등이 포착된 해외 개별주도 `pre-news:signal`과 `action:report` 가격 모멘텀 후보가 되도록 했다. 이미 보유 중인 종목은 신규 매수 후보에서 사라지는 대신 `추가매수/수익보호 점검`으로 분리해 눌림 대기, 조건부 추가매수, 고수익 일부 이익 잠금 판단을 표시한다.
 - 경제/시장 테마 감지를 추가했다. `decision-engine`은 시장 스냅샷과 기사에서 `AI_SEMICONDUCTOR_CYCLE`, `GROWTH_CONCENTRATION`을 감지해 장마감 종목 분석 프롬프트와 레짐 태그에 반영한다. AI 데이터센터/HBM/DRAM 기사와 SOXX/NVDA/MU/AMD/TSM 강세가 동시에 나타나면 AI/반도체 사이클을 별도 테마로 보고, 급등일 추격보다 눌림·분할 진입과 수익보호를 우선하는 playbook을 붙인다.
+- 2026-06-30 운영 점검에서 GitHub Actions와 Cloud Run 모두 Supabase PostgREST `PGRST002` schema cache 503에 흔들리는 것을 확인했다. 공통 persistence에 60초 circuit breaker를 추가해 첫 503 이후 후속 DB 호출을 빠르게 건너뛰고, KIS remote token cache도 같은 persistence 래퍼를 사용하도록 맞췄다.
+- 포트폴리오 스냅샷 workflow 안정성을 보강했다. 스냅샷 파일 생성은 Supabase 원본 동기화 실패와 분리해 DB 장애 중에도 완료되도록 했고, `portfolio-snapshot.yml`과 `telegram-smoke-actions.yml`에는 Supabase 재시도 env를 명시했다. pending action 생성은 저장 실패를 성공처럼 반환하지 않고 즉시 오류로 돌려 Telegram 승인 smoke가 실제 persistence 상태를 검증하게 했다.
+- Cloud Run 서버는 2026-06-30 로그 기준 `/jobs/news-collector`에 200으로 응답했지만 DB 저장/조회가 503으로 실패하고 있었다. 로컬 서버 `/health`와 `/version`은 정상 확인했고, 배포 최신성 점검에서는 운영 서버 커밋 `7e09c08`이 로컬 HEAD `1a9952d`보다 오래된 상태로 확인됐다.
+- Cloud Run source deploy 업로드 범위를 명시하기 위해 `.gcloudignore`를 추가했다. `.env`, `data/`, `.cache/`, `node_modules/`, 로컬 포트폴리오 문서가 배포 소스 tarball에 들어가지 않도록 `.dockerignore`와 같은 기준으로 관리한다.
 
 ## 다음 작업
 
-1. 내일 DRAM ETF 30주 매도 체결 시 실제 체결가로 `trade:record`, `portfolio:sync-secret`, `action:report -- --no-telegram` 순서로 반영하고 수량 170주/비중 변화를 검증한다. 체결 전 계획은 `trade:plan`으로 남겨 행동 리포트에서 누락 여부를 확인한다.
-2. 다음 scheduled Action Report 1회 성공 여부 확인. 2026-05-10 수동 workflow_dispatch는 성공했고, 직전 예약 실패는 원격의 과거 `node --env-file=.env` 실행 때문으로 확인됨
-3. 메타데이터가 붙은 추천의 평가 완료 건이 5건 이상 쌓이면 `npm run db:pull && npm run model:performance`로 Claude Sonnet 전환 효과를 다시 평가한다.
-4. 가격 provider의 `해외/글로벌 가격 API 보강 검토` 판단이 주간/월간 리뷰에서 반복되는지 모니터링하되, 최근 1일 점검은 정상이라 Massive 과금은 필요성이 명확해질 때까지 보류
-5. 다음 실제 workflow 실패 시 private 알림 도착 여부 재확인
-6. `/dashboard` 실제 사용 빈도에 따라 탭 분리와 상세 차트 추가 여부 결정
-7. 월간 리서치 worker 결과를 다음 월간 리뷰에서 실제 의사결정에 도움이 되는지 확인
+1. 이번 Supabase 장애 완화 변경을 원격 main과 Cloud Run에 반영한 뒤 `npm run deploy:freshness`와 다음 scheduled workflow 성공 여부를 재확인한다.
+2. Supabase `PGRST002`가 반복되면 Supabase 프로젝트 상태, PostgREST schema cache reload, 최근 migration 적용 여부를 별도로 점검한다.
+3. 내일 DRAM ETF 30주 매도 체결 시 실제 체결가로 `trade:record`, `portfolio:sync-secret`, `action:report -- --no-telegram` 순서로 반영하고 수량 170주/비중 변화를 검증한다. 체결 전 계획은 `trade:plan`으로 남겨 행동 리포트에서 누락 여부를 확인한다.
+4. 메타데이터가 붙은 추천의 평가 완료 건이 5건 이상 쌓이면 `npm run db:pull && npm run model:performance`로 Claude Sonnet 전환 효과를 다시 평가한다.
+5. 가격 provider의 `해외/글로벌 가격 API 보강 검토` 판단이 주간/월간 리뷰에서 반복되는지 모니터링하되, 최근 1일 점검은 정상이라 Massive 과금은 필요성이 명확해질 때까지 보류
+6. 다음 실제 workflow 실패 시 private 알림 도착 여부 재확인
+7. `/dashboard` 실제 사용 빈도에 따라 탭 분리와 상세 차트 추가 여부 결정
+8. 월간 리서치 worker 결과를 다음 월간 리뷰에서 실제 의사결정에 도움이 되는지 확인

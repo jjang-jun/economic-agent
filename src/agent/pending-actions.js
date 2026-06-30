@@ -178,7 +178,10 @@ async function createPendingAction({ chatId, text }) {
     expiresAt: expiresAt(),
     payload: { text },
   };
-  await persistPendingAction(action);
+  const persistResult = await persistPendingAction(action);
+  if (persistResult.error || persistResult.saved < 1) {
+    throw new Error(`pending action 저장 실패: ${persistResult.error?.message || 'Supabase persistence unavailable'}`);
+  }
 
   return {
     action,
