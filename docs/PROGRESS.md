@@ -269,6 +269,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 포트폴리오 스냅샷 workflow 안정성을 보강했다. 스냅샷 파일 생성은 Supabase 원본 동기화 실패와 분리해 DB 장애 중에도 완료되도록 했고, `portfolio-snapshot.yml`과 `telegram-smoke-actions.yml`에는 Supabase 재시도 env를 명시했다. pending action 생성은 저장 실패를 성공처럼 반환하지 않고 즉시 오류로 돌려 Telegram 승인 smoke가 실제 persistence 상태를 검증하게 했다.
 - Cloud Run 서버는 2026-06-30 로그 기준 `/jobs/news-collector`에 200으로 응답했지만 DB 저장/조회가 503으로 실패하고 있었다. 로컬 서버 `/health`와 `/version`은 정상 확인했고, 배포 최신성 점검에서는 운영 서버 커밋 `7e09c08`이 로컬 HEAD `1a9952d`보다 오래된 상태로 확인됐다.
 - Cloud Run source deploy 업로드 범위를 명시하기 위해 `.gcloudignore`를 추가했다. `.env`, `data/`, `.cache/`, `node_modules/`, 로컬 포트폴리오 문서가 배포 소스 tarball에 들어가지 않도록 `.dockerignore`와 같은 기준으로 관리한다.
+- Telegram 승인 smoke에 Supabase persistence preflight를 추가했다. DB/API 장애가 있으면 `/buy` assertion diff 대신 `Supabase persistence unavailable for Telegram smoke`로 초반에 실패해 코드 회귀와 외부 저장소 장애를 구분한다.
 
 ## 다음 작업
 

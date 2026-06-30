@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { routeTelegramMessage, routeTelegramCallback, getAllowedChatIds } = require('../src/agent/agent-router');
-const { loadPendingAction } = require('../src/utils/persistence');
+const { isPersistenceEnabled, loadPendingAction, selectRows } = require('../src/utils/persistence');
 const { loadStoredPortfolio } = require('../src/utils/portfolio-store');
 const { loadPortfolio, normalizePortfolio } = require('../src/utils/portfolio');
 
@@ -57,10 +57,25 @@ async function getCurrentCashAmount() {
   return typeof portfolio.cashAmount === 'number' ? portfolio.cashAmount : 0;
 }
 
+async function assertPersistenceAvailable() {
+  if (!isPersistenceEnabled()) {
+    throw new Error('Supabase persistence is not configured for Telegram smoke');
+  }
+
+  const result = await selectRows('pending_actions', {
+    select: 'id',
+    limit: '1',
+  });
+  if (result.error) {
+    throw new Error(`Supabase persistence unavailable for Telegram smoke: ${result.error.message}`);
+  }
+}
+
 async function main() {
   const chatId = process.env.TELEGRAM_SMOKE_CHAT_ID || getAllowedChatIds()[0];
   if (!chatId) throw new Error('TELEGRAM_SECRET_CHAT_ID or TELEGRAM_SMOKE_CHAT_ID is required');
 
+  await assertPersistenceAvailable();
   const cashAmount = await getCurrentCashAmount();
   const commands = [
     { text: '/buy 005930 1 1 smoke-buy', expectedIntent: 'draft_buy' },
@@ -80,7 +95,15 @@ async function main() {
   }, null, 2));
 }
 
-main().catch(err => {
-  console.error('[telegram-smoke] failed:', err.message);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch(err => {
+    console.error('[telegram-smoke] failed:', err.message);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  assertPersistenceAvailable,
+  getCancelCallbackData,
+  smokeDraftAndCancel,
+};
