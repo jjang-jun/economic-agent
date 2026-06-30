@@ -270,6 +270,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - Cloud Run 서버는 2026-06-30 로그 기준 `/jobs/news-collector`에 200으로 응답했지만 DB 저장/조회가 503으로 실패하고 있었다. 로컬 서버 `/health`와 `/version`은 정상 확인했고, 배포 최신성 점검에서는 운영 서버 커밋 `7e09c08`이 로컬 HEAD `1a9952d`보다 오래된 상태로 확인됐다.
 - Cloud Run source deploy 업로드 범위를 명시하기 위해 `.gcloudignore`를 추가했다. `.env`, `data/`, `.cache/`, `node_modules/`, 로컬 포트폴리오 문서가 배포 소스 tarball에 들어가지 않도록 `.dockerignore`와 같은 기준으로 관리한다.
 - Telegram 승인 smoke에 Supabase persistence preflight를 추가했다. DB/API 장애가 있으면 `/buy` assertion diff 대신 `Supabase persistence unavailable for Telegram smoke`로 초반에 실패해 코드 회귀와 외부 저장소 장애를 구분한다.
+- `npm audit` 경고로 다시 올라온 transitive `protobufjs <=7.6.2`, `tar <=7.5.15` moderate 취약점을 `overrides`와 lockfile 갱신으로 해소했다. 현재 `npm audit` 기준 0 vulnerabilities다.
 
 ## 다음 작업
 
