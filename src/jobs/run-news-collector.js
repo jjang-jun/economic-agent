@@ -17,10 +17,27 @@ const {
   releaseJobLock,
   persistAlertEvents,
   loadAlertEventsForArticles,
+  loadRecentImmediateAlertEvents,
 } = require('../utils/persistence');
 const { dedupeArticles, isSeenArticle, markSeenArticle } = require('../utils/article-identity');
 const { scoreArticles } = require('../filters/local-scorer');
-const { URGENT_SCORE, MAX_URGENT_ALERTS_PER_RUN } = require('../utils/config');
+const { loadPortfolio } = require('../utils/portfolio');
+const {
+  buildRelevantInstruments,
+  filterImmediateAlertsByHistory,
+  partitionImmediateAlerts,
+} = require('../utils/urgent-alert-policy');
+const {
+  loadUrgentAlertState,
+  markUrgentAlertsSent,
+  saveUrgentAlertState,
+} = require('../utils/urgent-alert-state');
+const {
+  URGENT_SCORE,
+  MAX_URGENT_ALERTS_PER_RUN,
+  MAX_URGENT_ALERTS_PER_DAY,
+  URGENT_EVENT_DEDUP_HOURS,
+} = require('../utils/config');
 
 const DEFAULT_LOOKBACK_MINUTES = Number(process.env.NEWS_COLLECTOR_LOOKBACK_MINUTES || 30);
 const MAX_LOOKBACK_MINUTES = Number(process.env.NEWS_COLLECTOR_MAX_LOOKBACK_MINUTES || 240);
@@ -235,7 +252,7 @@ async function runNewsCollector(options = {}) {
     console.log(`[아카이브] 점수화 기사 ${archived}건 신규 저장`);
     await persistArticles(scored);
 
-    const urgent = filterByRelevance(scored.filter(a => a.score >= URGENT_SCORE))
+    const urgentCandidates = filterByRelevance(scored.filter(a => a.score >= URGENT_SCORE))
       .sort((a, b) => (
         (b.urgencyScore || 0) - (a.urgencyScore || 0)
         || (b.importanceScore || 0) - (a.importanceScore || 0)
@@ -243,21 +260,57 @@ async function runNewsCollector(options = {}) {
         || new Date(b.pubDate || 0) - new Date(a.pubDate || 0)
       ));
     const normal = scored.filter(a => a.score < URGENT_SCORE);
-    const alertSplit = splitAlerts(urgent, { now, isCatchUpRun });
+    const relevantInstruments = buildRelevantInstruments({ portfolio: loadPortfolio() });
+    const urgentPolicy = partitionImmediateAlerts(urgentCandidates, {
+      instruments: relevantInstruments,
+    });
+    const alertSplit = splitAlerts(urgentPolicy.immediate, { now, isCatchUpRun });
+    alertSplit.overflow.push(...urgentPolicy.digest);
     const existingAlerts = buildExistingAlertSets(
       await loadAlertEventsForArticles(scored.map(article => article.id))
     );
-    const immediateToSend = filterUnsentImmediateAlerts(alertSplit.immediate, existingAlerts);
-    const suppressedImmediateCount = alertSplit.immediate.length - immediateToSend.length;
-    const overflowToQueue = filterUnqueuedAlerts(alertSplit.overflow, existingAlerts);
+    const unsentImmediate = filterUnsentImmediateAlerts(alertSplit.immediate, existingAlerts);
+    const suppressedImmediateCount = alertSplit.immediate.length - unsentImmediate.length;
+    let localUrgentState = { alerts: [] };
+    let historyPolicy = filterImmediateAlertsByHistory([], {
+      now,
+      dailyLimit: MAX_URGENT_ALERTS_PER_DAY,
+      dedupeHours: URGENT_EVENT_DEDUP_HOURS,
+    });
+    if (unsentImmediate.length > 0) {
+      const historySince = new Date(now.getTime() - URGENT_EVENT_DEDUP_HOURS * 60 * 60 * 1000).toISOString();
+      const recentImmediateResult = await loadRecentImmediateAlertEvents({ since: historySince });
+      localUrgentState = loadUrgentAlertState();
+      historyPolicy = filterImmediateAlertsByHistory(unsentImmediate, {
+        now,
+        dailyLimit: MAX_URGENT_ALERTS_PER_DAY,
+        dedupeHours: URGENT_EVENT_DEDUP_HOURS,
+        history: [
+          ...(recentImmediateResult.rows || []),
+          ...(localUrgentState.alerts || []),
+        ],
+      });
+    }
+    const immediateToSend = historyPolicy.immediate;
+    const overflowToQueue = filterUnqueuedAlerts([
+      ...alertSplit.overflow,
+      ...historyPolicy.digest,
+    ], existingAlerts);
     const normalToQueue = filterUnqueuedAlerts(
       normal.map(article => ({ ...article, alertType: 'digest' })),
       existingAlerts
     );
 
-    console.log(`[관련성] 긴급 ${urgent.length}건`);
+    console.log(
+      `[속보정책] 5점 후보 ${urgentCandidates.length}건 · 즉시 ${urgentPolicy.immediate.length}건 · 다이제스트 전환 ${urgentPolicy.digest.length}건`
+    );
     if (suppressedImmediateCount > 0) {
       console.log(`[중복알림] 이미 전송한 즉시 알림 ${suppressedImmediateCount}건 생략`);
+    }
+    if (historyPolicy.duplicateCount > 0 || historyPolicy.dailyCapCount > 0) {
+      console.log(
+        `[속보억제] 동일 사건 ${historyPolicy.duplicateCount}건 · 일일 상한 ${historyPolicy.dailyCapCount}건을 다이제스트로 전환`
+      );
     }
     if (alertSplit.overflow.length > 0) {
       console.log(`[긴급제한] 즉시 전송 후보 ${immediateToSend.length}건, 다이제스트/캐치업 이월 ${overflowToQueue.length}건`);
@@ -267,6 +320,13 @@ async function runNewsCollector(options = {}) {
     if (immediateToSend.length > 0) {
       sent = await notifyArticles(immediateToSend);
       console.log(`[긴급알림] ${sent}건 즉시 전송`);
+      if (sent > 0) {
+        saveUrgentAlertState(markUrgentAlertsSent(
+          immediateToSend.slice(0, sent),
+          localUrgentState,
+          now,
+        ));
+      }
     }
     await persistAlertEvents([
       ...immediateToSend.map((article, index) => ({

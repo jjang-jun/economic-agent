@@ -136,6 +136,25 @@ test('formatTimingAlertReport labels first entry as conditional for watch candid
   assert.match(message, /조건 충족 시 1차 400,000원 \(4주\)/);
 });
 
+test('premarket report keeps watch candidates out of Telegram candidates', async () => {
+  const blockedRecommendation = {
+    ...recommendation,
+    riskProfile: { ...recommendation.riskProfile, tradeable: false },
+    riskReview: { approved: false, action: 'watch_only', blockers: ['risk_reward: 1:1 < 2.5:1'] },
+  };
+  const report = await buildTimingAlertReport({
+    recommendations: [blockedRecommendation],
+    portfolio,
+    mode: 'premarket',
+    now,
+    fetcher: async () => quote,
+    benchmarkFetcher: async () => ({ symbol: '^KS11', return5dPct: 1, return20dPct: 4 }),
+  });
+
+  assert.equal(report.candidates.length, 0);
+  assert.equal(report.watchCandidates.length, 1);
+});
+
 test('getTimingSession separates premarket and intraday by KST clock', () => {
   assert.equal(getTimingSession(new Date('2026-05-11T23:45:00.000Z')).session, 'premarket');
   assert.equal(getTimingSession(new Date('2026-05-12T01:25:00.000Z')).session, 'intraday');

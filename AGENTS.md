@@ -14,7 +14,8 @@ RSS feeds
   -> keyword filter
   -> local scorer (keyword weights + FinBERT for English sentiment)
   -> daily scored article archive
-  -> score 5 urgent articles: relevance filter + Telegram immediate alert
+  -> score 5 urgent articles: strict immediate policy (systemic event or fatal holding/explicit critical-alert disclosure)
+  -> other score 5 articles: digest buffer
   -> score 4 articles: article buffer
   -> scheduled AI digest/report + Telegram
 ```
@@ -54,6 +55,7 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - Optional Supabase transient retry tuning: `SUPABASE_RETRY_COUNT`, `SUPABASE_RETRY_DELAY_MS`
 - Optional private portfolio file: `PORTFOLIO_FILE`, defaulting to ignored `data/portfolio.json`
 - Optional private portfolio env for GitHub Actions: `PORTFOLIO_JSON_BASE64` or `PORTFOLIO_JSON`
+- Optional urgent-alert tuning: `MAX_URGENT_ALERTS_PER_RUN`, `MAX_URGENT_ALERTS_PER_DAY`, `URGENT_EVENT_DEDUP_HOURS`, `IMMEDIATE_ALERT_MIN_IMPORTANCE`, `IMMEDIATE_ALERT_MIN_URGENCY`
 - Optional local research worker: `LOCAL_RESEARCH_WORKER_ENABLED=true` enables the monthly review sidecar that calls `scripts/local-backtest-worker.py`; `LOCAL_RESEARCH_WORKER_PROVIDER` and `LOCAL_RESEARCH_MAX_TICKERS` tune provider and ticker count.
 - `.env` is private and must not be committed.
 
@@ -81,6 +83,8 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - `src/notify/telegram.js`: Telegram formatting and sending
 - `src/utils/`: config, AI client, buffers, seen-article cache, indicators, daily summaries
 - `src/utils/ai-budget.js`: trims AI prompt inputs to control token use
+- `src/utils/urgent-alert-policy.js`: allows immediate alerts only for systemic events or fatal disclosures tied to holdings/`watchlist.criticalAlerts`
+- `src/utils/urgent-alert-state.js`: local fallback for 24-hour event deduplication and KST daily immediate-alert caps when shared persistence is unavailable
 - `src/utils/article-archive.js`: daily scored article archive used by stock reports and later performance review
 - `src/utils/article-identity.js`: normalized article identity keys for duplicate suppression across RSS/DART, URLs, and titles
 - `src/utils/recommendation-log.js`: stores stock signals and evaluates returns against KOSPI benchmark when available

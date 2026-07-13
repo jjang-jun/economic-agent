@@ -90,7 +90,7 @@ async function main() {
     mode: resolved.mode,
   });
   const state = loadTimingAlertState();
-  const filteredReport = resolved.mode === 'intraday' && !options.noState
+  const filteredReport = !options.noState
     ? filterAlreadyAlerted(report, state)
     : report;
 
@@ -101,13 +101,13 @@ async function main() {
     return;
   }
 
-  if (filteredReport.candidates.length === 0 && resolved.mode === 'intraday') {
-    console.log('[타이밍알림] 장중 신규 조건 충족 후보 없음');
+  if (filteredReport.candidates.length === 0) {
+    console.log('[타이밍알림] 신규 승인 후보 없음');
     return;
   }
 
   await sendTimingAlertReport(filteredReport);
-  if (resolved.mode === 'intraday' && !options.noState) {
+  if (!options.noState) {
     saveTimingAlertState(markTimingAlertsSent(filteredReport, state));
   }
 }

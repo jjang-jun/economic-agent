@@ -19,8 +19,8 @@
 
 - 뉴스/RSS/DART 공시 수집: 동작
 - 로컬 스코어링: 키워드, 섹터, FinBERT 기반으로 동작
-- Telegram 즉시 알림: score 5 기사 대상
-- 하루 5회 AI 다이제스트: 08:20, 11:50, 15:45, 17:10, 22:40 KST
+- Telegram 즉시 알림: score 5 중 보유/명시적 critical 종목의 치명 공시 또는 시장 전체 사건만 대상
+- 정기 AI 다이제스트: 평일 08:20, 11:50, 15:45, 17:10, 22:40 KST
 - 장 마감 종목 리포트: 당일 기사 아카이브 기반
 - 추천 성과 평가: 1일/5일/20일, KOSPI 벤치마크 대비 평가
 - 시장 레짐/행동 가드레일: 초안 적용
@@ -140,7 +140,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - FMP API key 실호출 검증 완료. `FMP_BASE_URL` trailing slash와 endpoint 조합 버그를 수정했고, NFLX quote/profile이 `stable/quote`, `stable/profile`에서 정상 조회됨.
 - Telegram Agent 배포 준비 추가. `Dockerfile`, `.dockerignore`, `telegram:set-webhook` 스크립트, `docs/TELEGRAM_AGENT_DEPLOY.md`를 추가하고 `agent:server`가 `.env`가 없어도 배포 환경변수만으로 실행되도록 변경.
 - Telegram Agent의 `/buy`, `/sell`, `/cash` pending action 초안과 inline button 승인/취소 흐름 추가. 승인 전에는 포트폴리오를 변경하지 않고, 승인 시에만 거래 기록 또는 현금 변경을 반영.
-- 뉴스 알림 폭주 완화. 5점 긴급 기사는 기본 상위 3건만 즉시 Telegram 전송하고, 나머지는 다이제스트 버퍼로 이월하도록 변경. `MAX_URGENT_ALERTS_PER_RUN` 환경변수로 상한 조정 가능.
+- 뉴스 알림 폭주 완화. 5점이나 관심 키워드만으로 즉시 전송하지 않고 보유 종목·`watchlist.criticalAlerts`의 치명 공시 또는 시장 전체 긴급 사건만 Telegram 속보로 허용한다. 가격 관찰 watchlist와 거래정지 해제·불성실공시 미지정/예고·액면병합 같은 행정 공시는 다이제스트로 이월하며 기본 실행당 상한은 1건, KST 일일 상한은 2건이다.
 - 기사 중복 제거 보강. tracking parameter 제거 범위를 넓히고, DART 접수번호, 제목 signature, 유사 제목 Jaccard 판정으로 RSS/공시/버퍼/스코어링 단계의 중복을 더 강하게 제거.
 - 로컬 스코어링 보강. 단일 최고 키워드 방식에서 `importanceScore`, `tradabilityScore`, `urgencyScore`, `eventType`, `matchedKeywords`를 계산하는 구조로 변경해 중요 뉴스와 실제 매매 연결 가능 뉴스를 구분.
 - DART 공시 시간 표시 보정. DART 목록 API는 접수 시각이 아니라 접수일만 제공하므로 Telegram 알림에는 `00:00` 대신 `공시일`로 표시.
@@ -197,6 +197,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 다이제스트 입력 버퍼를 Supabase 우선으로 전환했다. `digest`는 `alert_events`의 `digest`/`catch_up` 대기 항목과 로컬 `article-buffer.json`을 병합해 요약하고, Telegram 전송 성공 후 Supabase 대기 이벤트를 `sent`로 갱신한다.
 - 추천 성과 분석을 고도화했다. `performance-lab`이 실패 원인을 `stop_touched`, `low_risk_reward`, `underperformed_benchmark`, `large_drawdown` 등으로 자동 분류하고, 섹터별/리스크 요인별 승률·평균 신호수익률을 주간/월간 성과 리뷰에 표시한다.
 - Telegram 승인 흐름 smoke를 추가했다. `npm run telegram:smoke-actions`는 `/buy`, `/sell`, `/cash` 초안을 생성한 뒤 모두 취소해 Supabase `pending_actions`와 callback 경로를 검증하며, 실제 거래/현금 변경은 수행하지 않는다. GitHub Actions `telegram-smoke-actions.yml`로 평일 08:10 KST에 정기 점검한다.
+- Telegram 승인 흐름 smoke의 외부 장애 소음을 줄였다. 2026-06-10부터 2026-07-13까지 정기 실행 24회가 Supabase/PostgREST `503 PGRST002 schema cache`로 연속 실패해 매일 아침 실패 알림을 만들었다. 정기 스케줄은 동일한 408/429/5xx 외부 장애를 GitHub warning으로 남기고 스킵하며, 수동 실행은 엄격하게 실패시켜 실제 복구 확인에 사용한다. 정기 실행의 재시도는 1회, 수동 실행은 5회다.
 - 가격 provider 호출 시도 로그를 추가했다. `price_provider_attempts`에 provider/ticker/price_type/status/latency/error를 저장하고, 주간/월간 성과 리뷰의 가격 데이터 품질 섹션에서 provider 호출 수, 실패율, 빈 응답률을 함께 표시한다.
 - 다이제스트 전송 후 상태 추적을 운영 리포트에 보강했다. 주간/월간 성과 리뷰의 수집/알림 운영 섹션이 `digest`와 `catch_up` 각각의 전송완료/대기/실패 건수를 따로 보여주고, 상태 전환 실패가 있으면 이상치로 표시한다.
 - 추천 생성 AI 버전 추적을 추가했다. 종목 분석 리포트와 추천 로그에 `aiMetadata`를 저장하고, Supabase `recommendations`에 `ai_provider`, `ai_model`, `prompt_version`, `ai_metadata`를 별도 컬럼으로 남긴다. 주간/월간 성과 리뷰는 프롬프트/모델 조합별 승률과 평균 추천 수익률을 분리 표시한다.

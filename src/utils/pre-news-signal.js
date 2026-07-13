@@ -110,16 +110,23 @@ function scorePreNewsSignal(item, marketProfile = {}) {
   const reasons = [];
   const warnings = [];
   let score = 0;
+  const sources = new Set(item.sources || []);
+  const isPersonallyRelevant = sources.has('holding') || sources.has('recent_recommendation');
+  const changePercent = marketProfile.changePercent;
 
-  if (typeof marketProfile.changePercent === 'number') {
-    if (marketProfile.changePercent >= 10) {
+  if (typeof changePercent === 'number') {
+    if (changePercent >= 10) {
       score += 5;
-      reasons.push(`당일 급등 +${marketProfile.changePercent}%`);
-    } else if (marketProfile.changePercent >= 5) {
+      reasons.push(`당일 급등 +${changePercent}%`);
+    } else if (changePercent >= 5) {
       score += 3;
-      reasons.push(`당일 강세 +${marketProfile.changePercent}%`);
-    } else if (marketProfile.changePercent <= -5) {
-      warnings.push(`당일 급락 ${marketProfile.changePercent}%`);
+      reasons.push(`당일 강세 +${changePercent}%`);
+    } else if (changePercent <= -10) {
+      score += 5;
+      reasons.push(`당일 급락 ${changePercent}%`);
+      warnings.push('급락 원인과 보유 리스크 즉시 확인');
+    } else if (changePercent <= -5) {
+      warnings.push(`당일 급락 ${changePercent}%`);
     }
   }
 
@@ -175,7 +182,10 @@ function scorePreNewsSignal(item, marketProfile = {}) {
     warnings.push('20일선 아래');
   }
 
-  const action = score >= 5 && !warnings.some(text => text.includes('추격 금지'))
+  const extremeMove = typeof changePercent === 'number' && Math.abs(changePercent) >= 10;
+  const strongPersonalSignal = isPersonallyRelevant && score >= 7;
+  const chaseWarning = warnings.some(text => text.includes('추격 금지'));
+  const action = (extremeMove || (strongPersonalSignal && !chaseWarning))
     ? 'pre_news_candidate'
     : (score >= 3 ? 'watch' : 'ignore');
 

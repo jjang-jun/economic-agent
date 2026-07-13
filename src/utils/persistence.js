@@ -865,6 +865,17 @@ async function loadAlertEventsForArticles(articleIds = []) {
   return rows;
 }
 
+async function loadRecentImmediateAlertEvents(options = {}) {
+  return selectRows('alert_events', {
+    select: 'article_id,alert_type,status,sent_at,payload,created_at',
+    alert_type: 'eq.immediate',
+    status: 'eq.sent',
+    sent_at: options.since ? `gte.${options.since}` : undefined,
+    order: 'sent_at.desc',
+    limit: String(options.limit || 100),
+  });
+}
+
 module.exports = {
   isPersistenceEnabled,
   selectRows,
@@ -904,6 +915,7 @@ module.exports = {
   persistAlertEvents,
   loadBufferedDigestArticles,
   loadAlertEventsForArticles,
+  loadRecentImmediateAlertEvents,
   summarizeHttpError,
   shouldRetrySupabaseError,
 };

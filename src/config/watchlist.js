@@ -1,4 +1,7 @@
 module.exports = {
+  // 가격 관찰 목록과 분리된 즉시 공시 알림 목록. 꼭 필요한 종목만 명시한다.
+  // 보유 종목은 포트폴리오에서 자동으로 포함된다.
+  criticalAlerts: [],
   preopen: [
     { symbol: '^KS11', name: 'KOSPI' },
     { symbol: '^KQ11', name: 'KOSDAQ' },
