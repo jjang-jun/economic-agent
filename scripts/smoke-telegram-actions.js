@@ -4,6 +4,10 @@ const { isPersistenceEnabled, loadPendingAction, selectRows } = require('../src/
 const { loadStoredPortfolio } = require('../src/utils/portfolio-store');
 const { loadPortfolio, normalizePortfolio } = require('../src/utils/portfolio');
 
+function isTruthyEnv(value) {
+  return ['1', 'true', 'yes', 'y'].includes(String(value || '').trim().toLowerCase());
+}
+
 function messageId() {
   return Math.floor(Date.now() / 1000);
 }
@@ -67,11 +71,24 @@ async function assertPersistenceAvailable() {
     limit: '1',
   });
   if (result.error) {
-    throw new Error(`Supabase persistence unavailable for Telegram smoke: ${result.error.message}`);
+    const err = new Error(`Supabase persistence unavailable for Telegram smoke: ${result.error.message}`);
+    err.status = result.error.status;
+    err.transientSupabase = isTransientSupabaseError(result.error);
+    throw err;
   }
 }
 
-async function main() {
+function isTransientSupabaseError(err) {
+  if (!err) return false;
+  if (err.transientSupabase) return true;
+  if (typeof err.status === 'number') {
+    return err.status === 408 || err.status === 429 || err.status >= 500;
+  }
+  return /schema cache|temporarily disabled|fetch failed|ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|\b(?:408|429|5\d\d)\b/i
+    .test(String(err.message || err));
+}
+
+async function runTelegramSmoke() {
   const chatId = process.env.TELEGRAM_SMOKE_CHAT_ID || getAllowedChatIds()[0];
   if (!chatId) throw new Error('TELEGRAM_SECRET_CHAT_ID or TELEGRAM_SMOKE_CHAT_ID is required');
 
@@ -95,6 +112,25 @@ async function main() {
   }, null, 2));
 }
 
+async function main() {
+  try {
+    await runTelegramSmoke();
+  } catch (err) {
+    if (isTruthyEnv(process.env.TELEGRAM_SMOKE_ALLOW_TRANSIENT_SUPABASE) && isTransientSupabaseError(err)) {
+      console.warn(`[telegram-smoke] skipped: transient Supabase outage: ${err.message}`);
+      console.warn(`::warning title=Telegram smoke skipped::${String(err.message || err).replace(/[\r\n]+/g, ' ')}`);
+      console.log(JSON.stringify({
+        ok: false,
+        skipped: true,
+        reason: 'transient_supabase_unavailable',
+        message: err.message,
+      }, null, 2));
+      return;
+    }
+    throw err;
+  }
+}
+
 if (require.main === module) {
   main().catch(err => {
     console.error('[telegram-smoke] failed:', err.message);
@@ -105,5 +141,9 @@ if (require.main === module) {
 module.exports = {
   assertPersistenceAvailable,
   getCancelCallbackData,
+  isTransientSupabaseError,
+  isTruthyEnv,
+  main,
+  runTelegramSmoke,
   smokeDraftAndCancel,
 };
