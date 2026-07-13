@@ -73,8 +73,7 @@ async function main() {
   // Telegram 전송
   const sent = await sendDigest(digest);
   if (!sent) {
-    console.error('[완료] 다이제스트 전송 실패, 버퍼를 보존합니다.');
-    return;
+    throw new Error('다이제스트 전송 실패, 버퍼를 보존합니다.');
   }
 
   // 일일 요약 저장

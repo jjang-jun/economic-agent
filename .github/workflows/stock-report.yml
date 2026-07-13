@@ -40,7 +40,12 @@ jobs:
         run: node src/stock-report.js
         env:
           AI_PROVIDER: ${{ secrets.AI_PROVIDER }}
+          AI_MODEL: ${{ secrets.AI_MODEL }}
+          AI_STOCK_MODEL: ${{ secrets.AI_STOCK_MODEL }}
+          AI_REASONING_EFFORT: ${{ secrets.AI_REASONING_EFFORT }}
+          AI_STOCK_REASONING_EFFORT: ${{ secrets.AI_STOCK_REASONING_EFFORT }}
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

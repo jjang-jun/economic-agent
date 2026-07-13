@@ -32,11 +32,17 @@ function saveRecommendations(recommendations) {
   fs.writeFileSync(LOG_FILE, JSON.stringify(recommendations, null, 2));
 }
 
-async function loadRecommendations() {
+async function loadRecommendationsWithStatus() {
   const local = loadLocalRecommendations();
   const persisted = await loadPersistedRecommendations();
   if (persisted.error || persisted.disabled || !persisted.rows) {
-    return local;
+    return {
+      recommendations: local,
+      dataAvailable: local.length > 0,
+      source: local.length > 0 ? 'local_fallback' : 'unavailable',
+      persistenceAvailable: false,
+      error: persisted.error?.message || (persisted.disabled ? 'persistence disabled' : 'persistence unavailable'),
+    };
   }
 
   const byId = new Map(local.filter(r => r.id).map(r => [r.id, r]));
@@ -45,7 +51,18 @@ async function loadRecommendations() {
   }
   const merged = [...byId.values()];
   saveRecommendations(merged);
-  return merged;
+  return {
+    recommendations: merged,
+    dataAvailable: true,
+    source: 'supabase',
+    persistenceAvailable: true,
+    error: '',
+  };
+}
+
+async function loadRecommendations() {
+  const result = await loadRecommendationsWithStatus();
+  return result.recommendations;
 }
 
 function getRecommendationId(date, stock) {
@@ -54,6 +71,11 @@ function getRecommendationId(date, stock) {
 }
 
 function getRelatedArticleIds(stock, articles) {
+  const resolvedIds = Array.isArray(stock.related_article_ids)
+    ? stock.related_article_ids
+    : (Array.isArray(stock.relatedArticleIds) ? stock.relatedArticleIds : []);
+  if (resolvedIds.length > 0) return resolvedIds.filter(Boolean);
+
   const indexes = Array.isArray(stock.related_news) ? stock.related_news : [];
   return indexes
     .map(i => articles[i]?.id)
@@ -393,6 +415,7 @@ async function evaluateRecommendations() {
 }
 
 module.exports = {
+  loadRecommendationsWithStatus,
   EVALUATION_DAYS,
   loadRecommendations,
   loadLocalRecommendations,
@@ -409,4 +432,5 @@ module.exports = {
   fetchEvaluationQuote,
   getEvaluationStats,
   getResultLabel,
+  getRelatedArticleIds,
 };

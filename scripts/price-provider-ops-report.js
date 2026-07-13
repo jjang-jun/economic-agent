@@ -68,7 +68,7 @@ function formatSummary(summary, anomalies) {
   const attempts = summary.attempts || {};
   const providers = (attempts.byProvider || [])
     .slice(0, 4)
-    .map(item => `▸ ${item.provider}: ${item.count}회 · 실패 ${item.failed}회 (${item.failureRatePct ?? 'n/a'}%)`)
+    .map(item => `▸ ${item.provider}: ${item.count}회 · 실패 ${item.failed}회 (${item.failureRatePct ?? 'n/a'}%) · 빈 응답 ${item.empty ?? 0}회 (${item.emptyRatePct ?? 'n/a'}%)`)
     .join('\n');
 
   return [

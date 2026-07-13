@@ -45,6 +45,7 @@ test('summarizePriceSourceQuality separates official EOD and fallback sources', 
   assert.equal(summary.attempts.total, 3);
   assert.equal(summary.attempts.failed, 1);
   assert.equal(summary.attempts.failureRatePct, 33.33);
+  assert.equal(summary.attempts.byProvider.find(item => item.provider === 'data-go-kr').emptyRatePct, 100);
   assert.equal(summary.healthLabel, 'ok');
   assert.equal(summary.providerDecision.action, 'ok');
 });
@@ -62,6 +63,7 @@ test('buildPriceSourceQualityAnomalies flags provider failures and fallback over
       emptyRatePct: 10,
       byProvider: [
         { provider: 'kis-rest', count: 5, failed: 3, failureRatePct: 60 },
+        { provider: 'alpha-vantage', count: 5, empty: 5, failed: 0, failureRatePct: 0, emptyRatePct: 100 },
       ],
     },
   }, {
@@ -74,6 +76,7 @@ test('buildPriceSourceQualityAnomalies flags provider failures and fallback over
   assert.deepEqual(anomalies, [
     '가격 provider 실패율 40% (4/10)',
     'kis-rest 실패율 60% (3/5)',
+    'alpha-vantage 빈 응답률 100% (5/5)',
     '국내 Naver/Yahoo fallback 비중 60%',
     '오래된 가격 스냅샷 4건',
   ]);
@@ -152,7 +155,7 @@ test('price provider ops summary includes provider decision and anomalies', () =
       failureRatePct: 0,
       emptyRatePct: 40,
       byProvider: [
-        { provider: 'yahoo-finance', count: 3, failed: 0, failureRatePct: 0 },
+        { provider: 'yahoo-finance', count: 3, failed: 0, empty: 0, failureRatePct: 0, emptyRatePct: 0 },
       ],
     },
   }, ['Naver/Yahoo fallback 비중 63%']);
@@ -161,6 +164,7 @@ test('price provider ops summary includes provider decision and anomalies', () =
   assert.match(message, /판단: 해외 실시간 가격 API는 필요 시 보강/);
   assert.match(message, /국내 fallback: 10%/);
   assert.match(message, /해외 Yahoo: 100%/);
+  assert.match(message, /빈 응답 0회 \(0%\)/);
 });
 
 test('price provider ops skips delayed scheduled sends outside quiet-hours window', () => {

@@ -1175,6 +1175,7 @@ function formatPerformanceReview(review) {
   const missedAvg = fmtPct(missed.avgSignalReturnPct);
   const executedAvg = fmtPct(executed.avgSignalReturnPct);
   const verdict = (() => {
+    if (rec.dataAvailable === false) return '추천 성과 저장소를 읽지 못해 이번 주 성과를 판단할 수 없습니다.';
     if (!rec.evaluated) return '추천 성과를 판단하기에는 아직 평가 완료 데이터가 부족합니다.';
     if (typeof rec.avgAlphaPct === 'number' && rec.avgAlphaPct > 0 && typeof rec.winRatePct === 'number' && rec.winRatePct >= 50) {
       return '이번 기간의 추천은 시장 대비 양호했습니다.';
@@ -1185,20 +1186,32 @@ function formatPerformanceReview(review) {
     return '이번 기간의 추천은 혼재되어 있습니다. 승률보다 손익비와 최대낙폭을 함께 봐야 합니다.';
   })();
 
-  const recommendationLines = [
+  const recommendationLines = rec.dataAvailable === false ? [
+    '▸ 상태: 추천 데이터 조회 실패 (0건으로 해석하면 안 됨)',
+    `▸ 원인: ${rec.dataError || 'Supabase 또는 로컬 미러를 확인하세요'}`,
+  ] : [
     `▸ 추천 생성: ${rec.total ?? 0}건`,
     `▸ 평가 완료: ${rec.evaluated ?? 0}건`,
     `▸ 승률: ${winRate} - 평가 완료 추천 중 방향이 맞은 비율`,
     `▸ 평균 추천 수익률: ${avgSignal} - 추천 방향 기준 평균 성과`,
     `▸ 시장 대비 초과수익: ${avgAlpha} - KOSPI/Nasdaq 등 기준지수보다 더 잘했는지`,
   ];
+  if (rec.dataAvailable !== false && rec.persistenceAvailable === false) {
+    recommendationLines.unshift('▸ 상태: 로컬 캐시 사용 중 (최신성 보장 안 됨)');
+  }
 
-  const executionLines = [
+  const executionLines = trade.dataAvailable === false ? [
+    '▸ 상태: 실제 거래 데이터 조회 실패 (0건으로 해석하면 안 됨)',
+    `▸ 원인: ${trade.dataError || 'Supabase 또는 로컬 미러를 확인하세요'}`,
+  ] : [
     `▸ 실제 거래: ${trade.total ?? 0}건`,
     `▸ 추천과 연결된 거래: ${trade.linked ?? 0}건 (${linkedRate})`,
     `▸ 추천을 실제로 산 경우 평균: ${executedAvg}`,
     `▸ 추천했지만 매수하지 않은 경우 평균: ${missedAvg}`,
   ];
+  if (trade.dataAvailable !== false && trade.persistenceAvailable === false) {
+    executionLines.unshift('▸ 상태: 로컬 캐시 사용 중 (최신성 보장 안 됨)');
+  }
   if (tradeBehavior.buyTrades) {
     executionLines.push(`▸ 원칙 점검: 추천 미연결 매수 ${tradeBehavior.unlinkedBuys ?? 0}건, 관찰/차단 후보 매수 ${tradeBehavior.watchOnlyBuys ?? 0}건`);
   }
@@ -1225,7 +1238,10 @@ function formatPerformanceReview(review) {
     return `▸ ${item.key}: 평가 ${item.evaluated}건 · 승률 ${fmtPct(item.winRatePct)} · 평균 ${fmtPct(item.avgSignalReturnPct)}${sample}`;
   });
 
-  const collectorLines = collector.totalRuns ? [
+  const collectorLines = collector.dataAvailable === false ? [
+    '▸ 상태: 수집 이력 저장소 조회 실패 (수집기 중단으로 단정할 수 없음)',
+    `▸ 원인: ${collector.dataError || 'Supabase 상태를 확인하세요'}`,
+  ] : (collector.totalRuns ? [
     `▸ 수집 성공: ${collector.successfulRuns ?? 0}/${collector.completedRuns ?? collector.totalRuns}`,
     `▸ 마지막 성공: ${collector.lastSuccessAt || '없음'}${typeof collector.minutesSinceLastSuccess === 'number' ? ` · ${collector.minutesSinceLastSuccess}분 전` : ''}`,
     `▸ 조치 필요 실패: ${collector.actionableFailedRuns ?? collector.failedRuns ?? 0}건${collector.resolvedFailureRuns ? ` · 정리된 과거 실패 ${collector.resolvedFailureRuns}건` : ''}`,
@@ -1233,7 +1249,7 @@ function formatPerformanceReview(review) {
     `▸ 즉시 알림 실패: 최근 ${alerts.actionableFailedImmediate ?? alerts.failedImmediate ?? 0}건${alerts.historicalFailedImmediate ? ` · 과거 실패 ${alerts.historicalFailedImmediate}건` : ''}`,
     `▸ 다이제스트 처리: 전송완료 ${alerts.sentDigest ?? 0}건 · 대기 ${alerts.pendingDigest ?? 0}건 · 실패 ${alerts.failedDigest ?? 0}건`,
     `▸ catch-up 처리: 전송완료 ${alerts.sentCatchUp ?? 0}건 · 대기 ${alerts.pendingCatchUp ?? 0}건 · 실패 ${alerts.failedCatchUp ?? 0}건`,
-  ] : [];
+  ] : []);
   const priceLines = priceQuality.totalSnapshots ? [
     `▸ 가격 스냅샷: ${priceQuality.totalSnapshots ?? 0}건 / 종목 ${priceQuality.tickerCount ?? 0}개`,
     `▸ 가격 조회: ${priceAttempts.total ?? 0}건 · 실패 ${priceAttempts.failed ?? 0}건 (${priceAttempts.failureRatePct ?? 'n/a'}%) · 빈 응답 ${priceAttempts.empty ?? 0}건`,

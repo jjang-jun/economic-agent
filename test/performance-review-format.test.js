@@ -162,3 +162,34 @@ test('formatPerformanceReview explains recommendation and execution metrics in p
   assert.match(message, /즉시 알림 실패: 최근 0건 · 과거 실패 1건/);
   assert.match(message, /catch-up 처리: 전송완료 1건 · 대기 0건 · 실패 0건/);
 });
+
+test('formatPerformanceReview labels unavailable stores instead of reporting zero or stale data', () => {
+  const message = formatPerformanceReview({
+    period: 'weekly',
+    startDate: '2026-07-03',
+    endDate: '2026-07-10',
+    recommendationSummary: {
+      dataAvailable: false,
+      dataError: '503 schema cache unavailable',
+      total: 0,
+      evaluated: 0,
+    },
+    tradeSummary: {
+      dataAvailable: false,
+      dataError: '503 schema cache unavailable',
+      total: 0,
+      linked: 0,
+    },
+    collectorOps: {
+      dataAvailable: false,
+      dataError: '503 schema cache unavailable',
+      totalRuns: 0,
+    },
+  });
+
+  assert.match(message, /추천 데이터 조회 실패/);
+  assert.match(message, /0건으로 해석하면 안 됨/);
+  assert.match(message, /수집 이력 저장소 조회 실패/);
+  assert.match(message, /실제 거래 데이터 조회 실패/);
+  assert.doesNotMatch(message, /마지막 성공: 없음/);
+});

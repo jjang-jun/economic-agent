@@ -118,6 +118,19 @@ test('summarizeCollectorOps treats expected off-hours as idle', () => {
   assert.deepEqual(buildCollectorOpsAnomalies(summary), []);
 });
 
+test('collector ops distinguishes unavailable persistence from an actual stale collector', () => {
+  const summary = summarizeCollectorOps([], [], {
+    expectedRuns: true,
+    dataAvailable: false,
+    dataError: '503 schema cache unavailable',
+  });
+
+  assert.equal(summary.healthLabel, 'unavailable');
+  assert.equal(summary.staleSuccess, false);
+  assert.equal(summary.dataError, '503 schema cache unavailable');
+  assert.deepEqual(buildCollectorOpsAnomalies(summary), ['수집 상태 저장소를 조회할 수 없습니다']);
+});
+
 test('isCollectorExpectedNow follows KST weekday collection window', () => {
   assert.equal(isCollectorExpectedNow(new Date('2026-05-08T10:00:00+09:00')), true);
   assert.equal(isCollectorExpectedNow(new Date('2026-05-08T06:59:00+09:00')), false);
@@ -204,4 +217,16 @@ test('collector ops summary includes anomalies and alert counts', () => {
   assert.match(message, /즉시알림 실패: 최근 0/);
   assert.match(message, /알림대기: digest 2 · catch-up 1/);
   assert.match(message, /수집 성공률 80%/);
+});
+
+test('collector ops message does not call an unavailable store a stopped collector', () => {
+  const message = formatSummary({
+    dataAvailable: false,
+    dataError: '503 schema cache unavailable',
+  }, ['수집 상태 저장소를 조회할 수 없습니다']);
+
+  assert.match(message, /저장소 조회 실패/);
+  assert.match(message, /실제 수집기 중단으로 단정할 수 없습니다/);
+  assert.match(message, /503 schema cache unavailable/);
+  assert.doesNotMatch(message, /마지막 성공: 없음/);
 });

@@ -199,8 +199,17 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - Telegram 승인 흐름 smoke를 추가했다. `npm run telegram:smoke-actions`는 `/buy`, `/sell`, `/cash` 초안을 생성한 뒤 모두 취소해 Supabase `pending_actions`와 callback 경로를 검증하며, 실제 거래/현금 변경은 수행하지 않는다. GitHub Actions `telegram-smoke-actions.yml`로 평일 08:10 KST에 정기 점검한다.
 - Telegram 승인 흐름 smoke의 외부 장애 소음을 줄였다. 2026-06-10부터 2026-07-13까지 정기 실행 24회가 Supabase/PostgREST `503 PGRST002 schema cache`로 연속 실패해 매일 아침 실패 알림을 만들었다. 정기 스케줄은 동일한 408/429/5xx 외부 장애를 GitHub warning으로 남기고 스킵하며, 수동 실행은 엄격하게 실패시켜 실제 복구 확인에 사용한다. 정기 실행의 재시도는 1회, 수동 실행은 5회다.
 - 가격 provider 호출 시도 로그를 추가했다. `price_provider_attempts`에 provider/ticker/price_type/status/latency/error를 저장하고, 주간/월간 성과 리뷰의 가격 데이터 품질 섹션에서 provider 호출 수, 실패율, 빈 응답률을 함께 표시한다.
+- `db:pull`을 누적 데이터에 맞게 보강했다. Supabase REST 기본 1000건 한도에 걸리지 않도록 페이지 단위로 전체 테이블을 내려받고, PostgREST 408/429/5xx 일시 오류에는 retry/backoff를 적용한다.
+- 가격 provider 운영 점검을 provider별 빈 응답률까지 보강했다. 전체 empty 비율이 임계값 이하라도 Alpha Vantage/FMP/Tiingo처럼 특정 provider가 반복적으로 100% empty를 내면 이상치로 표시한다.
 - 다이제스트 전송 후 상태 추적을 운영 리포트에 보강했다. 주간/월간 성과 리뷰의 수집/알림 운영 섹션이 `digest`와 `catch_up` 각각의 전송완료/대기/실패 건수를 따로 보여주고, 상태 전환 실패가 있으면 이상치로 표시한다.
 - 추천 생성 AI 버전 추적을 추가했다. 종목 분석 리포트와 추천 로그에 `aiMetadata`를 저장하고, Supabase `recommendations`에 `ai_provider`, `ai_model`, `prompt_version`, `ai_metadata`를 별도 컬럼으로 남긴다. 주간/월간 성과 리뷰는 프롬프트/모델 조합별 승률과 평균 추천 수익률을 분리 표시한다.
+- GPT-5.6 모델 패밀리 전환 경로를 추가했다. OpenAI 기본은 비용/품질 균형형 `gpt-5.6-terra`이고, OpenAI 호출은 Responses API와 Structured Outputs를 사용한다. 다이제스트는 low, 종목 분석은 medium reasoning을 기본으로 하며 실제 응답 모델·토큰·지연·종료 상태를 `aiMetadata`에 기록한다. 다른 provider의 기존 API 경로는 유지한다.
+- 운영 추천 생성이 `claude-sonnet-4-20250514` 404를 성공 workflow로 숨기던 문제를 확인했다. AI provider 오류는 workflow 실패로 전파하고, OpenAI key 등록 전 Anthropic 안전망은 공식 현재 ID `claude-sonnet-5`를 사용한다. 주간 리뷰는 Supabase 조회 실패를 추천 0건이나 수집기 stale로 표시하지 않고 `데이터 조회 불가`로 구분한다.
+- GPT-5.6 프롬프트 계약을 보강했다. 다이제스트에도 외부 기사 prompt-injection 경계를 추가했고, 종목 분석은 근거가 부족할 때 억지로 3개 이상 추천하지 않고 빈 `stocks`를 허용한다. 종목 프롬프트는 `stock-analysis-v2.2`, 다이제스트는 `digest-v1.1`로 구분한다.
+- 종목 분석 `related_news` 인덱스가 전체 기사 배열의 다른 기사 ID로 저장될 수 있던 문제를 수정했다. AI에 실제 제공한 선택 기사 배열에서 즉시 `related_article_ids`를 확정하고 추천 로그는 이 ID를 우선 사용한다.
+- 속보 정책을 실제 발송 이력 기준으로 강화했다. 로컬 미러의 과거 즉시 전송 164건은 모두 관련성 없는 DART 공시였고 새 정책을 재적용하면 164건 모두 다이제스트 대상이다. 앞으로 보유·명시적 critical 종목의 치명 공시와 시장 전체 긴급 사건만 즉시 허용하며 실행당 기본 상한은 1건, 일일 상한은 2건이다. 같은 금리 결정·서킷브레이커·동일 기업의 같은 치명 공시 후속 기사는 24시간 동안 한 사건으로 묶고 나머지는 정기 다이제스트로 이월한다.
+- Telegram 중요 알림 모드는 정기 다이제스트 5회와 하루 단위 리포트는 유지하고 실시간성 알림만 축소한다. 장전/장중 타이밍 알림은 리스크와 진입 타이밍을 모두 통과한 신규 후보만 하루 한 번 보낸다.
+- 기사 전 선행 신호는 보유·최근 추천의 점수 7 이상 복합 신호 또는 관심 종목의 당일 ±10% 이상 극단 움직임으로 제한해 단순 기술적 강세 관찰은 보내지 않는다.
 - Telegram 승인 흐름 smoke 실패 알림을 추가했다. `telegram-smoke-actions.yml`에서 smoke 단계가 실패하면 `notify:workflow-failure`가 private Telegram으로 워크플로우명, 작업명, 브랜치, 커밋, GitHub Actions 로그 링크를 보낸다.
 - 가격 provider 운영 알림을 추가했다. `price-provider:ops-report`는 최근 provider 호출 실패율, 빈 응답률, fallback 비중, 오래된 가격 스냅샷을 점검하고 기준 초과 시 private Telegram으로 보낸다. GitHub Actions `price-provider-ops-report.yml`은 평일 23:55 KST에 실행된다. fallback 탐색 과정의 빈 응답은 정상적으로 발생할 수 있어 경보 기준을 90%로 둔다.
 - 가격 provider 운영 알림에 야간 전송 가드를 추가했다. GitHub Actions가 크게 지연돼 02:14 KST처럼 새벽에 실행되면 운영 점검 메시지는 Telegram 전송을 건너뛰고 로그만 남긴다. 필요하면 `PRICE_PROVIDER_ALLOW_OFF_HOURS=1`로 강제 전송할 수 있다.
@@ -257,7 +266,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 포트폴리오 원본과 저장 포트폴리오를 최신 수동 입력으로 맞췄다. DRAM ETF는 200주와 평가손익 +2,239,016원, NFLX는 현재가 $87.33과 평가손익 -156,702원을 기준으로 Action Report를 생성하며, GitHub Actions용 `PORTFOLIO_JSON_BASE64` secret도 같은 원본으로 동기화했다.
 - 경제적 자유 목표 입력을 갱신했다. 목표 순자산은 10억원, 월 투자 가능 금액은 200만원으로 설정했다. 최신 매크로/반도체 업황을 반영해 기준 계획 수익률은 연 12%, 공격 운용 목표는 연 15%로 둔다.
 - 경제적 자유 시나리오 리포트를 추가했다. 월 투자금 200/250/300/400만원과 연수익률 7/10/12/15% 조합별 목표 도달일을 계산해 Freedom Report에는 핵심 행만, 로컬 대시보드에는 전체 표를 표시한다. 현재 기준 월 400만원·연 12%는 2035-10-10 도달로 목표보다 1년 2개월 빠르다.
-- 모델/프롬프트 성과 표본을 재확인했다. `npm run db:pull && npm run model:performance` 기준 추천 11건, 평가 완료 6건이지만 모두 `legacy_prompt / unknown_provider:unknown_model`이라 Claude Sonnet 전환 효과는 아직 비교 불가다. 메타데이터가 붙은 추천의 평가 완료 건이 5건 이상 쌓인 뒤 다시 판단한다.
+- 모델/프롬프트 성과 표본을 재확인했다. 2026-07-10 `npm run model:performance -- --json` 기준 추천 11건, 평가 완료 8건, 평균 방향 수익률 +1.92%, 승률 62.5%지만 모두 `legacy_prompt / unknown_provider:unknown_model`이라 기존 모델 효과는 비교할 수 없다. GPT-5.6 메타데이터가 붙은 추천 평가가 5건 이상 쌓인 뒤 Terra reasoning 설정과 필요 시 Sol을 비교한다.
 - 대시보드 숫자 일관성을 재확인했다. `npm run dashboard` 생성 HTML은 목표 1,000,000,000원, 월 투자 가능 금액 2,000,000원, 현재 순자산 57,377,347원, 달성률 5.74%를 표시한다.
 - 수집기 운영 점검의 주말 오탐을 줄였다. KST 평일 07:00-23:59 수집 시간대가 아니면 최근 1일 실행 0건을 이상치로 보지 않고 `idle` 상태로 표시한다. 2026-05-10 일요일 재실행 기준 이상치 없음으로 확인했다.
 - 수집기 운영 점검에서 이미 해결된 과거 실패를 분리했다. `stale run cleaned` 계열 redeploy/smoke 실패와 과거 `toAdd` 초기화 버그 실패는 `resolvedFailureRuns`로 따로 보여주고, 성공률·상태·실패 이상치는 조치 필요 실패 기준으로 계산한다. 즉시 알림 실패도 최근 24시간 조치 필요 실패와 과거 실패로 나눈다. 2026-05-10 실조회 기준 최근 7일은 성공 244건, 조치 필요 실패 0건, 정리된 과거 실패 6건, 최근 즉시 알림 실패 0건, 과거 즉시 알림 실패 3건이며 이상치는 없다.

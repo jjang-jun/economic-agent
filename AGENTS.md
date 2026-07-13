@@ -48,7 +48,7 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 
 ## Environment
 - Required for Telegram delivery: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`
-- AI digest/report provider: `AI_PROVIDER`, optional `AI_MODEL`, `AI_BASE_URL`, and provider key such as `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GROQ_API_KEY`, or generic `AI_API_KEY`
+- AI digest/report provider: `AI_PROVIDER`, optional `AI_MODEL`, task overrides `AI_DIGEST_MODEL`/`AI_STOCK_MODEL`, `AI_DIGEST_REASONING_EFFORT`/`AI_STOCK_REASONING_EFFORT`, `AI_BASE_URL`, and provider key such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GROQ_API_KEY`, or generic fallback `AI_API_KEY`. The Anthropic fallback default is `claude-sonnet-5`.
 - Optional indicators/data: `BOK_API_KEY`, `FRED_API_KEY`, `DART_API_KEY`
 - Optional history store: `SUPABASE_PROJECT_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_DB_PASSWORD` or `SUPABASE_DB_URL` for schema pushes
 - Optional deploy freshness check: `AGENT_SERVER_URL` or `CLOUD_RUN_SERVICE_URL`, with `EXPECTED_DEPLOY_SHA` when running outside GitHub Actions
@@ -119,7 +119,7 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - `supabase/migrations/`: Postgres schema migrations for long-term history
 - `scripts/push-supabase.js`, `scripts/pull-supabase.js`: Supabase CLI push and local history mirror scripts
 - `scripts/import-local-history.js`: uploads existing ignored `data/*.json` history into Supabase after schema creation
-- `.github/workflows/`: collector, five digest schedules, stock report, timing alert, pre-news signal, portfolio snapshot, recommendation evaluation, collector/price ops checks, and trade performance schedules. Collector ops runs at 12:05 and 23:50 KST to catch daytime collection gaps.
+- `.github/workflows/`: collector, five scheduled digest workflows, stock report, timing alert, pre-news signal, portfolio snapshot, recommendation evaluation, collector/price ops checks, and trade performance schedules. Collector ops runs at 12:05 and 23:50 KST to catch daytime collection gaps.
 - `docs/README.md`: docs index and folder roles
 - `docs/AGENT_HARNESS.md`: Codex/sub-agent long-running task contract, verification loop, and documentation cleanup rules
 - `docs/PROGRESS.md`: human-readable development progress and current operating context

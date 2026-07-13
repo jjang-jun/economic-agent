@@ -22,11 +22,17 @@ function saveTradeExecutions(trades) {
   fs.writeFileSync(LOG_FILE, JSON.stringify(trades, null, 2));
 }
 
-async function loadTradeExecutions() {
+async function loadTradeExecutionsWithStatus() {
   const local = loadLocalTradeExecutions();
   const persisted = await loadPersistedTradeExecutions();
   if (persisted.error || persisted.disabled || !persisted.rows) {
-    return local;
+    return {
+      trades: local,
+      dataAvailable: local.length > 0,
+      source: local.length > 0 ? 'local_fallback' : 'unavailable',
+      persistenceAvailable: false,
+      error: persisted.error?.message || (persisted.disabled ? 'persistence disabled' : 'persistence unavailable'),
+    };
   }
 
   const byId = new Map(local.filter(trade => trade.id).map(trade => [trade.id, trade]));
@@ -35,7 +41,18 @@ async function loadTradeExecutions() {
   }
   const merged = [...byId.values()].sort((a, b) => new Date(a.executedAt) - new Date(b.executedAt));
   saveTradeExecutions(merged);
-  return merged;
+  return {
+    trades: merged,
+    dataAvailable: true,
+    source: 'supabase',
+    persistenceAvailable: true,
+    error: '',
+  };
+}
+
+async function loadTradeExecutions() {
+  const result = await loadTradeExecutionsWithStatus();
+  return result.trades;
 }
 
 function normalizeSide(side) {
@@ -102,6 +119,7 @@ module.exports = {
   LOG_FILE,
   loadLocalTradeExecutions,
   loadTradeExecutions,
+  loadTradeExecutionsWithStatus,
   saveTradeExecutions,
   buildTradeExecution,
   recordTradeExecution,

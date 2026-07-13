@@ -280,20 +280,21 @@ Codex 작업 위임 원칙:
 - [x] Telegram 승인 흐름 smoke script와 정기 점검 workflow 추가
 
 ## 현재 가장 중요한 다음 작업
-1. 내일 DRAM ETF 30주 매도 체결 시 실제 체결가로 거래 기록, 포트폴리오/Actions secret 동기화, Action Report 검증을 진행한다. 사전 계획은 `trade:plan`으로 남겨 일일 행동 리포트에서 확인한다.
-2. 다음 scheduled Action Report 1회 성공 여부를 확인한다. 2026-05-10 수동 workflow_dispatch는 성공했다.
-3. 메타데이터가 있는 추천 평가 표본이 5건 이상 누적된 뒤 `npm run db:pull && npm run model:performance`로 Claude Sonnet 전환 효과를 평가한다. 2026-05-10 재확인 기준 평가 완료 6건은 모두 legacy/unknown 메타데이터다.
-4. 가격 provider의 `해외/글로벌 가격 API 보강 검토` 판단이 반복되는지 보되, Massive 같은 유료 API는 미국 주식 고품질 히스토리/실시간 필요성이 명확해질 때까지 보류한다.
-5. 핵심 workflow 실패 알림은 다음 실제 실패 시 private Telegram 도착 여부를 재확인한다.
-6. 월간 로컬 리서치 worker 결과가 실제 월간 리뷰 의사결정에 도움이 되는지 다음 리뷰에서 확인한다.
-7. 인증 `/dashboard`의 실제 사용 빈도를 보고 탭 분리와 상세 차트를 추가할지 결정한다.
+1. Supabase/PostgREST `PGRST002 schema cache` 503을 우선 해소한다. Dashboard의 Project Settings > Data API에서 삭제된 schema가 Exposed Schemas에 남아 있는지 확인해 제거하고, Project Status가 unhealthy면 DB 재시작/리소스 상태를 점검한다. 복구 후 `Telegram 승인 흐름 점검`을 수동 실행하고 `npm run db:pull`로 전체 페이지 미러를 새로 만든다.
+2. 이번 운영 안정성 변경을 원격 main과 Cloud Run에 반영한 뒤 `npm run deploy:freshness`, 다음 scheduled `Telegram 승인 흐름 점검`, `Price Provider Ops Report`, `Quality Gate` 성공 여부를 재확인한다.
+3. GitHub Actions의 `AI_PROVIDER=openai`, `AI_MODEL=gpt-5.6-terra`, `OPENAI_API_KEY`를 설정해 GPT-5.6을 단계적으로 활성화한다. 첫 다이제스트/종목 리포트에서 Structured Outputs 성공, 응답 모델, reasoning 토큰, 지연을 확인한다.
+4. 최신 미러 생성 후 `npm run model:performance`로 `stock-analysis-v2.2` + GPT-5.6 메타데이터가 붙은 추천 평가 표본이 5건 이상 쌓였는지 확인한다. 표본이 쌓이면 Terra low/medium과 필요 시 Sol의 품질·비용을 비교한다.
+5. `price_provider_attempts`에서 provider별 빈 응답률을 본다. Alpha Vantage/FMP/Tiingo가 계속 100% empty면 API key/endpoint/rate-limit 설정을 고치거나, 유효하지 않은 provider 호출을 줄여 Yahoo fallback 전에 불필요한 지연과 로그 소음을 낮춘다.
+6. 실제 거래 기록과 추천 연결률을 주간 리뷰에서 확인한다. 추천을 보고도 실행하지 않은 후보의 성과가 반복적으로 좋으면 action report의 진입 타이밍/분할 매수 기준을 재조정한다.
+7. 월간 로컬 리서치 worker 결과가 실제 월간 리뷰 의사결정에 도움이 되는지 확인한다. 도움이 없으면 기본 비활성 유지, 도움이 있으면 리서치 대상 선정 기준을 보유/추천/워치리스트별로 분리한다.
+8. 인증 `/dashboard`의 실제 사용 빈도를 보고 탭 분리, 가격 provider 차트, 추천 성과 모델별 차트 추가 여부를 결정한다.
 
 ## 운영 루프
 
 실전 운용은 아래 순서를 기준으로 한다.
 
 ### 매일
-1. 개장 전/장중/장마감/미국장 다이제스트로 시장 상태 확인
+1. 개장 전/오전장/장마감/유럽장/미국장 정기 다이제스트로 시장 상태 확인
 2. 추천 후보 확인: `npm run recommendations:list`
 3. 일일 행동 후보 확인: `npm run action:report`
 4. 경제적 자유 상태 확인: `npm run freedom:report`

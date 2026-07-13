@@ -73,6 +73,7 @@ function isResolvedCollectorFailure(run = {}) {
 function summarizeCollectorOps(runs = [], alerts = [], options = {}) {
   const now = options.now ? new Date(options.now).getTime() : Date.now();
   const expectedRuns = options.expectedRuns !== false;
+  const dataAvailable = options.dataAvailable !== false;
   const recentAlertFailureMs = (options.recentAlertFailureHours ?? 24) * 60 * 60 * 1000;
   const staleSuccessMinutes = options.staleSuccessMinutes ?? Number(process.env.COLLECTOR_STALE_SUCCESS_MINUTES || 45);
   const completed = runs.filter(run => run.status !== 'running');
@@ -98,15 +99,17 @@ function summarizeCollectorOps(runs = [], alerts = [], options = {}) {
   const minutesSinceLastSuccess = lastSuccessAt
     ? Math.floor((now - new Date(lastSuccessAt).getTime()) / 60000)
     : null;
-  const staleSuccess = expectedRuns
+  const staleSuccess = dataAvailable && expectedRuns
     && (lastSuccessAt === null || (minutesSinceLastSuccess !== null && minutesSinceLastSuccess > staleSuccessMinutes));
 
-  const healthLabel = runs.length === 0
+  const healthLabel = !dataAvailable
+    ? 'unavailable'
+    : (runs.length === 0
     ? (expectedRuns ? 'empty' : 'idle')
     : (staleSuccess ? 'stale'
     : (actionableFailures.length > 0
       ? (success.length > actionableFailures.length ? 'warn' : 'failed')
-      : 'ok'));
+      : 'ok')));
 
   return {
     totalRuns: runs.length,
@@ -155,6 +158,8 @@ function summarizeCollectorOps(runs = [], alerts = [], options = {}) {
       errorMessage: run.error_message || '',
     })),
     expectedRuns,
+    dataAvailable,
+    dataError: options.dataError || '',
     healthLabel,
   };
 }
@@ -167,6 +172,10 @@ function buildCollectorOpsAnomalies(summary = {}, options = {}) {
   const maxLookbackMinutes = options.maxLookbackMinutes ?? 90;
   const maxMinutesSinceLastSuccess = options.maxMinutesSinceLastSuccess ?? summary.staleSuccessMinutes ?? 45;
   const anomalies = [];
+
+  if (summary.dataAvailable === false) {
+    return ['수집 상태 저장소를 조회할 수 없습니다'];
+  }
 
   if ((summary.totalRuns || 0) === 0 && summary.expectedRuns !== false) {
     anomalies.push('최근 수집 실행 기록이 없습니다');
@@ -240,7 +249,18 @@ async function buildCollectorOpsSummary({ days = 7 } = {}) {
     }),
   ]);
 
-  return summarizeCollectorOps(runResult.rows || [], alertResult.rows || [], { expectedRuns });
+  const errors = [runResult.error, alertResult.error].filter(Boolean);
+  const dataAvailable = !runResult.disabled
+    && !alertResult.disabled
+    && !runResult.error
+    && !alertResult.error
+    && Array.isArray(runResult.rows)
+    && Array.isArray(alertResult.rows);
+  return summarizeCollectorOps(runResult.rows || [], alertResult.rows || [], {
+    expectedRuns,
+    dataAvailable,
+    dataError: errors.map(error => error.message).filter(Boolean).join(' / '),
+  });
 }
 
 module.exports = {

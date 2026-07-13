@@ -141,13 +141,15 @@ function summarizeProviderAttempts(attempts = []) {
     .map(([provider, count]) => {
       const providerRows = completed.filter(row => row.provider === provider);
       const providerFailures = providerRows.filter(row => row.status === 'failed').length;
+      const providerEmpty = providerRows.filter(row => row.status === 'empty').length;
       return {
         provider,
         count,
         success: providerRows.filter(row => row.status === 'success').length,
-        empty: providerRows.filter(row => row.status === 'empty').length,
+        empty: providerEmpty,
         failed: providerFailures,
         failureRatePct: count ? round((providerFailures / count) * 100) : null,
+        emptyRatePct: count ? round((providerEmpty / count) * 100) : null,
       };
     })
     .sort((a, b) => b.count - a.count || b.failed - a.failed)
@@ -205,6 +207,9 @@ function buildPriceSourceQualityAnomalies(summary = {}, options = {}) {
   for (const provider of attempts.byProvider || []) {
     if (provider.count >= minAttempts && typeof provider.failureRatePct === 'number' && provider.failureRatePct > maxFailureRatePct) {
       anomalies.push(`${provider.provider} 실패율 ${provider.failureRatePct}% (${provider.failed}/${provider.count})`);
+    }
+    if (provider.count >= minAttempts && typeof provider.emptyRatePct === 'number' && provider.emptyRatePct > maxEmptyRatePct) {
+      anomalies.push(`${provider.provider} 빈 응답률 ${provider.emptyRatePct}% (${provider.empty}/${provider.count})`);
     }
   }
   if (typeof summary.fallback?.domesticRatePct === 'number' && summary.fallback.domesticRatePct > maxFallbackRatePct) {

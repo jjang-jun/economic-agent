@@ -38,6 +38,16 @@ function parseArgs(argv = process.argv.slice(2), env = process.env) {
 }
 
 function formatSummary(summary, anomalies) {
+  if (summary.dataAvailable === false) {
+    return [
+      '⚠️ <b>수집기 운영 점검</b>',
+      '상태: 저장소 조회 실패',
+      '실제 수집기 중단으로 단정할 수 없습니다.',
+      summary.dataError ? `원인: ${summary.dataError}` : '',
+      '<b>조치</b>',
+      '▸ Supabase 상태를 복구한 뒤 수집 이력을 다시 확인하세요.',
+    ].filter(Boolean).join('\n');
+  }
   const alert = anomalies.length > 0 ? '⚠️' : '✅';
   const resolved = summary.resolvedFailureRuns ? ` · 정리된 과거 실패 ${summary.resolvedFailureRuns}` : '';
   const historicalAlerts = summary.alertEvents?.historicalFailedImmediate

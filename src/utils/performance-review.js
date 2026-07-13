@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
-const { loadRecommendations } = require('./recommendation-log');
-const { loadTradeExecutions } = require('./trade-log');
+const { loadRecommendationsWithStatus } = require('./recommendation-log');
+const { loadTradeExecutionsWithStatus } = require('./trade-log');
 const { getKSTDate } = require('./article-archive');
 const { loadPortfolio, enrichPortfolio, loadLatestPortfolioSnapshot } = require('./portfolio');
 const { buildFreedomStatus, saveFreedomStatus } = require('./freedom-engine');
@@ -35,7 +35,7 @@ function latestEvaluation(recommendation) {
   return entries[0] || null;
 }
 
-function summarizeRecommendations(recommendations) {
+function summarizeRecommendations(recommendations, options = {}) {
   const evaluated = recommendations
     .map(recommendation => ({ recommendation, latest: latestEvaluation(recommendation) }))
     .filter(item => item.latest);
@@ -46,6 +46,10 @@ function summarizeRecommendations(recommendations) {
   const avgAlpha = evaluated.filter(item => typeof item.latest.evaluation.alphaPct === 'number');
 
   return {
+    dataAvailable: options.dataAvailable !== false,
+    persistenceAvailable: options.persistenceAvailable !== false,
+    dataSource: options.dataSource || 'unknown',
+    dataError: options.dataError || '',
     total: recommendations.length,
     evaluated: evaluated.length,
     winRatePct: evaluated.length ? round((wins.length / evaluated.length) * 100) : null,
@@ -73,10 +77,14 @@ function countBy(items, getKey) {
   }, {});
 }
 
-function summarizeTrades(trades, recommendations) {
+function summarizeTrades(trades, recommendations, options = {}) {
   const recommendationIds = new Set(recommendations.map(item => item.id));
   const linked = trades.filter(trade => trade.recommendationId && recommendationIds.has(trade.recommendationId));
   return {
+    dataAvailable: options.dataAvailable !== false,
+    persistenceAvailable: options.persistenceAvailable !== false,
+    dataSource: options.dataSource || 'unknown',
+    dataError: options.dataError || '',
     total: trades.length,
     buy: trades.filter(trade => trade.side === 'buy').length,
     sell: trades.filter(trade => trade.side === 'sell').length,
@@ -93,14 +101,26 @@ function filterByWindow(items, dateKey, startDate) {
 async function buildPerformanceReview(period = 'weekly') {
   const days = period === 'monthly' ? 30 : 7;
   const startDate = daysAgo(days);
-  const [recommendations, trades] = await Promise.all([
-    loadRecommendations(),
-    loadTradeExecutions(),
+  const [recommendationResult, tradeResult] = await Promise.all([
+    loadRecommendationsWithStatus(),
+    loadTradeExecutionsWithStatus(),
   ]);
+  const recommendations = recommendationResult.recommendations;
+  const trades = tradeResult.trades;
   const periodRecommendations = filterByWindow(recommendations, 'date', startDate);
   const periodTrades = filterByWindow(trades, 'date', startDate);
-  const recommendationSummary = summarizeRecommendations(periodRecommendations);
-  const tradeSummary = summarizeTrades(periodTrades, periodRecommendations);
+  const recommendationSummary = summarizeRecommendations(periodRecommendations, {
+    dataAvailable: recommendationResult.dataAvailable,
+    persistenceAvailable: recommendationResult.persistenceAvailable,
+    dataSource: recommendationResult.source,
+    dataError: recommendationResult.error,
+  });
+  const tradeSummary = summarizeTrades(periodTrades, periodRecommendations, {
+    dataAvailable: tradeResult.dataAvailable,
+    persistenceAvailable: tradeResult.persistenceAvailable,
+    dataSource: tradeResult.source,
+    dataError: tradeResult.error,
+  });
   const performanceLab = buildPerformanceLab({
     recommendations: periodRecommendations,
     trades: periodTrades,
@@ -231,10 +251,14 @@ function buildImprovementActions({
 
 function buildNotes(recommendationSummary, tradeSummary, behaviorReview = {}, collectorOps = {}, priceSourceQuality = {}, backtestResearch = null) {
   const notes = [];
-  if (recommendationSummary.evaluated === 0) {
+  if (recommendationSummary.dataAvailable === false) {
+    notes.push('추천 데이터 저장소를 읽지 못했습니다. 추천 0건은 실제 성과가 아니라 조회 실패 상태입니다.');
+  } else if (recommendationSummary.evaluated === 0) {
     notes.push('평가 완료된 추천이 아직 부족합니다.');
   }
-  if (tradeSummary.total === 0) {
+  if (tradeSummary.dataAvailable === false) {
+    notes.push('실제 거래 저장소를 읽지 못했습니다. 거래 0건은 실제 미거래가 아니라 조회 실패 상태입니다.');
+  } else if (tradeSummary.total === 0) {
     notes.push('실제 거래 기록이 없어 추천과 실행 간 차이를 분석할 수 없습니다.');
   } else if (tradeSummary.linkedRatePct !== null && tradeSummary.linkedRatePct < 70) {
     notes.push('실제 거래 중 추천과 연결되지 않은 비중이 높습니다.');

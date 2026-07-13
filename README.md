@@ -207,6 +207,8 @@ npm run db:import-local
 sqlite3 data/economic-agent.db "select count(*) from articles;"
 ```
 
+`db:pull`은 Supabase REST 응답을 페이지 단위로 모두 내려받아 `data/supabase/*.json`과 SQLite 미러를 갱신합니다. 일시적인 PostgREST 408/429/5xx 오류는 `SUPABASE_RETRY_COUNT`, `SUPABASE_RETRY_DELAY_MS` 기준으로 재시도하며, 필요하면 `SUPABASE_PULL_PAGE_SIZE`로 페이지 크기를 조정할 수 있습니다.
+
 추천 리포트를 보고 실제로 매수/매도했다면 별도 거래 기록으로 남깁니다. 이 기록은 추천 성과와 실제 계좌 성과를 분리해서 검증하기 위한 데이터입니다.
 
 ```bash
@@ -304,6 +306,8 @@ npm run db:pull
 npm run model:performance
 ```
 
+2026-07-10 로컬 미러 기준 추천 11건 중 평가 완료는 8건이지만 전부 `legacy_prompt / unknown_provider:unknown_model`입니다. 전체 방향 수익률은 평균 +1.92%, 승률 62.5%였으나 모델별 성능으로 해석할 수는 없습니다. GPT-5.6 전환 이후 메타데이터가 있는 평가 표본이 최소 5건 쌓이면 이전 모델과 비교합니다.
+
 보유 종목의 현재가와 평가손익은 장 마감 리포트 생성 시 자동 계산되며, 필요하면 별도로 스냅샷을 만들 수 있습니다.
 
 ```bash
@@ -325,7 +329,7 @@ https://<cloud-run-url>/dashboard?token=<DASHBOARD_SECRET>
 
 이 화면은 경제적 자유 진행률, 포트폴리오 요약, 추천 평가, 수집기 상태, 최근 추천의 진입가/손절가를 빠르게 확인하는 운영 화면입니다.
 
-`db:push`에는 `SUPABASE_PROJECT_URL`과 `SUPABASE_DB_PASSWORD`가 필요합니다. 네트워크가 Supabase direct DB의 IPv6 연결을 지원하지 않으면 Supabase 대시보드의 pooler 연결 문자열을 `SUPABASE_DB_URL`로 넣어 우회합니다. 런타임 저장과 `db:pull`에는 `SUPABASE_PROJECT_URL`과 `SUPABASE_PUBLISHABLE_KEY`를 사용합니다.
+`db:push`에는 `SUPABASE_PROJECT_URL`과 `SUPABASE_DB_PASSWORD`가 필요합니다. 네트워크가 Supabase direct DB의 IPv6 연결을 지원하지 않으면 Supabase 대시보드의 pooler 연결 문자열을 `SUPABASE_DB_URL`로 넣어 우회합니다. 런타임 저장과 `db:pull`에는 `SUPABASE_PROJECT_URL`과 `SUPABASE_PUBLISHABLE_KEY` 또는 service role key를 사용합니다.
 
 ## 대화형 Agent 서버
 
@@ -388,14 +392,18 @@ cp .env.example .env
 
 ```env
 # AI 설정 (다이제스트 + 종목분석에 사용)
-AI_PROVIDER=anthropic          # anthropic | openai | groq | ollama | custom
-# AI_MODEL=                    # 모델 지정 (선택, 제공자별 기본값 있음)
+AI_PROVIDER=openai             # openai | anthropic | groq | ollama | custom
+AI_MODEL=gpt-5.6-terra         # 품질/비용 균형 기본값
+# AI_DIGEST_MODEL=gpt-5.6-terra
+# AI_STOCK_MODEL=gpt-5.6       # 최고 품질이 필요할 때 Sol alias 사용
+AI_DIGEST_REASONING_EFFORT=low
+AI_STOCK_REASONING_EFFORT=medium
 # AI_BASE_URL=                 # 커스텀 엔드포인트 (선택)
 # LOCAL_RESEARCH_WORKER_ENABLED=false # 월간 리뷰에서 로컬 Python 리서치 worker 사용 여부
 
 # 사용하는 제공자의 키만 설정
-ANTHROPIC_API_KEY=sk-ant-...
-# OPENAI_API_KEY=sk-...
+OPENAI_API_KEY=sk-...
+# ANTHROPIC_API_KEY=sk-ant-...
 # GROQ_API_KEY=gsk_...
 
 # Telegram (필수)
@@ -453,9 +461,11 @@ npm run db:pull
 |--------|--------|-----------|------|
 | **Groq** | `groq` | llama-3.3-70b-versatile | 무료 티어 |
 | **Ollama** | `ollama` | llama3 | 완전 무료 (로컬) |
-| **Anthropic** | `anthropic` | claude-sonnet-4-20250514 | 사용량 의존 |
-| **OpenAI** | `openai` | gpt-4o-mini | 사용량 의존 |
+| **OpenAI** | `openai` | gpt-5.6-terra (기본), gpt-5.6 (Sol) | 사용량 의존 |
+| **Anthropic** | `anthropic` | claude-sonnet-5 | 사용량 의존 |
 | **Custom** | `custom` | - | AI_BASE_URL 설정 |
+
+OpenAI는 GPT-5.6부터 Responses API와 Structured Outputs를 사용합니다. 다이제스트는 `low`, 종목 분석은 `medium` reasoning을 기본으로 하며 실제 응답 모델, 입력/출력/reasoning 토큰, 지연, 종료 상태를 `aiMetadata`에 기록합니다. `gpt-5.6-terra`는 비용과 분석 품질의 균형용이고, `gpt-5.6`은 최고 품질의 Sol alias입니다.
 
 AI 비용을 줄이기 위해 전체 히스토리를 매번 프롬프트에 넣지 않습니다. 다이제스트는 상위 기사 16건, 종목 리포트는 상위 기사 32건과 핵심 시장 스냅샷만 잘라 넣고, 장기 히스토리는 Supabase/SQLite에 저장해 필요할 때만 조회합니다.
 
@@ -562,7 +572,7 @@ FMP profile, 재무제표 요약, earnings calendar는 해외 종목 후보의 `
 
 포트폴리오에 미국 주식과 한국 주식이 섞여 있으면 USD 종목은 USD/KRW로 KRW 환산해 총자산을 계산합니다.
 
-사용한 가격은 Supabase `price_snapshots`에 `ticker`, `source`, `price_type`, `as_of`와 함께 저장합니다. provider 호출 시도는 `price_provider_attempts`에 저장하며, `npm run db:pull`은 두 테이블을 모두 로컬 미러로 가져옵니다. 추천 성과와 포트폴리오 스냅샷은 나중에 어떤 가격 소스를 기준으로 계산됐는지 추적할 수 있어야 합니다.
+사용한 가격은 Supabase `price_snapshots`에 `ticker`, `source`, `price_type`, `as_of`와 함께 저장합니다. provider 호출 시도는 `price_provider_attempts`에 저장하며, `npm run db:pull`은 두 테이블을 모두 로컬 미러로 가져옵니다. 가격 provider 운영 점검은 전체 실패율/빈 응답률뿐 아니라 provider별 빈 응답률도 표시해, 특정 유료/공식 provider가 계속 빈 응답만 내는지 분리해서 볼 수 있습니다. 추천 성과와 포트폴리오 스냅샷은 나중에 어떤 가격 소스를 기준으로 계산됐는지 추적할 수 있어야 합니다.
 
 한국투자증권 Open API를 쓰려면 아래 환경 변수를 설정합니다.
 
@@ -659,6 +669,7 @@ npm run freedom:report
 | 다이제스트 + 종목분석 (Groq) | **$0/월** |
 | 다이제스트 + 종목분석 (Claude Haiku) | **~$5.4/월** |
 | 다이제스트 + 종목분석 (Claude Sonnet, 현재 호출량 기준) | **대략 $6~25/월** |
+| 다이제스트 + 종목분석 (GPT-5.6 Terra) | 사용량 기반 (입력 $2.50 / 출력 $15.00 per 1M tokens) |
 | GitHub Actions (Public) | 무료 |
 | Telegram / BOK / FRED / DART API | 무료 |
 | Supabase | 무료 티어로 시작 가능 |
