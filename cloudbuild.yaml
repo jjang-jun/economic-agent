@@ -27,7 +27,7 @@ steps:
       - --platform=managed
       - --image=$_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
       - --update-env-vars=COMMIT_SHA=$COMMIT_SHA
-      - --labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID,gcb-trigger-id=$_TRIGGER_ID
+      - --labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID,gcb-trigger-name=$TRIGGER_NAME
       - --region=$_DEPLOY_REGION
       - --quiet
 
@@ -44,4 +44,3 @@ substitutions:
   _AR_REPOSITORY: cloud-run-source-deploy
   _DEPLOY_REGION: asia-northeast3
   _SERVICE_NAME: economic-agent
-  _TRIGGER_ID: 07bffe95-dc27-4128-bc60-a30e69c4b7ee
