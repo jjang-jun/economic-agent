@@ -138,6 +138,8 @@ src/
     └── daily-summary.js       # 일일 요약 저장
 ```
 
+Cloud Run 자동 배포는 루트의 `cloudbuild.yaml`을 사용합니다. 배포 이미지 태그, revision label, 런타임 `COMMIT_SHA`를 같은 Git 커밋으로 맞춰 `/version`과 배포 최신성 점검이 실제 실행 코드를 정확히 가리키게 합니다.
+
 ## Codex 작업 지침
 
 Codex에서 작업할 때는 저장소 루트의 `AGENTS.md`를 기준으로 프로젝트 구조, 실행 명령, 환경 변수, 변경 기록 규칙을 따릅니다.

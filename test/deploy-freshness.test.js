@@ -70,3 +70,14 @@ test('deploy freshness workflow notifies private Telegram on failure', () => {
   assert.match(workflow, /name: Notify private chat on failure/);
   assert.match(workflow, /npm run notify:workflow-failure -- "Deploy Freshness Check \(서버 배포 최신성 점검\)" "Check deployed server freshness"/);
 });
+
+test('Cloud Build deploys the image and refreshes COMMIT_SHA metadata together', () => {
+  const config = fs.readFileSync(
+    path.join(__dirname, '..', 'cloudbuild.yaml'),
+    'utf8',
+  );
+
+  assert.match(config, /--image=.*\$COMMIT_SHA/);
+  assert.match(config, /--update-env-vars=COMMIT_SHA=\$COMMIT_SHA/);
+  assert.match(config, /commit-sha=\$COMMIT_SHA/);
+});

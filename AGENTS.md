@@ -119,6 +119,7 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - `supabase/migrations/`: Postgres schema migrations for long-term history
 - `scripts/push-supabase.js`, `scripts/pull-supabase.js`: Supabase CLI push and local history mirror scripts
 - `scripts/import-local-history.js`: uploads existing ignored `data/*.json` history into Supabase after schema creation
+- `cloudbuild.yaml`: builds and deploys the Cloud Run service while keeping the image tag, revision label, and runtime `COMMIT_SHA` aligned
 - `.github/workflows/`: collector, five scheduled digest workflows, stock report, timing alert, pre-news signal, portfolio snapshot, recommendation evaluation, collector/price ops checks, and trade performance schedules. Collector ops runs at 12:05 and 23:50 KST to catch daytime collection gaps.
 - `docs/README.md`: docs index and folder roles
 - `docs/AGENT_HARNESS.md`: Codex/sub-agent long-running task contract, verification loop, and documentation cleanup rules

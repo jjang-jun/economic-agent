@@ -206,6 +206,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - GPT-5.6 모델 패밀리 전환 경로를 추가했다. OpenAI 기본은 비용/품질 균형형 `gpt-5.6-terra`이고, OpenAI 호출은 Responses API와 Structured Outputs를 사용한다. 다이제스트는 low, 종목 분석은 medium reasoning을 기본으로 하며 실제 응답 모델·토큰·지연·종료 상태를 `aiMetadata`에 기록한다. 다른 provider의 기존 API 경로는 유지한다.
 - 운영 추천 생성이 `claude-sonnet-4-20250514` 404를 성공 workflow로 숨기던 문제를 확인했다. AI provider 오류는 workflow 실패로 전파하고, OpenAI key 등록 전 Anthropic 안전망은 공식 현재 ID `claude-sonnet-5`를 사용한다. 주간 리뷰는 Supabase 조회 실패를 추천 0건이나 수집기 stale로 표시하지 않고 `데이터 조회 불가`로 구분한다.
 - GPT-5.6 프롬프트 계약을 보강했다. 다이제스트에도 외부 기사 prompt-injection 경계를 추가했고, 종목 분석은 근거가 부족할 때 억지로 3개 이상 추천하지 않고 빈 `stocks`를 허용한다. 종목 프롬프트는 `stock-analysis-v2.2`, 다이제스트는 `digest-v1.1`로 구분한다.
+- 2026-07-13 운영 AI canary에서 현재 안전망인 Anthropic `claude-sonnet-5`가 실제 응답 모델과 `end_turn`을 반환해 과거 404 모델 ID 장애가 해소됐음을 확인했다. GPT-5.6 실운영 비교는 GitHub Actions에 `OPENAI_API_KEY`가 등록된 뒤 시작한다.
 - 종목 분석 `related_news` 인덱스가 전체 기사 배열의 다른 기사 ID로 저장될 수 있던 문제를 수정했다. AI에 실제 제공한 선택 기사 배열에서 즉시 `related_article_ids`를 확정하고 추천 로그는 이 ID를 우선 사용한다.
 - 속보 정책을 실제 발송 이력 기준으로 강화했다. 로컬 미러의 과거 즉시 전송 164건은 모두 관련성 없는 DART 공시였고 새 정책을 재적용하면 164건 모두 다이제스트 대상이다. 앞으로 보유·명시적 critical 종목의 치명 공시와 시장 전체 긴급 사건만 즉시 허용하며 실행당 기본 상한은 1건, 일일 상한은 2건이다. 같은 금리 결정·서킷브레이커·동일 기업의 같은 치명 공시 후속 기사는 24시간 동안 한 사건으로 묶고 나머지는 정기 다이제스트로 이월한다.
 - Telegram 중요 알림 모드는 정기 다이제스트 5회와 하루 단위 리포트는 유지하고 실시간성 알림만 축소한다. 장전/장중 타이밍 알림은 리스크와 진입 타이밍을 모두 통과한 신규 후보만 하루 한 번 보낸다.
@@ -279,6 +280,8 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 포트폴리오 스냅샷 workflow 안정성을 보강했다. 스냅샷 파일 생성은 Supabase 원본 동기화 실패와 분리해 DB 장애 중에도 완료되도록 했고, `portfolio-snapshot.yml`과 `telegram-smoke-actions.yml`에는 Supabase 재시도 env를 명시했다. pending action 생성은 저장 실패를 성공처럼 반환하지 않고 즉시 오류로 돌려 Telegram 승인 smoke가 실제 persistence 상태를 검증하게 했다.
 - Cloud Run 서버는 2026-06-30 로그 기준 `/jobs/news-collector`에 200으로 응답했지만 DB 저장/조회가 503으로 실패하고 있었다. 로컬 서버 `/health`와 `/version`은 정상 확인했고, 배포 최신성 점검에서는 운영 서버 커밋 `7e09c08`이 로컬 HEAD `1a9952d`보다 오래된 상태로 확인됐다.
 - Cloud Run source deploy 업로드 범위를 명시하기 위해 `.gcloudignore`를 추가했다. `.env`, `data/`, `.cache/`, `node_modules/`, 로컬 포트폴리오 문서가 배포 소스 tarball에 들어가지 않도록 `.dockerignore`와 같은 기준으로 관리한다.
+- Cloud Run 자동 배포가 최신 이미지를 사용하면서도 `COMMIT_SHA` 환경변수만 과거 값으로 남겨 배포 최신성 점검이 실패하던 문제를 수정했다. 저장소 `cloudbuild.yaml`이 이미지 태그, revision label, 런타임 `COMMIT_SHA`를 같은 `$COMMIT_SHA`로 갱신하도록 하고 회귀 테스트를 추가했다.
+- 2026-07-13 Supabase REST 재점검에서도 `PGRST002` 503이 3회 재시도 후 계속됐고, pooler 직접 연결 dry-run도 인증 단계 시간 초과로 실패했다. 애플리케이션 코드 문제가 아니라 프로젝트 DB/Data API 상태 또는 DB 접속 자격 증명을 Supabase Dashboard에서 복구해야 하는 외부 장애로 분리했다.
 - Telegram 승인 smoke에 Supabase persistence preflight를 추가했다. DB/API 장애가 있으면 `/buy` assertion diff 대신 `Supabase persistence unavailable for Telegram smoke`로 초반에 실패해 코드 회귀와 외부 저장소 장애를 구분한다.
 - `npm audit` 경고로 다시 올라온 transitive `protobufjs <=7.6.2`, `tar <=7.5.15` moderate 취약점을 `overrides`와 lockfile 갱신으로 해소했다. 현재 `npm audit` 기준 0 vulnerabilities다.
 
