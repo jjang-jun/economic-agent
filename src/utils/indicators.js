@@ -22,9 +22,10 @@ async function fetchAllIndicators() {
       indicators.fedRate = fi.fed_funds_rate.value;
       console.log(`[지표] 미국 기준금리: ${fi.fed_funds_rate.value}%`);
     }
-    if (fi.cpi) {
-      indicators.cpi = fi.cpi.value;
-      console.log(`[지표] 미국 CPI: ${fi.cpi.value}`);
+    if (fi.cpi_yoy) {
+      indicators.cpiYoY = fi.cpi_yoy.value;
+      indicators.cpiDate = fi.cpi_yoy.date;
+      console.log(`[지표] 미국 CPI 전년동월비: ${fi.cpi_yoy.value}% (${fi.cpi_yoy.date})`);
     }
     if (fi.unemployment) {
       indicators.unemployment = fi.unemployment.value;

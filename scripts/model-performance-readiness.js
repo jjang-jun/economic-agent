@@ -5,10 +5,13 @@ const {
   aiModelKey,
   aiVersionKey,
   promptVersionKey,
+  isEligibleRecommendation,
+  evaluationAtHorizon,
 } = require('../src/utils/performance-lab');
 
 const DEFAULT_DATA_DIR = path.join(__dirname, '..', 'data', 'supabase');
-const DEFAULT_MIN_EVALUATED = 5;
+const DEFAULT_MIN_EVALUATED = 30;
+const DEFAULT_HORIZON_DAYS = 20;
 
 function readJson(file) {
   return JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -105,21 +108,30 @@ function buildModelPerformanceReadiness({
   recommendationRows = [],
   evaluationRows = [],
   minEvaluated = DEFAULT_MIN_EVALUATED,
+  horizonDays = DEFAULT_HORIZON_DAYS,
 } = {}) {
   const recommendations = attachLatestEvaluations(
     recommendationRows.map(recommendationFromRow),
     evaluationRows
   );
-  const lab = buildPerformanceLab({ recommendations, trades: [] });
-  const evaluated = recommendations.filter(item => Object.keys(item.evaluations || {}).length > 0);
+  const eligible = recommendations.filter(isEligibleRecommendation);
+  const lab = buildPerformanceLab({
+    recommendations,
+    trades: [],
+    primaryHorizonDays: horizonDays,
+    groupMinEvaluated: minEvaluated,
+  });
+  const evaluated = eligible.filter(item => evaluationAtHorizon(item, horizonDays));
 
   return {
     generatedAt: new Date().toISOString(),
     totalRecommendations: recommendations.length,
+    eligibleRecommendations: eligible.length,
     evaluatedRecommendations: lab.recommendationQuality.evaluated,
     minEvaluated,
+    horizonDays,
     missingMetadata: countMissingMetadata(evaluated),
-    metadataCoverage: metadataCoverage(recommendations),
+    metadataCoverage: metadataCoverage(eligible),
     modelLeaders: lab.leaders.aiModels.map(item => ({
       ...item,
       metadataMissing: isUnknownModelKey(item.key),
@@ -142,6 +154,7 @@ function formatReadiness(readiness) {
   const lines = [
     '모델/프롬프트 성과 판단 준비도',
     `추천 ${readiness.totalRecommendations}건 · 평가 완료 ${readiness.evaluatedRecommendations}건 · 기준 ${readiness.minEvaluated}건`,
+    `검증 계약 통과 추천: ${readiness.eligibleRecommendations ?? readiness.totalRecommendations}건 · 고정 ${readiness.horizonDays || 20}거래일 평가`,
     `메타데이터 누락 평가 추천: ${readiness.missingMetadata}건`,
     `메타데이터 보유 추천: ${readiness.metadataCoverage?.totalWithMetadata || 0}건 · 평가 대기 중 메타데이터 보유: ${readiness.metadataCoverage?.unevaluatedWithMetadata || 0}건`,
     '',
@@ -155,7 +168,7 @@ function formatReadiness(readiness) {
       ? readiness.promptLeaders.map(item => summaryLine(item, readiness.minEvaluated))
       : ['데이터 부족']),
     '',
-    '[프롬프트+모델별]',
+    '[프롬프트+모델 설정별]',
     ...(readiness.versionLeaders.length
       ? readiness.versionLeaders.map(item => summaryLine(item, readiness.minEvaluated))
       : ['데이터 부족']),

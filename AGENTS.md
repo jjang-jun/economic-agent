@@ -10,6 +10,7 @@
 ```
 RSS feeds
   + DART disclosures
+  + KOSPI/KOSDAQ intraday stress thresholds
   -> seen-articles duplicate filter
   -> keyword filter
   -> local scorer (keyword weights + FinBERT for English sentiment)
@@ -48,14 +49,17 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 
 ## Environment
 - Required for Telegram delivery: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`
-- AI digest/report provider: `AI_PROVIDER`, optional `AI_MODEL`, task overrides `AI_DIGEST_MODEL`/`AI_STOCK_MODEL`, `AI_DIGEST_REASONING_EFFORT`/`AI_STOCK_REASONING_EFFORT`, `AI_BASE_URL`, and provider key such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GROQ_API_KEY`, or generic fallback `AI_API_KEY`. The Anthropic fallback default is `claude-sonnet-5`.
+- AI digest/report provider: `AI_PROVIDER`, optional `AI_MODEL`, task overrides `AI_DIGEST_MODEL`/`AI_STOCK_MODEL`, `AI_DIGEST_REASONING_EFFORT`/`AI_STOCK_REASONING_EFFORT`, `AI_DIGEST_VERBOSITY`/`AI_STOCK_VERBOSITY`, Qwen/DeepSeek `AI_DIGEST_THINKING_MODE`/`AI_STOCK_THINKING_MODE`, optional `AI_TEMPERATURE`, privacy-safe `OPENAI_SAFETY_IDENTIFIER`, `AI_BASE_URL`, and provider key such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GROQ_API_KEY`, `DASHSCOPE_API_KEY`, `DEEPSEEK_API_KEY`, or generic fallback `AI_API_KEY`. The Anthropic fallback default is `claude-sonnet-5`.
 - Optional indicators/data: `BOK_API_KEY`, `FRED_API_KEY`, `DART_API_KEY`
 - Optional history store: `SUPABASE_PROJECT_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_DB_PASSWORD` or `SUPABASE_DB_URL` for schema pushes
 - Optional deploy freshness check: `AGENT_SERVER_URL` or `CLOUD_RUN_SERVICE_URL`, with `EXPECTED_DEPLOY_SHA` when running outside GitHub Actions
-- Optional Supabase transient retry tuning: `SUPABASE_RETRY_COUNT`, `SUPABASE_RETRY_DELAY_MS`
+- Optional Supabase resilience tuning: `SUPABASE_REQUEST_TIMEOUT_MS`, `SUPABASE_RETRY_COUNT`, `SUPABASE_RETRY_DELAY_MS`, `SUPABASE_RETRY_MAX_DELAY_MS`, `SUPABASE_CIRCUIT_BREAKER_MS`
+- Optional Telegram network timeout: `TELEGRAM_REQUEST_TIMEOUT_MS`
 - Optional private portfolio file: `PORTFOLIO_FILE`, defaulting to ignored `data/portfolio.json`
 - Optional private portfolio env for GitHub Actions: `PORTFOLIO_JSON_BASE64` or `PORTFOLIO_JSON`
 - Optional urgent-alert tuning: `MAX_URGENT_ALERTS_PER_RUN`, `MAX_URGENT_ALERTS_PER_DAY`, `URGENT_EVENT_DEDUP_HOURS`, `IMMEDIATE_ALERT_MIN_IMPORTANCE`, `IMMEDIATE_ALERT_MIN_URGENCY`
+- Optional market-stress tuning: `MARKET_STRESS_ALERTS_ENABLED`, `MARKET_STRESS_WARNING_PCT`, `MARKET_STRESS_SEVERE_PCT`, `MARKET_STRESS_CIRCUIT_BREAKER_PCT`
+- Optional evidence gates: `STRATEGY_MIN_EVALUATED`, `STRATEGY_MIN_LINKED_TRADES`; `EVALUATION_ALLOW_CURRENT_FALLBACK` should remain false in normal operation.
 - Optional local research worker: `LOCAL_RESEARCH_WORKER_ENABLED=true` enables the monthly review sidecar that calls `scripts/local-backtest-worker.py`; `LOCAL_RESEARCH_WORKER_PROVIDER` and `LOCAL_RESEARCH_MAX_TICKERS` tune provider and ticker count.
 - `.env` is private and must not be committed.
 
@@ -85,6 +89,8 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - `src/utils/ai-budget.js`: trims AI prompt inputs to control token use
 - `src/utils/urgent-alert-policy.js`: allows immediate alerts only for systemic events or fatal disclosures tied to holdings/`watchlist.criticalAlerts`
 - `src/utils/urgent-alert-state.js`: local fallback for 24-hour event deduplication and KST daily immediate-alert caps when shared persistence is unavailable
+- `src/utils/market-stress-monitor.js`: KST regular-session KOSPI/KOSDAQ -3/-5/-8% staged alerts, deduplicated locally and in Supabase
+- `src/utils/capital-flow-radar.js`: daily 19-ETF price/volume relative-strength proxy; never describe it as actual ETF creations/redemptions
 - `src/utils/article-archive.js`: daily scored article archive used by stock reports and later performance review
 - `src/utils/article-identity.js`: normalized article identity keys for duplicate suppression across RSS/DART, URLs, and titles
 - `src/utils/recommendation-log.js`: stores stock signals and evaluates returns against KOSPI benchmark when available
@@ -97,11 +103,12 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - `src/utils/trade-log.js`: stores actual manual trade executions in ignored local data and Supabase
 - `src/utils/decision-engine.js`: rule-based market regime, index trend scoring, and action guardrails
 - Market regime can include tags such as `OVERHEATED`, `CONCENTRATED_LEADERSHIP`, `SEMICONDUCTOR_LEADERSHIP`, `AI_SEMICONDUCTOR_CYCLE`, `GROWTH_CONCENTRATION`, and `MOMENTUM_ALLOWED`. Treat these as risk controls, not pure buy signals.
+- Macro overlays include `STAGFLATION_RISK`, `KOREA_TIGHTENING_RISK`, `EXPORT_CONCENTRATION`, `CHINA_DEMAND_RISK`, and `OIL_GEOPOLITICAL_TAIL_RISK`. They are derived from current indicators/news, not a permanently hardcoded market view.
 - Stock recommendations should be framed as expected-value trades. Prefer risk/reward, stop-loss width, invalidation, suggested amount, and account weight over plain buy/sell wording.
 - `action:report` should also surface strong domestic/global price movers from `watchlist.domesticMomentum` and `watchlist.globalMomentum` as `가격 모멘텀 관찰`, even when they are not fresh AI/news recommendations. Treat these as watch candidates unless risk/timing rules approve a proper recommendation.
 - For existing holdings, sharp price momentum should be routed to add/trim review rather than hidden because the ticker is already held. High-profit 급등 holdings should prioritize trailing stop and partial profit lock; smaller profitable holdings can become conditional add or pullback-wait candidates.
 - Recommended stocks can include `market_profile` with relative strength, volume ratio, and average turnover. Liquidity and relative strength filters should reduce tradeability, not just decorate the report.
-- Recent performance review learning can tighten recommendation rules through `performanceLearning`: repeated low risk/reward failures raise the effective minimum risk/reward, and drawdown/stop issues can require explicit stop and entry-timing approval.
+- Recent performance review learning can tighten recommendation rules only after the approved-candidate 20-trading-session cohort passes `strategyReadiness`. Before then, failures are reported but must not tune live rules.
 - `market_profile` also tracks 20d/60d highs and distance from the 20d high. For momentum candidates, being far below the 20d high should reduce tradeability.
 - `market_profile.entryTiming` tracks 5d/20d moving-average alignment, 20d moving-average distance/slope, breakout/pullback status, and should block chase entries even when AI text is bullish.
 - Recommendations should include `risk_review` before persistence. Treat blockers as a reason to mark a stock watch-only even when AI text sounds bullish.
@@ -143,7 +150,7 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 ## Working Rules
 - Prefer existing CommonJS style: `require`, `module.exports`, async functions, and small utility modules.
 - Keep changes focused. Avoid broad refactors unless the task needs them.
-- For simple, independent Codex subtasks that can be delegated, use a lightweight sub-agent model to reduce token/context cost: prefer `gpt-5.4-mini` for file lookup or narrow analysis, and `gpt-5.3-codex-spark` for simple code/test assistance. Keep complex design, risky edits, and final integration in the main session.
+- For simple, independent Codex subtasks that can be delegated, prefer `gpt-5.6-terra` with low reasoning for file lookup, narrow analysis, or simple code/test assistance. Keep complex design, risky edits, and final integration in the main session.
 - For long-running or multi-file agent work, follow `docs/AGENT_HARNESS.md`: define goal/scope/safety/verification/handoff, keep generated state inspectable, and run `npm run agent:harness-check` after changing the doc map.
 - When MCP resources are available, prefer them over ad-hoc scripts or web search for matching tasks: Supabase MCP for database/log context, GitHub MCP for Actions/PR/repository context, and Playwright MCP for dashboard/browser verification.
 - When changing behavior, update `README.md` if user-facing usage, architecture, schedules, or environment variables change.

@@ -36,6 +36,14 @@ function getCircuitBreakerMs() {
   return parseNonNegativeInt(process.env.SUPABASE_CIRCUIT_BREAKER_MS, 60_000);
 }
 
+function getRequestTimeoutMs() {
+  return parseNonNegativeInt(process.env.SUPABASE_REQUEST_TIMEOUT_MS, 10_000);
+}
+
+function getRetryMaxDelayMs() {
+  return parseNonNegativeInt(process.env.SUPABASE_RETRY_MAX_DELAY_MS, 5_000);
+}
+
 function getSupabaseCircuitError() {
   if (Date.now() >= supabaseCircuitOpenUntil) return null;
   const err = new Error(`Supabase persistence temporarily disabled: ${supabaseCircuitReason || 'recent transient failure'}`);
@@ -59,6 +67,7 @@ async function buildHttpError(res) {
   const err = new Error(summarizeHttpError(res.status, body, contentType));
   err.status = res.status;
   err.body = body;
+  err.retryAfterMs = parseRetryAfterMs(res.headers?.get?.('retry-after'));
   return err;
 }
 
@@ -67,26 +76,72 @@ function shouldRetrySupabaseError(err) {
   return err.status === 408 || err.status === 429 || err.status >= 500;
 }
 
+function parseRetryAfterMs(value, now = Date.now()) {
+  const raw = String(value || '').trim();
+  if (!raw) return 0;
+
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.round(seconds * 1000);
+  }
+
+  const date = Date.parse(raw);
+  if (!Number.isFinite(date)) return 0;
+  return Math.max(0, date - now);
+}
+
+function getRetryDelayMs(err, attempt, baseDelayMs) {
+  const retryAfterMs = parseNonNegativeInt(err?.retryAfterMs, 0);
+  const exponentialMs = baseDelayMs * (2 ** attempt);
+  const jitteredMs = exponentialMs > 0
+    ? Math.round(exponentialMs * (0.75 + (Math.random() * 0.5)))
+    : 0;
+  return Math.min(
+    getRetryMaxDelayMs(),
+    Math.max(retryAfterMs, jitteredMs),
+  );
+}
+
+function withRequestTimeout(options = {}) {
+  const timeoutMs = getRequestTimeoutMs();
+  if (timeoutMs <= 0) return options;
+
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  return {
+    ...options,
+    signal: options.signal
+      ? AbortSignal.any([options.signal, timeoutSignal])
+      : timeoutSignal,
+  };
+}
+
 async function fetchSupabaseWithRetry(url, options = {}) {
   const retries = parseNonNegativeInt(process.env.SUPABASE_RETRY_COUNT, 1);
   const baseDelayMs = parseNonNegativeInt(process.env.SUPABASE_RETRY_DELAY_MS, 300);
+  const timeoutMs = getRequestTimeoutMs();
   let lastError = null;
 
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     try {
-      const res = await fetch(url, options);
+      const res = await fetch(url, withRequestTimeout(options));
       if (res.ok) return res;
 
       const err = await buildHttpError(res);
       if (!shouldRetrySupabaseError(err) || attempt >= retries) throw err;
       lastError = err;
     } catch (err) {
+      if (err?.name === 'TimeoutError') {
+        const timeoutError = new Error(`Supabase request timed out after ${timeoutMs}ms`, { cause: err });
+        timeoutError.name = 'TimeoutError';
+        timeoutError.timeout = true;
+        err = timeoutError;
+      }
       if (!shouldRetrySupabaseError(err) || attempt >= retries) throw err;
       lastError = err;
     }
 
-    const delay = baseDelayMs * (2 ** attempt);
-    console.warn(`[DB] Supabase 일시 오류 재시도 ${attempt + 1}/${retries}: ${lastError.message}`);
+    const delay = getRetryDelayMs(lastError, attempt, baseDelayMs);
+    console.warn(`[DB] Supabase 일시 오류 재시도 ${attempt + 1}/${retries} (${delay}ms 후): ${lastError.message}`);
     if (delay > 0) await sleep(delay);
   }
 
@@ -918,4 +973,6 @@ module.exports = {
   loadRecentImmediateAlertEvents,
   summarizeHttpError,
   shouldRetrySupabaseError,
+  parseRetryAfterMs,
+  getRetryDelayMs,
 };

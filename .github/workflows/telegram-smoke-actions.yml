@@ -38,7 +38,7 @@ jobs:
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
           SUPABASE_RETRY_COUNT: ${{ github.event_name == 'schedule' && '1' || '5' }}
           SUPABASE_RETRY_DELAY_MS: 1000
-          TELEGRAM_SMOKE_ALLOW_TRANSIENT_SUPABASE: ${{ github.event_name == 'schedule' && 'true' || 'false' }}
+          SUPABASE_REQUEST_TIMEOUT_MS: 10000
 
       - name: Notify private chat on failure
         if: failure()
@@ -48,4 +48,5 @@ jobs:
           TELEGRAM_SECRET_CHAT_ID: ${{ secrets.TELEGRAM_SECRET_CHAT_ID }}
           TELEGRAM_PRIVATE_CHAT_ID: ${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_REQUEST_TIMEOUT_MS: 10000
           GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

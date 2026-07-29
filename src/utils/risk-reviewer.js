@@ -58,6 +58,18 @@ function reviewStock(stock, decision = {}) {
   if (marketTags.includes('CONCENTRATED_LEADERSHIP')) {
     warnings.push('대형주 쏠림: 주변 테마 추격 금지');
   }
+  if (marketTags.includes('STAGFLATION_RISK')) {
+    warnings.push('스태그플레이션 위험: 고밸류 종목은 더 높은 손익비와 작은 비중 필요');
+  }
+  if (marketTags.includes('KOREA_TIGHTENING_RISK')) {
+    warnings.push('한국 긴축 위험: 레버리지·부동산·내수 민감도 확인 필요');
+  }
+  if (marketTags.includes('EXPORT_CONCENTRATION')) {
+    warnings.push('수출 집중: 반도체 외 종목은 개별 주문·실적 근거 확인 필요');
+  }
+  if (marketTags.includes('CHINA_DEMAND_RISK')) {
+    warnings.push('중국 내수 위험: 부동산·건설·소비 노출을 첨단 제조 수요와 분리 평가');
+  }
   for (const action of learning.actions || []) {
     warnings.push(`성과학습: ${action}`);
   }

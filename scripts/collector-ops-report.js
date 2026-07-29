@@ -37,15 +37,34 @@ function parseArgs(argv = process.argv.slice(2), env = process.env) {
   return options;
 }
 
+function getSupabaseRestartUrl(env = process.env) {
+  const projectUrl = env.SUPABASE_PROJECT_URL || env.SUPABASE_URL;
+  if (!projectUrl) return '';
+  try {
+    const hostname = new URL(projectUrl).hostname;
+    const projectRef = hostname.endsWith('.supabase.co')
+      ? hostname.slice(0, -'.supabase.co'.length)
+      : '';
+    return projectRef
+      ? `https://supabase.com/dashboard/project/${projectRef}/settings/general#restart-project`
+      : '';
+  } catch (_) {
+    return '';
+  }
+}
+
 function formatSummary(summary, anomalies) {
   if (summary.dataAvailable === false) {
+    const restartUrl = getSupabaseRestartUrl();
     return [
       '⚠️ <b>수집기 운영 점검</b>',
       '상태: 저장소 조회 실패',
       '실제 수집기 중단으로 단정할 수 없습니다.',
       summary.dataError ? `원인: ${summary.dataError}` : '',
       '<b>조치</b>',
-      '▸ Supabase 상태를 복구한 뒤 수집 이력을 다시 확인하세요.',
+      '▸ Supabase Logs에서 localhost:5432 connection refused 여부를 확인하세요.',
+      restartUrl ? `▸ <a href="${restartUrl}">Supabase Project availability 열기</a>` : '',
+      '▸ Restart project 후 수집 이력을 다시 확인하세요.',
     ].filter(Boolean).join('\n');
   }
   const alert = anomalies.length > 0 ? '⚠️' : '✅';
@@ -87,7 +106,10 @@ async function main() {
     return;
   }
 
-  await sendTelegramMessage(formatSummary(summary, anomalies), { channel: 'private' });
+  await sendTelegramMessage(formatSummary(summary, anomalies), {
+    channel: 'private',
+    requireDelivery: true,
+  });
 }
 
 if (require.main === module) {
@@ -100,4 +122,5 @@ if (require.main === module) {
 module.exports = {
   parseArgs,
   formatSummary,
+  getSupabaseRestartUrl,
 };

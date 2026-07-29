@@ -12,12 +12,14 @@
 
 - **실시간 뉴스 수집** — Agent Server + Scheduler가 연합뉴스, 매일경제, 한국경제, Bloomberg RSS 피드와 DART 공시를 5분 주기로 수집
 - **보수적 속보 필터링** — 키워드/중요도 5점만으로 보내지 않고, 보유 종목(또는 `watchlist.criticalAlerts`)의 치명적 공시와 시장 전체 긴급 사건만 즉시 알림
+- **장중 시장 급락 감시** — KOSPI/KOSDAQ이 -3%, -5%, -8%를 하향 돌파하면 단계별 private Telegram 경보를 하루 한 번씩 전송
 - **FinBERT 감성 분석** — 영문 기사는 금융 특화 ML 모델로 호재/악재 판단 (로컬, 무료)
 - **감성 강도 표시** — 강한 호재/호재/약한 호재/중립/약한 악재/악재/강한 악재 7단계
 - **섹터 자동 분류** — 반도체, 에너지·원자재, 금융·통화, 부동산, 거시경제, 테크, 무역·지정학, 공시·기업이벤트
 - **DART 공시 수집** — 주요 공시를 뉴스와 함께 스코어링하여 기업 이벤트 반영
 - **프리마켓 스냅샷** — 개장 전/미국장 오픈 브리핑에 관심 지수·종목·원자재 가격 반영
 - **시장 레짐 추세 점수** — KOSPI/KOSDAQ/S&P/Nasdaq/반도체 5일·20일 흐름으로 RISK_ON/OFF 보강
+- **글로벌 ETF 자금이동 프록시** — 주식·지역·섹터·채권·금·달러 ETF 19개의 가격·거래량·상대강도로 위험선호/회피를 교차점검
 - **하루 5회 AI 다이제스트** — 시장 이벤트 시간대에 맞춘 뉴스 요약 브리핑
 - **장 마감 종목 분석** — AI 기반 섹터/종목 인사이트 리포트
 - **추천 성과 추적** — 종목 신호를 저장하고 1일/5일/20일 후 수익률 평가
@@ -33,6 +35,7 @@
 
 ```
 5분마다 ─ Agent Server 뉴스 수집 파이프라인 (무료)
+  KOSPI/KOSDAQ 장중 낙폭 확인 → -3%/-5%/-8% 단계별 중복 없는 시장 경보
   RSS 피드 (연합뉴스, 매경, 한경, Bloomberg) + DART 공시
       ↓
   1단계: 키워드 필터
@@ -49,9 +52,9 @@
   버퍼 기사 수집 → AI 요약 → Telegram 발송 성공 후 버퍼 비움
 
 하루 1회 ─ 종목 분석 (AI 1회/일)
-  일별 기사 아카이브 기반 당일 뉴스 종합 → AI 섹터/종목 분석 → Telegram 발송
+  일별 기사 + 글로벌 ETF 가격·거래량 자금이동 프록시 → AI 섹터/종목 분석 → Telegram 발송
       ↓
-  추천 로그 저장 → KOSPI 벤치마크 대비 1일/5일/20일 성과 평가
+  승인 후보만 추천 로그 저장 → 같은 거래일 KOSPI 종가 대비 1/5/20 거래일 성과 평가
 
 상시 ─ 히스토리 저장
   기사/요약/리포트/추천/성과/시장 스냅샷(5일/20일 추세 포함) → 로컬 JSON + Supabase 병행 저장
@@ -114,6 +117,7 @@ src/
 │   ├── disclosure-keywords.js # DART/공시 이벤트 키워드
 │   ├── interests.js           # 개인 관심사
 │   ├── watchlist.js           # 프리마켓/시장 스냅샷 관심 종목
+│   ├── capital-flow-etfs.js   # 글로벌 자금이동 프록시 ETF 바스켓
 │   ├── portfolio.js           # 포트폴리오/리스크 제약
 │   ├── price-source-policy.js # KIS/Naver/Yahoo 가격 소스 우선순위
 │   └── ai-budget.js           # AI 프롬프트 토큰 예산
@@ -130,6 +134,8 @@ src/
     ├── position-sizer.js      # 손실 허용액/현금/종목/섹터/레짐 기준 매수금액 계산
     ├── risk-reviewer.js       # 추천 전 리스크 관리자/factor 검토
     ├── market-snapshot.js     # 프리마켓/글로벌 가격 스냅샷
+    ├── market-stress-monitor.js # KOSPI/KOSDAQ 장중 단계별 급락 감시
+    ├── capital-flow-radar.js  # ETF 가격·거래량 기반 자금이동 프록시
     ├── decision-engine.js     # 시장 레짐/행동 가드레일
     ├── portfolio.js           # 로컬 포트폴리오 파일 로딩
     ├── persistence.js         # Supabase 히스토리 저장
@@ -209,7 +215,9 @@ npm run db:import-local
 sqlite3 data/economic-agent.db "select count(*) from articles;"
 ```
 
-`db:pull`은 Supabase REST 응답을 페이지 단위로 모두 내려받아 `data/supabase/*.json`과 SQLite 미러를 갱신합니다. 일시적인 PostgREST 408/429/5xx 오류는 `SUPABASE_RETRY_COUNT`, `SUPABASE_RETRY_DELAY_MS` 기준으로 재시도하며, 필요하면 `SUPABASE_PULL_PAGE_SIZE`로 페이지 크기를 조정할 수 있습니다.
+`db:pull`은 Supabase REST 응답을 페이지 단위로 모두 내려받아 `data/supabase/*.json`과 SQLite 미러를 갱신합니다. 공통 persistence는 `SUPABASE_REQUEST_TIMEOUT_MS` 안에 응답이 없으면 요청을 중단하고, PostgREST 408/429/5xx 오류는 `SUPABASE_RETRY_COUNT`, `SUPABASE_RETRY_DELAY_MS`, `SUPABASE_RETRY_MAX_DELAY_MS` 기준으로 제한된 재시도를 수행합니다. 429의 `Retry-After`를 우선하며, 반복 장애 중에는 circuit breaker가 후속 요청을 빠르게 건너뜁니다. `db:pull` 페이지 크기는 `SUPABASE_PULL_PAGE_SIZE`로 조정할 수 있습니다.
+
+Supabase 내부 로그가 `localhost:5432 connection refused`, `PGRST000/PGRST002`, Auth/REST health 503을 함께 보이면 SQL이나 Exposed Schemas보다 관리형 PostgreSQL 프로세스 장애를 먼저 의심합니다. 이때 `Settings → General → Project availability → Restart project`를 한 번 실행하고, 재발하거나 Compute and Disk의 `System` 사용량이 비정상적이면 지원 티켓으로 관리형 compute/disk 조사를 요청합니다. `collector:ops-report` 장애 메시지는 해당 프로젝트의 재시작 화면 링크를 포함합니다.
 
 추천 리포트를 보고 실제로 매수/매도했다면 별도 거래 기록으로 남깁니다. 이 기록은 추천 성과와 실제 계좌 성과를 분리해서 검증하기 위한 데이터입니다.
 
@@ -233,7 +241,9 @@ npm run security:audit
 
 주간/월간 성과 리뷰는 단순 점검 메모와 별도로 `다음 개선 액션`을 생성합니다. 실제 매수한 추천보다 놓친 추천의 성과가 좋았는지, 손익비 부족 실패가 반복되는지, 손절 기준 없는 bullish 추천이 있었는지, 수집기 공백이나 가격 provider 경고가 있었는지를 행동 항목으로 분리해 Telegram에 표시합니다.
 
-성과 리뷰의 일부 개선 액션은 다음 장마감 종목 추천에 직접 환류됩니다. 최근 `low_risk_reward` 실패나 손익비 미달 추천이 반복되면 최소 손익비가 일시 상향되고, 큰 낙폭/손절 문제나 손절 기준 누락이 반복되면 손절 기준과 진입 타이밍 승인을 통과하지 못한 후보는 `watch_only`로 내려갑니다.
+성과 리뷰의 일부 개선 액션은 다음 장마감 종목 추천에 직접 환류됩니다. 단, 리스크 승인을 받은 후보의 20거래일 평가가 기본 30건 쌓이고 AI 메타데이터 커버리지가 80% 이상일 때만 규칙을 자동 조정합니다. 그 전에는 `low_risk_reward` 같은 소수 실패가 있어도 최소 손익비를 바꾸지 않고 표본 부족으로 표시합니다.
+
+ETF 레이더의 `inflow_proxy`/`outflow_proxy`는 실제 ETF 순설정·순환매 금액이 아닙니다. 가격 5일·20일 상대강도와 20일 평균 대비 거래량으로 “어디가 강하고 약한지”를 추정하며, 실제 자금 유입은 발행주식수·AUM·creation/redemption 데이터가 확보된 경우에만 별도 수치로 해석해야 합니다.
 
 리뷰 명령을 운영 저장 없이 점검하려면 `--dry-run`을 붙입니다. `--noTelegram`은 Telegram 전송만 생략하고 로컬/Supabase 저장은 수행합니다.
 
@@ -301,7 +311,7 @@ suggested_buy_amount = min(position_by_risk, position_by_cap, available_cash)
 - 추천과 연결되지 않은 매수, 관찰/차단 후보 매수, 최소 손익비 미달 매수 경고
 - 손절 기준이나 근거 기사 없이 생성된 호재 후보 점검
 
-프롬프트/모델별 성과는 최소 표본이 쌓인 뒤 판단합니다. Supabase 미러를 최신화한 뒤 아래 명령으로 모델, 프롬프트, 프롬프트+모델 조합별 평가 건수와 평균 추천 수익률, 메타데이터 누락 여부를 확인합니다.
+프롬프트/모델별 성과는 최소 표본이 쌓인 뒤 판단합니다. Supabase 미러를 최신화한 뒤 아래 명령으로 모델, 프롬프트, 프롬프트+모델 설정(reasoning/verbosity) 조합별 평가 건수와 평균 추천 수익률, 메타데이터 누락 여부를 확인합니다.
 
 ```bash
 npm run db:pull
@@ -394,12 +404,17 @@ cp .env.example .env
 
 ```env
 # AI 설정 (다이제스트 + 종목분석에 사용)
-AI_PROVIDER=openai             # openai | anthropic | groq | ollama | custom
+AI_PROVIDER=openai             # openai | anthropic | groq | ollama | qwen | deepseek | custom
 AI_MODEL=gpt-5.6-terra         # 품질/비용 균형 기본값
 # AI_DIGEST_MODEL=gpt-5.6-terra
-# AI_STOCK_MODEL=gpt-5.6       # 최고 품질이 필요할 때 Sol alias 사용
+# AI_STOCK_MODEL=gpt-5.6-sol   # 최고 품질이 필요할 때 명시적 Sol 사용
 AI_DIGEST_REASONING_EFFORT=low
 AI_STOCK_REASONING_EFFORT=medium
+AI_DIGEST_VERBOSITY=low
+AI_STOCK_VERBOSITY=medium
+# AI_DIGEST_THINKING_MODE=disabled # Qwen/DeepSeek
+# AI_STOCK_THINKING_MODE=disabled
+# OPENAI_SAFETY_IDENTIFIER=privacy-safe-stable-hash
 # AI_BASE_URL=                 # 커스텀 엔드포인트 (선택)
 # LOCAL_RESEARCH_WORKER_ENABLED=false # 월간 리뷰에서 로컬 Python 리서치 worker 사용 여부
 
@@ -407,6 +422,8 @@ AI_STOCK_REASONING_EFFORT=medium
 OPENAI_API_KEY=sk-...
 # ANTHROPIC_API_KEY=sk-ant-...
 # GROQ_API_KEY=gsk_...
+# DASHSCOPE_API_KEY=...        # Qwen 국제 리전
+# DEEPSEEK_API_KEY=...
 
 # Telegram (필수)
 TELEGRAM_BOT_TOKEN=123456:ABC...
@@ -431,6 +448,14 @@ SUPABASE_DB_PASSWORD=...
 
 # 로컬 포트폴리오 파일 (선택, 커밋 금지)
 # PORTFOLIO_FILE=data/portfolio.json
+
+# 장중 시장 급락 경보 (선택)
+# MARKET_STRESS_ALERTS_ENABLED=true
+# MARKET_STRESS_WARNING_PCT=-3
+# MARKET_STRESS_SEVERE_PCT=-5
+# MARKET_STRESS_CIRCUIT_BREAKER_PCT=-8
+# STRATEGY_MIN_EVALUATED=30
+# STRATEGY_MIN_LINKED_TRADES=10
 ```
 
 ### 실행
@@ -463,11 +488,17 @@ npm run db:pull
 |--------|--------|-----------|------|
 | **Groq** | `groq` | llama-3.3-70b-versatile | 무료 티어 |
 | **Ollama** | `ollama` | llama3 | 완전 무료 (로컬) |
-| **OpenAI** | `openai` | gpt-5.6-terra (기본), gpt-5.6 (Sol) | 사용량 의존 |
+| **OpenAI** | `openai` | gpt-5.6-terra (기본), gpt-5.6-sol | 사용량 의존 |
 | **Anthropic** | `anthropic` | claude-sonnet-5 | 사용량 의존 |
+| **Qwen** | `qwen` | qwen3.7-flash | 저비용, 국제 리전 |
+| **DeepSeek** | `deepseek` | deepseek-v4-flash | 최저비용 우선 |
 | **Custom** | `custom` | - | AI_BASE_URL 설정 |
 
-OpenAI는 GPT-5.6부터 Responses API와 Structured Outputs를 사용합니다. 다이제스트는 `low`, 종목 분석은 `medium` reasoning을 기본으로 하며 실제 응답 모델, 입력/출력/reasoning 토큰, 지연, 종료 상태를 `aiMetadata`에 기록합니다. `gpt-5.6-terra`는 비용과 분석 품질의 균형용이고, `gpt-5.6`은 최고 품질의 Sol alias입니다.
+OpenAI는 GPT-5.6 Responses API와 Structured Outputs를 사용합니다. 다이제스트는 reasoning/verbosity `low`, 종목 분석은 `medium`을 기본으로 합니다. 실제 응답 모델, reasoning 설정, 입력/캐시 읽기/캐시 쓰기/출력/reasoning 토큰, 지연, 종료·미완료 사유를 `aiMetadata`에 기록해 비용과 품질을 비교할 수 있습니다. `gpt-5.6-terra`는 비용과 분석 품질의 균형용이고, 최고 품질이 필요하면 명시적 `gpt-5.6-sol`을 작업별 override로 사용합니다.
+
+개별 사용자가 모델과 상호작용하는 배포에서는 `OPENAI_SAFETY_IDENTIFIER`에 이메일·Telegram ID 원문이 아닌 안정적인 해시나 불투명 ID를 선택적으로 설정할 수 있습니다. 이 값은 OpenAI 요청에만 포함하며 로그나 `aiMetadata`에는 저장하지 않습니다.
+
+저비용 중국 모델은 `qwen`과 `deepseek`를 OpenAI 호환 Chat Completions 경로로 지원합니다. JSON 응답이 필요한 다이제스트/종목 분석에는 `response_format=json_object`를 보내고, `AI_*_THINKING_MODE`는 기본 `disabled`로 명시해 reasoning 출력 비용을 통제합니다. thinking 설정도 `aiMetadata`와 성과 그룹 키에 남습니다. 개인정보·정확한 계좌/포트폴리오 데이터까지 외부 모델에 보낼 때는 서비스 약관과 데이터 처리 리전을 먼저 확인하고, 운영 전 실제 한국어 기사 30~50건으로 숫자·고유명사·JSON 준수율·비용을 A/B 평가합니다.
 
 AI 비용을 줄이기 위해 전체 히스토리를 매번 프롬프트에 넣지 않습니다. 다이제스트는 상위 기사 16건, 종목 리포트는 상위 기사 32건과 핵심 시장 스냅샷만 잘라 넣고, 장기 히스토리는 Supabase/SQLite에 저장해 필요할 때만 조회합니다.
 
@@ -507,7 +538,7 @@ AI 비용을 줄이기 위해 전체 히스토리를 매번 프롬프트에 넣�
 | `trade-performance.yml` | 금요일 17:40 KST | 실제 거래 성과 평가 |
 | `performance-review-weekly.yml` | 금요일 18:10 KST | 주간 성과 리뷰 |
 | `performance-review-monthly.yml` | 매월 1일 18:20 KST | 월간 성과 리뷰 |
-| `telegram-smoke-actions.yml` | 평일 08:10 KST | Telegram 승인 버튼 흐름 점검 |
+| `telegram-smoke-actions.yml` | 평일 08:10 KST | Telegram 승인 버튼 흐름 점검. Supabase 장애를 성공으로 스킵하지 않고 workflow 실패로 표시 |
 | `collector-ops-report.yml` | 평일 12:05, 23:50 KST | 수집기 운영 상태 점검. 마지막 성공 시각이 오래되면 수집 공백으로 경고 |
 | `price-provider-ops-report.yml` | 평일 23:55 KST | 가격 provider 품질 점검. GitHub Actions가 크게 지연되면 새벽 텔레그램 전송은 건너뜀 |
 | `deploy-freshness.yml` | 평일 09:20 KST | 서버 `/version`의 배포 커밋과 GitHub 최신 커밋 비교 |

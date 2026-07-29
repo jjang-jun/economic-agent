@@ -41,7 +41,8 @@ async function main() {
     return;
   }
 
-  await sendPreNewsSignalReport(filtered);
+  const sent = await sendPreNewsSignalReport(filtered);
+  if (!sent) throw new Error('선행 신호 리포트 전송 실패');
   if (!options.noState) {
     savePreNewsSignalState(markPreNewsSignalsSent(filtered, state));
   }

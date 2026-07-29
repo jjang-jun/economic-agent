@@ -15,6 +15,8 @@ test('collector ops workflow notifies private Telegram on failure', () => {
   assert.match(workflow, /name: Build and send collector ops report/);
   assert.match(workflow, /name: Notify private chat on failure/);
   assert.match(workflow, /if: failure\(\)/);
+  assert.match(workflow, /SUPABASE_REQUEST_TIMEOUT_MS: 10000/);
+  assert.match(workflow, /TELEGRAM_REQUEST_TIMEOUT_MS: 10000/);
   assert.match(workflow, /npm run notify:workflow-failure -- "Collector Ops Report \(수집기 운영 점검\)" "Build and send collector ops report"/);
   assert.match(workflow, /GITHUB_RUN_URL:/);
 });

@@ -9,7 +9,7 @@ const PRICE_SOURCE_POLICY = {
   },
   eodOfficial: {
     domestic: ['krx-openapi', 'data-go-kr', 'kis-rest'],
-    global: ['tiingo-eod', 'alpha-vantage', 'fmp', 'yahoo-finance'],
+    global: ['fmp', 'yahoo-finance', 'tiingo-eod'],
   },
   backtest: {
     domestic: ['pykrx', 'finance-data-reader'],

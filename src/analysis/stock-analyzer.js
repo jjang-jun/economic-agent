@@ -6,9 +6,10 @@ const {
   formatStockReportArticle,
   formatMarketSnapshot,
 } = require('../utils/ai-budget');
+const { formatCapitalFlowRadar } = require('../utils/capital-flow-radar');
 const { buildReportContext } = require('../utils/report-context');
 
-const STOCK_ANALYSIS_PROMPT_VERSION = 'stock-analysis-v2.2';
+const STOCK_ANALYSIS_PROMPT_VERSION = 'stock-analysis-v2.3';
 const STOCK_ANALYSIS_RESPONSE_SCHEMA = {
   name: 'stock_analysis',
   schema: {
@@ -115,13 +116,18 @@ async function analyzeStocks(articles, indicators, options = {}) {
   const indicatorInfo = [];
   if (indicators.baseRate) indicatorInfo.push(`Korea base rate: ${indicators.baseRate}%`);
   if (indicators.fedRate) indicatorInfo.push(`US Fed rate: ${indicators.fedRate}%`);
-  if (indicators.cpi) indicatorInfo.push(`US CPI: ${indicators.cpi}`);
+  if (indicators.cpiYoY) {
+    indicatorInfo.push(`US CPI YoY: ${indicators.cpiYoY}%${indicators.cpiDate ? ` (${indicators.cpiDate})` : ''}`);
+  }
   if (indicators.unemployment) indicatorInfo.push(`US unemployment: ${indicators.unemployment}%`);
   if (indicators.marketSnapshot?.length > 0) {
     indicatorInfo.push('Market snapshot:');
     for (const line of formatMarketSnapshot(indicators.marketSnapshot, AI_BUDGET.stockReport.maxSnapshotItems)) {
       indicatorInfo.push(line);
     }
+  }
+  if (indicators.capitalFlowRadar?.items?.length > 0) {
+    indicatorInfo.push(...formatCapitalFlowRadar(indicators.capitalFlowRadar));
   }
   if (indicators.investorFlow?.latest) {
     const flow = indicators.investorFlow;
@@ -215,6 +221,11 @@ Rules:
 - Do not invent ticker codes
 - Avoid unconditional buy/sell wording; frame outputs as candidates gated by market regime and risk
 - Explicitly connect recommendations to current economic/market themes such as AI capex, semiconductor cycles, USD/KRW, rates, oil, and growth-stock concentration when relevant
+- Treat strong Korean export headlines as broad-market evidence only when non-semiconductor demand and employment also confirm; otherwise flag export concentration
+- When inflation stays elevated while labor or domestic demand weakens, apply a stagflation/higher-for-longer valuation haircut instead of assuming imminent rate cuts
+- Treat KRW weakness as a foreign-flow and volatility risk input, not automatically as an exporter buy signal
+- Separate China's high-tech/export strength from property and household-demand weakness; do not use one side as proof of the other
+- For oil/geopolitical shocks, state both the disruption trigger and the normalization condition that would invalidate the risk case
 - In a strong but overheated market, prefer trend-following candidates only when they have direct AI/semiconductor/infrastructure linkage, strong relative strength, sufficient liquidity, and foreign/institution support
 - Penalize vague theme stocks, weak relative-strength stocks, large one-day chase entries, and recommendations without an invalidation or stop-loss condition
 - For aggressive candidates, mention split-entry and the condition that would invalidate the setup

@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { summarizeCollectorOps, buildCollectorOpsAnomalies, isCollectorExpectedNow } = require('../src/utils/collector-ops');
-const { parseArgs, formatSummary } = require('../scripts/collector-ops-report');
+const { parseArgs, formatSummary, getSupabaseRestartUrl } = require('../scripts/collector-ops-report');
 
 test('summarizeCollectorOps reports run health and pending alerts', () => {
   const summary = summarizeCollectorOps([
@@ -229,4 +229,14 @@ test('collector ops message does not call an unavailable store a stopped collect
   assert.match(message, /실제 수집기 중단으로 단정할 수 없습니다/);
   assert.match(message, /503 schema cache unavailable/);
   assert.doesNotMatch(message, /마지막 성공: 없음/);
+});
+
+test('collector ops builds a direct Supabase restart URL', () => {
+  assert.equal(
+    getSupabaseRestartUrl({
+      SUPABASE_PROJECT_URL: 'https://fgywttjmnikkvcjscith.supabase.co',
+    }),
+    'https://supabase.com/dashboard/project/fgywttjmnikkvcjscith/settings/general#restart-project',
+  );
+  assert.equal(getSupabaseRestartUrl({ SUPABASE_PROJECT_URL: 'not-a-url' }), '');
 });

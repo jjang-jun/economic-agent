@@ -41,7 +41,10 @@ async function main() {
     runUrl: process.env.GITHUB_RUN_URL || githubRunUrl(),
   });
 
-  await sendTelegramMessage(message, { channel: 'private' });
+  await sendTelegramMessage(message, {
+    channel: 'private',
+    requireDelivery: true,
+  });
   console.log('[workflow-failure] private Telegram notification sent');
 }
 

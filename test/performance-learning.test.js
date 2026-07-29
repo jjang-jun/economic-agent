@@ -9,6 +9,7 @@ test('performance learning raises risk reward and blocks borderline candidates',
     id: '2026-05-27:weekly',
     period: 'weekly',
     performanceLab: {
+      strategyReadiness: { readyForRuleLearning: true },
       failureAnalysis: [
         { reason: 'low_risk_reward', count: 2 },
       ],
@@ -75,6 +76,7 @@ test('performance learning requires stop and entry timing after drawdown failure
   const learning = buildPerformanceLearningFromReview({
     id: '2026-05-27:weekly',
     performanceLab: {
+      strategyReadiness: { readyForRuleLearning: true },
       failureAnalysis: [
         { reason: 'large_drawdown', count: 1 },
       ],
@@ -112,4 +114,26 @@ test('performance learning requires stop and entry timing after drawdown failure
   assert.equal(review.approved, false);
   assert.ok(review.blockers.some(item => item.includes('learning_entry_timing')));
   assert.ok(review.blockers.some(item => item.includes('learning_stop_required')));
+});
+
+test('performance learning does not tune live rules from an insufficient cohort', () => {
+  const learning = buildPerformanceLearningFromReview({
+    id: '2026-07-29:monthly',
+    performanceLab: {
+      strategyReadiness: {
+        readyForRuleLearning: false,
+        evaluatedRecommendations: 1,
+        minEvaluated: 30,
+      },
+      failureAnalysis: [{ reason: 'low_risk_reward', count: 1 }],
+    },
+    behaviorReview: {
+      recommendationHygiene: { belowMinRiskReward: 1 },
+      tradeReview: {},
+    },
+  });
+
+  assert.equal(learning.readyForRuleLearning, false);
+  assert.equal(learning.rules.minRiskReward, 2);
+  assert.ok(learning.actions.some(item => item.includes('자동 조정을 보류')));
 });

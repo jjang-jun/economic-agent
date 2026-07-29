@@ -55,7 +55,8 @@ async function main() {
     return;
   }
 
-  await sendActionReport(report);
+  const sent = await sendActionReport(report);
+  if (!sent) throw new Error('행동 리포트 전송 실패');
 }
 
 if (require.main === module) {

@@ -10,6 +10,68 @@ function normalizeYahooSymbol(ticker) {
   return cleaned.toUpperCase();
 }
 
+function yahooChartRow(result, index, symbol) {
+  const quote = result.indicators?.quote?.[0] || {};
+  const adjusted = result.indicators?.adjclose?.[0]?.adjclose || [];
+  const timestamp = result.timestamp?.[index];
+  const close = quote.close?.[index];
+  if (!timestamp || typeof close !== 'number') return null;
+  return {
+    symbol,
+    ticker: symbol,
+    name: '',
+    price: adjusted[index] ?? close,
+    open: quote.open?.[index] ?? null,
+    high: quote.high?.[index] ?? null,
+    low: quote.low?.[index] ?? null,
+    close,
+    adjustedClose: adjusted[index] ?? null,
+    previousClose: null,
+    changePercent: null,
+    volume: quote.volume?.[index] ?? null,
+    currency: result.meta?.currency || '',
+    market: result.meta?.exchangeName || '',
+    exchange: result.meta?.exchangeName || '',
+    priceType: 'eod',
+    isRealtime: false,
+    isAdjusted: typeof adjusted[index] === 'number',
+    marketTime: new Date(timestamp * 1000).toISOString(),
+    source: 'yahoo-finance-eod',
+  };
+}
+
+async function fetchDailyOhlcv(ticker, from, to) {
+  const symbol = normalizeYahooSymbol(ticker);
+  if (!symbol) return [];
+  const fromDate = new Date(`${String(from || '').slice(0, 10)}T00:00:00Z`);
+  const toDate = new Date(`${String(to || '').slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) return [];
+  const period1 = Math.floor((fromDate.getTime() - 24 * 60 * 60 * 1000) / 1000);
+  const period2 = Math.floor((toDate.getTime() + 2 * 24 * 60 * 60 * 1000) / 1000);
+
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`
+      + `?period1=${period1}&period2=${period2}&interval=1d&events=history`;
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'economic-agent/2.0' },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const result = data.chart?.result?.[0];
+    if (!result) throw new Error(data.chart?.error?.description || 'no chart result');
+    return (result.timestamp || [])
+      .map((_, index) => yahooChartRow(result, index, symbol))
+      .filter(Boolean)
+      .filter(row => {
+        const date = new Date(row.marketTime).toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+        return date >= String(from).slice(0, 10) && date <= String(to).slice(0, 10);
+      });
+  } catch (err) {
+    console.warn(`[Yahoo] ${symbol} EOD 조회 실패: ${err.message}`);
+    return [];
+  }
+}
+
 async function fetchQuote(ticker) {
   const rawTicker = String(ticker || '').trim();
   const domesticTicker = normalizeNaverTicker(rawTicker);
@@ -202,6 +264,7 @@ async function fetchBenchmarkQuote() {
 
 module.exports = {
   fetchQuote,
+  fetchDailyOhlcv,
   fetchBenchmarkQuote,
   normalizeYahooSymbol,
   calculatePeriodReturn,

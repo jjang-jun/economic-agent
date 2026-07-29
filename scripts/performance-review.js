@@ -60,7 +60,8 @@ async function main() {
   if (noTelegram) {
     console.log('[성과리뷰] Telegram 전송 생략');
   } else {
-    await sendPerformanceReview(review);
+    const sent = await sendPerformanceReview(review);
+    if (!sent) throw new Error('성과 리뷰 전송 실패');
   }
 }
 

@@ -3,19 +3,31 @@ const BASE_URL = 'https://api.stlouisfed.org/fred';
 
 // 주요 시리즈
 const SERIES = {
-  fed_funds_rate: 'FEDFUNDS',   // 미국 기준금리
-  cpi: 'CPIAUCSL',              // 소비자물가지수
-  unemployment: 'UNRATE',       // 실업률
+  fed_funds_rate: { id: 'FEDFUNDS' },             // 미국 기준금리
+  cpi_yoy: { id: 'CPIAUCSL', units: 'pc1' },      // 소비자물가 전년동월비
+  unemployment: { id: 'UNRATE' },                 // 실업률
 };
 
-async function fetchFredSeries(seriesId) {
+function buildFredUrl(seriesId, apiKey, options = {}) {
+  const params = new URLSearchParams({
+    series_id: seriesId,
+    api_key: apiKey,
+    file_type: 'json',
+    sort_order: 'desc',
+    limit: '1',
+  });
+  if (options.units) params.set('units', options.units);
+  return `${BASE_URL}/series/observations?${params}`;
+}
+
+async function fetchFredSeries(seriesId, options = {}) {
   if (!FRED_API_KEY) {
     console.warn('[FRED] API 키가 설정되지 않았습니다.');
     return null;
   }
 
   try {
-    const url = `${BASE_URL}/series/observations?series_id=${seriesId}&api_key=${FRED_API_KEY}&file_type=json&sort_order=desc&limit=1`;
+    const url = buildFredUrl(seriesId, FRED_API_KEY, options);
 
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -27,6 +39,7 @@ async function fetchFredSeries(seriesId) {
         seriesId,
         value: obs.value,
         date: obs.date,
+        units: options.units || 'lin',
       };
     }
   } catch (err) {
@@ -38,9 +51,12 @@ async function fetchFredSeries(seriesId) {
 
 async function fetchKeyIndicators() {
   const entries = await Promise.all(
-    Object.entries(SERIES).map(async ([key, seriesId]) => [key, await fetchFredSeries(seriesId)])
+    Object.entries(SERIES).map(async ([key, config]) => [
+      key,
+      await fetchFredSeries(config.id, config),
+    ])
   );
   return Object.fromEntries(entries);
 }
 
-module.exports = { fetchFredSeries, fetchKeyIndicators };
+module.exports = { SERIES, buildFredUrl, fetchFredSeries, fetchKeyIndicators };

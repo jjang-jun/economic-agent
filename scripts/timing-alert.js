@@ -106,7 +106,8 @@ async function main() {
     return;
   }
 
-  await sendTimingAlertReport(filteredReport);
+  const sent = await sendTimingAlertReport(filteredReport);
+  if (!sent) throw new Error('타이밍 알림 전송 실패');
   if (!options.noState) {
     saveTimingAlertState(markTimingAlertsSent(filteredReport, state));
   }

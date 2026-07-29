@@ -9,6 +9,7 @@ const { fetchAlphaVantageQuote } = require('./alpha-vantage-api');
 const { fetchTiingoQuote } = require('./tiingo-api');
 const {
   fetchQuote: fetchYahooQuote,
+  fetchDailyOhlcv: fetchYahooDailyOhlcv,
   fetchBenchmarkQuote: fetchYahooBenchmarkQuote,
   normalizeYahooSymbol,
 } = require('./yahoo-finance');
@@ -205,8 +206,7 @@ async function fetchGlobalDailyOhlcv(ticker, from, to) {
           return quote ? [{ ...quote, priceType: 'eod', isRealtime: false }] : [];
         }
         if (source === 'yahoo-finance') {
-          const quote = await fetchYahooQuote(ticker);
-          return quote ? [{ ...quote, priceType: 'eod', isRealtime: false }] : [];
+          return fetchYahooDailyOhlcv(ticker, from, to);
         }
         return [];
       },

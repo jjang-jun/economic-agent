@@ -93,7 +93,9 @@ async function generateDigest(articles, indicators, session, options = {}) {
   const indicatorInfo = [];
   if (indicators.baseRate) indicatorInfo.push(`Korea base rate: ${indicators.baseRate}%`);
   if (indicators.fedRate) indicatorInfo.push(`US Fed rate: ${indicators.fedRate}%`);
-  if (indicators.cpi) indicatorInfo.push(`US CPI: ${indicators.cpi}`);
+  if (indicators.cpiYoY) {
+    indicatorInfo.push(`US CPI YoY: ${indicators.cpiYoY}%${indicators.cpiDate ? ` (${indicators.cpiDate})` : ''}`);
+  }
   if (indicators.unemployment) indicatorInfo.push(`US unemployment: ${indicators.unemployment}%`);
   if (indicators.marketSnapshot?.length > 0) {
     indicatorInfo.push('Market snapshot:');

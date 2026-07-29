@@ -1,6 +1,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { classifyMarketRegime, detectMarketThemes, scoreMarketRegime } = require('../src/utils/decision-engine');
+const {
+  classifyMarketRegime,
+  detectMacroRiskOverlays,
+  detectMarketThemes,
+  scoreMarketRegime,
+} = require('../src/utils/decision-engine');
 
 test('classifyMarketRegime returns detailed risk-on regimes', () => {
   assert.equal(classifyMarketRegime({
@@ -113,4 +118,42 @@ test('scoreMarketRegime surfaces market themes as risk-control tags', () => {
   assert.ok(result.tags.includes('AI_SEMICONDUCTOR_CYCLE'));
   assert.ok(result.themes.some(theme => theme.id === 'AI_SEMICONDUCTOR_CYCLE'));
   assert.match(result.reasons.join(' '), /AI\/반도체 사이클/);
+});
+
+test('detectMacroRiskOverlays identifies current inflation, tightening, export concentration, and China demand risks', () => {
+  const result = detectMacroRiskOverlays({
+    articles: [
+      { title: '한국은행, 물가 압력에 추가 금리 인상 가능성 시사' },
+      { title: '반도체 수출 급증으로 무역수지 흑자 확대' },
+      { title: '중국 부동산 투자와 소매판매 둔화 지속' },
+      { title: '중동 분쟁으로 호르무즈 원유 공급 차질 우려' },
+    ],
+    indicators: {
+      cpiYoY: '3.5',
+      unemployment: '4.2',
+    },
+  });
+
+  assert.equal(result.scoreDelta, -2);
+  assert.ok(result.tags.includes('INFLATION_PRESSURE'));
+  assert.ok(result.tags.includes('STAGFLATION_RISK'));
+  assert.ok(result.tags.includes('KOREA_TIGHTENING_RISK'));
+  assert.ok(result.tags.includes('EXPORT_CONCENTRATION'));
+  assert.ok(result.tags.includes('CHINA_DEMAND_RISK'));
+  assert.ok(result.tags.includes('OIL_GEOPOLITICAL_TAIL_RISK'));
+  assert.match(result.warnings.join(' '), /전 업종의 수요 회복으로 확대해석 금지/);
+});
+
+test('stagflation overlay prevents an otherwise strong score from becoming broad risk-on', () => {
+  assert.equal(classifyMarketRegime({
+    score: 3,
+    tags: ['BROAD_RALLY', 'STAGFLATION_RISK'],
+    vixPrice: 16,
+  }), 'FRAGILE_RISK_ON');
+
+  assert.equal(classifyMarketRegime({
+    score: 2,
+    tags: ['STAGFLATION_RISK'],
+    vixPrice: 16,
+  }), 'FRAGILE_RISK_ON');
 });

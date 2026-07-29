@@ -8,7 +8,8 @@ async function main() {
   console.log(`[성과평가] 전체 추천 ${result.total}건, 신규 평가 ${result.completed.length}건`);
 
   if (result.completed.length > 0) {
-    await sendPerformanceReport(result.completed);
+    const sent = await sendPerformanceReport(result.completed);
+    if (!sent) throw new Error('추천 성과 리포트 전송 실패');
   }
 
   console.log(`[${new Date().toISOString()}] 추천 성과 평가 완료`);

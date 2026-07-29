@@ -44,8 +44,11 @@ jobs:
           AI_STOCK_MODEL: ${{ secrets.AI_STOCK_MODEL }}
           AI_REASONING_EFFORT: ${{ secrets.AI_REASONING_EFFORT }}
           AI_STOCK_REASONING_EFFORT: ${{ secrets.AI_STOCK_REASONING_EFFORT }}
+          AI_VERBOSITY: ${{ secrets.AI_VERBOSITY }}
+          AI_STOCK_VERBOSITY: ${{ secrets.AI_STOCK_VERBOSITY }}
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_SAFETY_IDENTIFIER: ${{ secrets.OPENAI_SAFETY_IDENTIFIER }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

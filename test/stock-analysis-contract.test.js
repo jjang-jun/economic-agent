@@ -7,8 +7,8 @@ const {
 } = require('../src/analysis/stock-analyzer');
 const { getRelatedArticleIds } = require('../src/utils/recommendation-log');
 
-test('stock analysis prompt version advances for GPT-5.6 contract changes', () => {
-  assert.equal(STOCK_ANALYSIS_PROMPT_VERSION, 'stock-analysis-v2.2');
+test('stock analysis prompt version advances for current macro risk rules', () => {
+  assert.equal(STOCK_ANALYSIS_PROMPT_VERSION, 'stock-analysis-v2.3');
 });
 
 test('stock analysis propagates provider failures so workflow cannot report false success', async () => {

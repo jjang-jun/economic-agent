@@ -12,7 +12,8 @@ async function main() {
   console.log(`[거래성과] 평가손익 ${formatKRW(report.totalPnl)} (${report.totalReturnPct ?? 0}%)`);
 
   if (report.totalTrades > 0) {
-    await sendTradePerformanceReport(report);
+    const sent = await sendTradePerformanceReport(report);
+    if (!sent) throw new Error('실제 매매 성과 리포트 전송 실패');
   }
 }
 

@@ -220,6 +220,9 @@ Codex 작업 위임 원칙:
 - [x] RISK_OFF 시 신규 매수 제한 자동 적용
 - [x] `STRONG_RISK_ON`, `FRAGILE_RISK_ON`, `PANIC` 세부 레짐 추가
 - [x] 레짐별 `maxEquityExposure`, `maxNewBuyRatio`, `minRiskReward` 정책 도입
+- [x] KOSPI/KOSDAQ -3%/-5%/-8% 장중 단계별 급락 경보와 일일 중복 억제
+- [x] 글로벌 ETF 19개 가격·거래량 자금이동 프록시를 레짐 교차확인에 연결
+- [ ] ETF 발행주식수/AUM 시계열을 확보한 뒤 실제 순설정·순환매와 가격 프록시를 분리 검증
 
 ## Phase 5: 추천 품질 개선
 - [x] AI 추천과 룰 기반 리스크 필터 분리
@@ -237,6 +240,9 @@ Codex 작업 위임 원칙:
 - [x] 모델별 승률 리포트
 - [x] 프롬프트 버전별 성과 비교
 - [x] 추천했지만 매수하지 않은 종목과 실제 매수 종목의 성과 차이 분석
+- [x] 추천 성과의 1/5/20일을 달력일이 아닌 거래 세션으로 평가
+- [x] 종목과 KOSPI 벤치마크를 동일 평가일 EOD로 비교
+- [x] 승인 후보 20거래일 평가 30건 전에는 성과 기반 규칙 자동 조정 금지
 
 ## Phase 6: 실전 운영
 - [x] 일일 행동 리포트: 신규 매수/관찰/보유/축소/매도 후보
@@ -280,10 +286,10 @@ Codex 작업 위임 원칙:
 - [x] Telegram 승인 흐름 smoke script와 정기 점검 workflow 추가
 
 ## 현재 가장 중요한 다음 작업
-1. Supabase/PostgREST `PGRST002 schema cache` 503을 우선 해소한다. Dashboard의 Project Settings > Data API에서 삭제된 schema가 Exposed Schemas에 남아 있는지 확인해 제거하고, Project Status가 unhealthy면 DB 재시작/리소스 상태를 점검한다. 복구 후 `Telegram 승인 흐름 점검`을 수동 실행하고 `npm run db:pull`로 전체 페이지 미러를 새로 만든다.
+1. 2026-07-29 `Restart project`로 복구한 Supabase가 안정적으로 유지되는지 확인한다. `PGRST000/PGRST002`와 내부 `localhost:5432 connection refused`가 같이 재발하면 SQL/Data API 설정을 바꾸지 말고, 비정상 `System` disk 사용량과 함께 티켓 `SU-419701`로 managed compute/disk 복구를 요청한다. 복구 후 `Telegram 승인 흐름 점검`과 `npm run db:pull`을 다시 실행한다.
 2. 이번 운영 안정성 변경을 원격 main과 Cloud Run에 반영한 뒤 `npm run deploy:freshness`, 다음 scheduled `Telegram 승인 흐름 점검`, `Price Provider Ops Report`, `Quality Gate` 성공 여부를 재확인한다.
-3. GitHub Actions의 `AI_PROVIDER=openai`, `AI_MODEL=gpt-5.6-terra`, `OPENAI_API_KEY`를 설정해 GPT-5.6을 단계적으로 활성화한다. 첫 다이제스트/종목 리포트에서 Structured Outputs 성공, 응답 모델, reasoning 토큰, 지연을 확인한다.
-4. 최신 미러 생성 후 `npm run model:performance`로 `stock-analysis-v2.2` + GPT-5.6 메타데이터가 붙은 추천 평가 표본이 5건 이상 쌓였는지 확인한다. 표본이 쌓이면 Terra low/medium과 필요 시 Sol의 품질·비용을 비교한다.
+3. Alibaba Cloud 국제 리전 키를 준비해 `AI_PROVIDER=qwen`, `AI_MODEL=qwen3.7-flash`, thinking disabled로 다이제스트 canary를 먼저 실행한다. 공개 뉴스만 넣은 DeepSeek V4 Flash를 최저비용 비교군으로 두고, 정확한 포트폴리오/거래 데이터는 데이터 처리 정책을 승인하기 전 제외한다.
+4. 최신 미러 생성 후 `npm run model:performance`로 `stock-analysis-v2.3`의 Qwen/DeepSeek/GPT-5.6 메타데이터를 수집한다. 운영 전환 판단은 승인 후보의 고정 20거래일 평가가 최소 30건 쌓인 뒤 하며, 한국어 고유명사·숫자·JSON 준수율·지연·실제 추천 성과가 확인되기 전에는 전체 workflow를 한 번에 전환하지 않는다.
 5. `price_provider_attempts`에서 provider별 빈 응답률을 본다. Alpha Vantage/FMP/Tiingo가 계속 100% empty면 API key/endpoint/rate-limit 설정을 고치거나, 유효하지 않은 provider 호출을 줄여 Yahoo fallback 전에 불필요한 지연과 로그 소음을 낮춘다.
 6. 실제 거래 기록과 추천 연결률을 주간 리뷰에서 확인한다. 추천을 보고도 실행하지 않은 후보의 성과가 반복적으로 좋으면 action report의 진입 타이밍/분할 매수 기준을 재조정한다.
 7. 월간 로컬 리서치 worker 결과가 실제 월간 리뷰 의사결정에 도움이 되는지 확인한다. 도움이 없으면 기본 비활성 유지, 도움이 있으면 리서치 대상 선정 기준을 보유/추천/워치리스트별로 분리한다.

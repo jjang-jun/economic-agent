@@ -19,16 +19,20 @@ test('buildPerformanceLab separates executed and missed recommendation quality',
       signal: 'bullish',
       conviction: 'high',
       aiMetadata: { promptVersion: 'stock-analysis-v2.1', provider: 'anthropic', model: 'claude-sonnet-4-5' },
-      riskProfile: { riskReward: 2.4 },
-      evaluations: { 1: { signalReturnPct: 5, alphaPct: 2, maxFavorableExcursionPct: 7, maxAdverseExcursionPct: -1, stopTouched: false, targetTouched: true } },
+      entry: { price: 100 },
+      riskReview: { approved: true, action: 'candidate' },
+      riskProfile: { riskReward: 2.4, expectedLossPct: 5 },
+      evaluations: { 20: { signalReturnPct: 5, alphaPct: 2, maxFavorableExcursionPct: 7, maxAdverseExcursionPct: -1, stopTouched: false, targetTouched: true } },
     },
     {
       id: 'r2',
       signal: 'bullish',
       conviction: 'low',
       aiMetadata: { promptVersion: 'stock-analysis-v2.0', provider: 'openai', model: 'gpt-4o-mini' },
-      riskProfile: { riskReward: 1.6 },
-      evaluations: { 1: { signalReturnPct: -3, alphaPct: -4, maxFavorableExcursionPct: 1, maxAdverseExcursionPct: -5, stopTouched: true, targetTouched: false } },
+      entry: { price: 100 },
+      riskReview: { approved: true, action: 'candidate' },
+      riskProfile: { riskReward: 1.6, expectedLossPct: 5 },
+      evaluations: { 20: { signalReturnPct: -3, alphaPct: -4, maxFavorableExcursionPct: 1, maxAdverseExcursionPct: -5, stopTouched: true, targetTouched: false } },
     },
   ];
   const trades = [{ id: 't1', side: 'buy', recommendationId: 'r1' }];
@@ -59,6 +63,29 @@ test('riskRewardBucket groups missing and low risk reward values', () => {
     'p1 / anthropic:claude'
   );
   assert.equal(aiModelKey({ aiMetadata: { provider: 'anthropic', model: 'claude' } }), 'anthropic:claude');
+  assert.equal(
+    aiVersionKey({
+      aiMetadata: {
+        promptVersion: 'p2',
+        provider: 'openai',
+        model: 'gpt-5.6-terra',
+        reasoningEffort: 'medium',
+        verbosity: 'medium',
+      },
+    }),
+    'p2 / openai:gpt-5.6-terra / reasoning=medium / verbosity=medium'
+  );
+  assert.equal(
+    aiVersionKey({
+      aiMetadata: {
+        promptVersion: 'p3',
+        provider: 'qwen',
+        model: 'qwen3.7-flash',
+        thinkingMode: 'disabled',
+      },
+    }),
+    'p3 / qwen:qwen3.7-flash / thinking=disabled'
+  );
   assert.equal(promptVersionKey({ aiMetadata: { promptVersion: 'p1' } }), 'p1');
   assert.equal(aiVersionKey({}), 'legacy_prompt / unknown_provider:unknown_model');
   assert.deepEqual(addSampleConfidence([{ key: 'a', evaluated: 5 }], 5)[0].sampleConfidence, 'enough');
@@ -73,9 +100,11 @@ test('buildPerformanceLab groups sector, risk factors, and failure reasons', () 
       conviction: 'high',
       signal: 'bullish',
       riskProfile: { riskReward: 2.4, expectedLossPct: 5 },
+      riskReview: { approved: true, action: 'candidate' },
+      entry: { price: 100 },
       marketProfile: { sector: 'semiconductor' },
       relatedNews: ['a1'],
-      evaluations: { 5: { signalReturnPct: 4, alphaPct: 1, stopTouched: false } },
+      evaluations: { 20: { signalReturnPct: 4, alphaPct: 1, stopTouched: false } },
     },
     {
       id: 'r2',
@@ -83,9 +112,11 @@ test('buildPerformanceLab groups sector, risk factors, and failure reasons', () 
       conviction: 'low',
       signal: 'bullish',
       riskProfile: { riskReward: 1.3, expectedLossPct: 8 },
+      riskReview: { approved: true, action: 'candidate' },
+      entry: { price: 100 },
       marketProfile: { sector: 'construction' },
       relatedNews: ['a2'],
-      evaluations: { 5: { signalReturnPct: -3, alphaPct: -2, stopTouched: false } },
+      evaluations: { 20: { signalReturnPct: -3, alphaPct: -2, stopTouched: false } },
     },
   ];
   const lab = buildPerformanceLab({ recommendations, trades: [] });

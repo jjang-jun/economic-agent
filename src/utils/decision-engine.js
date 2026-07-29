@@ -69,6 +69,78 @@ function countThemeMentions(articles = [], patterns = []) {
   }, 0);
 }
 
+function countCombinedMentions(articles = [], patternGroups = []) {
+  return articles.reduce((count, article) => {
+    const text = articleText(article);
+    return count + (patternGroups.every(group => group.some(pattern => pattern.test(text))) ? 1 : 0);
+  }, 0);
+}
+
+function detectMacroRiskOverlays({ articles = [], indicators = {} } = {}) {
+  const tags = [];
+  const reasons = [];
+  const warnings = [];
+  let scoreDelta = 0;
+
+  const cpiYoY = Number(indicators.cpiYoY);
+  const unemployment = Number(indicators.unemployment);
+  const hasElevatedInflation = Number.isFinite(cpiYoY) && cpiYoY >= 3;
+  const hasLaborCooling = Number.isFinite(unemployment) && unemployment >= 4.2;
+
+  if (hasElevatedInflation) {
+    tags.push('INFLATION_PRESSURE');
+    reasons.push(`미국 CPI 전년동월비 ${cpiYoY}%로 물가 압력 지속`);
+  }
+  if (hasElevatedInflation && hasLaborCooling) {
+    scoreDelta -= 1;
+    tags.push('STAGFLATION_RISK');
+    warnings.push(`미국 CPI ${cpiYoY}%와 실업률 ${unemployment}% 조합: 고금리 장기화와 성장 둔화를 함께 점검`);
+  }
+
+  const koreaTighteningMentions = countCombinedMentions(articles, [
+    [/한국은행|한은|금통위|Bank of Korea|BOK/i],
+    [/금리 인상|기준금리.*올|추가 인상|긴축|rate hike|further rate hikes/i],
+  ]);
+  if (koreaTighteningMentions > 0) {
+    tags.push('KOREA_TIGHTENING_RISK');
+    warnings.push('한국 통화긴축 뉴스 확인: 부동산·레버리지·내수·고밸류 성장주의 손익비 기준 상향');
+  }
+
+  const exportMentions = countThemeMentions(articles, [
+    /수출|무역수지|통관|exports?|trade surplus/i,
+  ]);
+  const semiconductorExportMentions = countCombinedMentions(articles, [
+    [/수출|exports?/i],
+    [/반도체|HBM|DRAM|메모리|semiconductor|chips?/i],
+  ]);
+  if (exportMentions > 0 && semiconductorExportMentions > 0) {
+    tags.push('EXPORT_CONCENTRATION');
+    warnings.push('수출 강세에 반도체 기여가 큼: 헤드라인 수출 증가를 국내 전 업종의 수요 회복으로 확대해석 금지');
+  }
+
+  const chinaDemandWeakness = countCombinedMentions(articles, [
+    [/중국|China/i],
+    [/부동산|주택 판매|내수|소매판매|고정자산투자|디플레이션|property|retail sales|domestic demand/i],
+    [/감소|하락|부진|위축|둔화|약세|declin|slump|weak|slow/i],
+  ]);
+  if (chinaDemandWeakness > 0) {
+    scoreDelta -= 1;
+    tags.push('CHINA_DEMAND_RISK');
+    warnings.push('중국 부동산·내수 약세: 중국 경기민감/건설/소재 노출은 첨단 제조·수출 강세와 분리 평가');
+  }
+
+  const oilGeopoliticalMentions = countCombinedMentions(articles, [
+    [/유가|원유|WTI|브렌트|호르무즈|oil|crude|Hormuz/i],
+    [/전쟁|분쟁|공급 차질|봉쇄|중동|이란|war|conflict|disruption|blockade|Middle East|Iran/i],
+  ]);
+  if (oilGeopoliticalMentions > 0) {
+    tags.push('OIL_GEOPOLITICAL_TAIL_RISK');
+    warnings.push('유가 지정학 꼬리위험: 운송 정상화 여부와 실제 유가 추세를 함께 확인');
+  }
+
+  return { scoreDelta, tags, reasons, warnings };
+}
+
 function detectMarketThemes({ articles = [], indicators = {} } = {}) {
   const snapshot = indicators.marketSnapshot || [];
   const semiconductorTrend = getTrendSignal(snapshot, ['SOXX', 'NVDA', 'AMD', 'MU', 'TSM']);
@@ -162,10 +234,17 @@ function scoreInvestorFlow(flow) {
 }
 
 function classifyMarketRegime({ score, tags = [], vixPrice = null }) {
+  const hasFragileOverlay = [
+    'OVERHEATED',
+    'CONCENTRATED_LEADERSHIP',
+    'STAGFLATION_RISK',
+    'KOREA_TIGHTENING_RISK',
+  ].some(tag => tags.includes(tag));
+
   if (score <= -4 || (typeof vixPrice === 'number' && vixPrice >= 35)) return 'PANIC';
   if (score <= -2) return 'RISK_OFF';
-  if (score >= 3 && tags.includes('BROAD_RALLY') && !tags.includes('OVERHEATED')) return 'STRONG_RISK_ON';
-  if (score >= 2 && (tags.includes('OVERHEATED') || tags.includes('CONCENTRATED_LEADERSHIP'))) return 'FRAGILE_RISK_ON';
+  if (score >= 3 && tags.includes('BROAD_RALLY') && !hasFragileOverlay) return 'STRONG_RISK_ON';
+  if (score >= 2 && hasFragileOverlay) return 'FRAGILE_RISK_ON';
   if (score >= 2) return 'RISK_ON';
   return 'NEUTRAL';
 }
@@ -314,6 +393,28 @@ function scoreMarketRegime({ articles, indicators }) {
   score += investorFlow.score;
   reasons.push(...investorFlow.reasons);
 
+  const capitalFlowRegime = indicators.capitalFlowRadar?.regime;
+  if (capitalFlowRegime?.hint === 'risk_off') {
+    score -= 1;
+    tags.push('GLOBAL_RISK_OFF_FLOW_PROXY');
+    warnings.push(
+      `ETF 가격·거래량 프록시 위험회피: 위험자산 약세 ${capitalFlowRegime.riskOutflows}개, `
+      + `방어자산 강세 ${capitalFlowRegime.defensiveInflows}개`
+    );
+  } else if (capitalFlowRegime?.hint === 'risk_on') {
+    score += 1;
+    tags.push('GLOBAL_RISK_ON_FLOW_PROXY');
+    reasons.push(
+      `ETF 가격·거래량 프록시 위험선호: 위험자산 강세 ${capitalFlowRegime.riskInflows}개`
+    );
+  }
+
+  const macroOverlays = detectMacroRiskOverlays({ articles, indicators });
+  score += macroOverlays.scoreDelta;
+  tags.push(...macroOverlays.tags);
+  reasons.push(...macroOverlays.reasons);
+  warnings.push(...macroOverlays.warnings);
+
   const themes = detectMarketThemes({ articles, indicators });
   for (const theme of themes) {
     if (theme.id === 'AI_SEMICONDUCTOR_CYCLE') {
@@ -414,6 +515,12 @@ function buildActions(market, portfolio) {
     tags.includes('DEMAND_SHOCK') ? '유가 급락 구간: 경기민감주 수요 둔화 가능성 확인' : '',
     tags.includes('COPPER_WEAKNESS') ? '구리 약세 구간: 경기민감/소재/산업재 비중 확대 보류' : '',
     tags.includes('SAFE_HAVEN_BID') ? '안전자산 선호 구간: 현금과 방어적 비중 우선' : '',
+    tags.includes('STAGFLATION_RISK') ? '물가와 성장 둔화가 겹치는 구간: 고밸류/장기 듀레이션 종목의 손익비 기준 상향' : '',
+    tags.includes('KOREA_TIGHTENING_RISK') ? '한국 긴축 구간: 부동산·레버리지·내수 민감주의 신규 비중 축소' : '',
+    tags.includes('EXPORT_CONCENTRATION') ? '수출 호조가 반도체에 집중될 수 있어 비반도체 종목은 개별 주문·실적 근거 필수' : '',
+    tags.includes('CHINA_DEMAND_RISK') ? '중국 내수/부동산 약세: 건설·소재·소비 노출은 첨단 제조 수요와 분리 검증' : '',
+    tags.includes('OIL_GEOPOLITICAL_TAIL_RISK') ? '호르무즈/중동 공급 차질과 운송 정상화 조건을 동시에 모니터링' : '',
+    tags.includes('GLOBAL_RISK_OFF_FLOW_PROXY') ? '글로벌 ETF 위험회피 프록시: 신규매수 규모를 줄이고 실제 순발행 데이터와 교차확인' : '',
     riskBudget.maxRisk1Pct ? `거래 1회 손실 허용액 ${formatKRW(riskBudget.maxRisk1Pct)}~${formatKRW(riskBudget.maxRisk2Pct)} 이내` : '',
     '손절선 없는 신규 매수 금지',
   ].filter(Boolean);
@@ -530,4 +637,5 @@ module.exports = {
   scoreInvestorFlow,
   getTrendSignal,
   detectMarketThemes,
+  detectMacroRiskOverlays,
 };

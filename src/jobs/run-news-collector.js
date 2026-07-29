@@ -38,6 +38,7 @@ const {
   MAX_URGENT_ALERTS_PER_DAY,
   URGENT_EVENT_DEDUP_HOURS,
 } = require('../utils/config');
+const { monitorMarketStress } = require('../utils/market-stress-monitor');
 
 const DEFAULT_LOOKBACK_MINUTES = Number(process.env.NEWS_COLLECTOR_LOOKBACK_MINUTES || 30);
 const MAX_LOOKBACK_MINUTES = Number(process.env.NEWS_COLLECTOR_MAX_LOOKBACK_MINUTES || 240);
@@ -176,6 +177,10 @@ async function runNewsCollector(options = {}) {
 
   try {
     console.log(`[${now.toISOString()}] 뉴스 수집 시작`);
+    const marketStress = await monitorMarketStress({ now });
+    if (marketStress.checked) {
+      console.log(`[시장급락감시] 지수 ${marketStress.quoteCount}개 확인 · 신규 경보 ${marketStress.sent}건`);
+    }
 
     const lastSuccessAt = await getLastSuccessfulCollectorRun(jobName);
     const lookbackMinutes = options.lookbackMinutes || calculateLookbackMinutes({ now, lastSuccessAt });

@@ -171,6 +171,16 @@ function addKstDays(date, days) {
   return start.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
 }
 
+function toKstDate(value) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+}
+
+function tradingWindowEnd(date, tradingDays) {
+  return addKstDays(date, Math.max(7, Math.ceil(tradingDays * 1.8) + 7));
+}
+
 function historyFromEodRows(rows = []) {
   return rows.map(row => ({
     date: row.marketTime || row.date || '',
@@ -179,6 +189,23 @@ function historyFromEodRows(rows = []) {
     low: row.low,
     volume: row.volume,
   })).filter(row => typeof row.close === 'number');
+}
+
+function selectTradingSessionRows(rows = [], recommendationDate, tradingDays) {
+  const byDate = new Map();
+  for (const row of rows) {
+    if (typeof row?.price !== 'number') continue;
+    const date = toKstDate(row.marketTime || row.date);
+    if (!date || date <= recommendationDate) continue;
+    byDate.set(date, row);
+  }
+  const sessions = [...byDate.entries()].sort(([a], [b]) => a.localeCompare(b));
+  const selected = sessions[tradingDays - 1];
+  if (!selected) return null;
+  return {
+    targetDate: selected[0],
+    rows: sessions.slice(0, tradingDays).map(([, row]) => row),
+  };
 }
 
 function buildEodEvaluationQuote(rows = [], requestedSymbol = '') {
@@ -199,39 +226,44 @@ function buildEodEvaluationQuote(rows = [], requestedSymbol = '') {
 }
 
 async function fetchEvaluationQuote(recommendation, day) {
-  const targetDate = addKstDays(recommendation.date, day);
+  const requestedEndDate = tradingWindowEnd(recommendation.date, day);
   const symbol = recommendation.symbol || recommendation.ticker;
+  let rows = [];
 
   if (isDomesticTicker(symbol)) {
-    const rows = await fetchDomesticDailyOhlcv(symbol, recommendation.date, targetDate);
-    const quote = buildEodEvaluationQuote(rows, symbol);
-    if (quote) {
-      return {
-        ...quote,
-        evaluationTargetDate: targetDate,
-        evaluationPriceMode: 'official_eod',
-      };
-    }
+    rows = await fetchDomesticDailyOhlcv(symbol, recommendation.date, requestedEndDate);
+  } else {
+    rows = await fetchGlobalDailyOhlcv(symbol, recommendation.date, requestedEndDate);
   }
 
-  const globalRows = await fetchGlobalDailyOhlcv(symbol, recommendation.date, targetDate);
-  const globalQuote = buildEodEvaluationQuote(globalRows, symbol);
-  if (globalQuote) {
+  const selected = selectTradingSessionRows(rows, recommendation.date, day);
+  const quote = selected ? buildEodEvaluationQuote(selected.rows, symbol) : null;
+  if (quote) {
     return {
-      ...globalQuote,
-      evaluationTargetDate: targetDate,
+      ...quote,
+      evaluationTargetDate: selected.targetDate,
       evaluationPriceMode: 'official_eod',
     };
   }
 
-  const quote = await fetchCurrentPrice(symbol);
-  return quote
-    ? {
-        ...quote,
-        evaluationTargetDate: targetDate,
-        evaluationPriceMode: 'current_fallback',
-      }
-    : null;
+  if (process.env.EVALUATION_ALLOW_CURRENT_FALLBACK !== 'true') return null;
+  const current = await fetchCurrentPrice(symbol);
+  return current ? {
+    ...current,
+    evaluationTargetDate: addKstDays(recommendation.date, day),
+    evaluationPriceMode: 'current_fallback',
+  } : null;
+}
+
+async function fetchHistoricalQuoteAtDate(symbol, fromDate, targetDate) {
+  const rows = isDomesticTicker(symbol)
+    ? await fetchDomesticDailyOhlcv(symbol, fromDate, targetDate)
+    : await fetchGlobalDailyOhlcv(symbol, fromDate, targetDate);
+  const eligible = rows
+    .filter(row => typeof row?.price === 'number')
+    .filter(row => toKstDate(row.marketTime || row.date) <= targetDate)
+    .sort((a, b) => new Date(a.marketTime || a.date || 0) - new Date(b.marketTime || b.date || 0));
+  return buildEodEvaluationQuote(eligible, symbol);
 }
 
 async function logRecommendations(report, context = {}) {
@@ -276,6 +308,12 @@ function daysSince(date) {
 }
 
 function calculateReturn(signal, entryPrice, currentPrice) {
+  if (signal !== 'bullish' && signal !== 'bearish') {
+    return {
+      returnPct: Number((((currentPrice - entryPrice) / entryPrice) * 100).toFixed(2)),
+      signalReturnPct: null,
+    };
+  }
   const returnPct = ((currentPrice - entryPrice) / entryPrice) * 100;
   const signalReturnPct = signal === 'bearish' ? -returnPct : returnPct;
   return {
@@ -338,7 +376,7 @@ function getEvaluationStats(recommendation, quote) {
 }
 
 function getResultLabel(evaluation) {
-  if (evaluation.stopTouched && evaluation.targetTouched) return 'target_and_stop_touched';
+  if (evaluation.stopTouched && evaluation.targetTouched) return 'stop_first_assumed';
   if (evaluation.stopTouched) return 'stop_touched';
   if (evaluation.targetTouched) return 'target_touched';
   if (typeof evaluation.alphaPct === 'number' && evaluation.alphaPct > 0) return 'beat_benchmark';
@@ -358,10 +396,6 @@ async function evaluateRecommendations() {
       day => ageDays >= day && !recommendation.evaluations[String(day)]
     );
     if (dueTargets.length === 0) continue;
-
-    const benchmarkQuote = recommendation.benchmark?.symbol
-      ? await fetchCurrentPrice(recommendation.benchmark.symbol)
-      : null;
 
     for (const day of dueTargets) {
       const quote = await fetchEvaluationQuote(recommendation, day);
@@ -384,7 +418,18 @@ async function evaluateRecommendations() {
         ...result,
         ...getEvaluationStats(recommendation, quote),
       };
-      if (recommendation.benchmark?.entryPrice && benchmarkQuote?.price) {
+      const benchmarkQuote = recommendation.benchmark?.symbol
+        ? await fetchHistoricalQuoteAtDate(
+            recommendation.benchmark.symbol,
+            recommendation.date,
+            recommendation.evaluations[String(day)].targetDate,
+          )
+        : null;
+      if (
+        typeof result.signalReturnPct === 'number'
+        && recommendation.benchmark?.entryPrice
+        && benchmarkQuote?.price
+      ) {
         const benchmarkReturnPct = calculateBenchmarkReturn(
           recommendation.benchmark.entryPrice,
           benchmarkQuote.price
@@ -427,9 +472,13 @@ module.exports = {
   calculateReturn,
   calculateBenchmarkReturn,
   addKstDays,
+  toKstDate,
+  tradingWindowEnd,
   historyFromEodRows,
+  selectTradingSessionRows,
   buildEodEvaluationQuote,
   fetchEvaluationQuote,
+  fetchHistoricalQuoteAtDate,
   getEvaluationStats,
   getResultLabel,
   getRelatedArticleIds,

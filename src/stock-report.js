@@ -10,6 +10,7 @@ const { saveDailySummary } = require('./utils/daily-summary');
 const { archiveScoredArticles, loadScoredArticles, getKSTDate } = require('./utils/article-archive');
 const { logRecommendations } = require('./utils/recommendation-log');
 const { fetchMarketSnapshot } = require('./utils/market-snapshot');
+const { fetchCapitalFlowRadar } = require('./utils/capital-flow-radar');
 const { buildDecisionContextWithQuotes, detectMarketThemes } = require('./utils/decision-engine');
 const { applyRecommendationRisk } = require('./utils/recommendation-risk');
 const { applyRecommendationMarketData } = require('./utils/recommendation-market');
@@ -49,7 +50,10 @@ async function main() {
   console.log(`[${new Date().toISOString()}] 장 마감 종목 분석 시작`);
 
   const indicators = await fetchAllIndicators();
-  indicators.marketSnapshot = await fetchMarketSnapshot('close');
+  [indicators.marketSnapshot, indicators.capitalFlowRadar] = await Promise.all([
+    fetchMarketSnapshot('close'),
+    fetchCapitalFlowRadar(),
+  ]);
   const [recentDailySummaries, recentStockReports] = await Promise.all([
     loadPersistedDailySummaries({ limit: 2 }),
     loadPersistedStockReports({ limit: 2 }),
@@ -57,6 +61,7 @@ async function main() {
   indicators.recentDailySummaries = recentDailySummaries.rows || [];
   indicators.recentStockReports = recentStockReports.rows || [];
   await persistMarketSnapshots(indicators.marketSnapshot, 'close');
+  await persistMarketSnapshots(indicators.capitalFlowRadar.items, 'capital_flow');
   await persistInvestorFlow(indicators.investorFlow);
 
   const persisted = await loadPersistedArticles({ date: getKSTDate(), minScore: 4, limit: 200 });
@@ -116,7 +121,10 @@ async function main() {
   await persistStockReport(report);
   await persistDecisionContext(report.decision);
 
-  await sendStockReport(report);
+  const sent = await sendStockReport(report);
+  if (!sent) {
+    throw new Error('종목 리포트 전송 실패: 추천 로그 생성을 중단합니다.');
+  }
   const logged = await logRecommendations(report, { articles: scored, indicators });
   console.log(`[추천로그] 신규 ${logged.added}건, 중복 ${logged.skipped}건`);
 

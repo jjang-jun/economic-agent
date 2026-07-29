@@ -36,7 +36,10 @@ async function main(options = parseArgs()) {
   const file = options.noSave ? null : saveFreedomStatus(status);
   if (!options.noPersist) await persistFinancialFreedomGoal(status);
 
-  if (options.telegram) await sendFreedomStatus(status);
+  if (options.telegram) {
+    const sent = await sendFreedomStatus(status);
+    if (!sent) throw new Error('경제적 자유 현황 전송 실패');
+  }
   else console.log(formatFreedomStatus(status));
 
   console.log(`[Freedom] 저장: ${file || 'skip'}`);

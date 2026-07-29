@@ -197,15 +197,19 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 다이제스트 입력 버퍼를 Supabase 우선으로 전환했다. `digest`는 `alert_events`의 `digest`/`catch_up` 대기 항목과 로컬 `article-buffer.json`을 병합해 요약하고, Telegram 전송 성공 후 Supabase 대기 이벤트를 `sent`로 갱신한다.
 - 추천 성과 분석을 고도화했다. `performance-lab`이 실패 원인을 `stop_touched`, `low_risk_reward`, `underperformed_benchmark`, `large_drawdown` 등으로 자동 분류하고, 섹터별/리스크 요인별 승률·평균 신호수익률을 주간/월간 성과 리뷰에 표시한다.
 - Telegram 승인 흐름 smoke를 추가했다. `npm run telegram:smoke-actions`는 `/buy`, `/sell`, `/cash` 초안을 생성한 뒤 모두 취소해 Supabase `pending_actions`와 callback 경로를 검증하며, 실제 거래/현금 변경은 수행하지 않는다. GitHub Actions `telegram-smoke-actions.yml`로 평일 08:10 KST에 정기 점검한다.
-- Telegram 승인 흐름 smoke의 외부 장애 소음을 줄였다. 2026-06-10부터 2026-07-13까지 정기 실행 24회가 Supabase/PostgREST `503 PGRST002 schema cache`로 연속 실패해 매일 아침 실패 알림을 만들었다. 정기 스케줄은 동일한 408/429/5xx 외부 장애를 GitHub warning으로 남기고 스킵하며, 수동 실행은 엄격하게 실패시켜 실제 복구 확인에 사용한다. 정기 실행의 재시도는 1회, 수동 실행은 5회다.
+- Telegram 승인 흐름 smoke의 외부 장애 분류를 보강했다. 2026-06-10부터 2026-07-13까지 정기 실행 24회가 Supabase/PostgREST `503 PGRST002 schema cache`로 연속 실패했다. 이후 일시 장애 스킵을 넣었으나 2주 장애까지 녹색 workflow로 숨긴 문제가 확인되어, 2026-07-29부터 정기/수동 실행 모두 persistence 불가를 실패로 표시한다.
 - 가격 provider 호출 시도 로그를 추가했다. `price_provider_attempts`에 provider/ticker/price_type/status/latency/error를 저장하고, 주간/월간 성과 리뷰의 가격 데이터 품질 섹션에서 provider 호출 수, 실패율, 빈 응답률을 함께 표시한다.
 - `db:pull`을 누적 데이터에 맞게 보강했다. Supabase REST 기본 1000건 한도에 걸리지 않도록 페이지 단위로 전체 테이블을 내려받고, PostgREST 408/429/5xx 일시 오류에는 retry/backoff를 적용한다.
 - 가격 provider 운영 점검을 provider별 빈 응답률까지 보강했다. 전체 empty 비율이 임계값 이하라도 Alpha Vantage/FMP/Tiingo처럼 특정 provider가 반복적으로 100% empty를 내면 이상치로 표시한다.
 - 다이제스트 전송 후 상태 추적을 운영 리포트에 보강했다. 주간/월간 성과 리뷰의 수집/알림 운영 섹션이 `digest`와 `catch_up` 각각의 전송완료/대기/실패 건수를 따로 보여주고, 상태 전환 실패가 있으면 이상치로 표시한다.
 - 추천 생성 AI 버전 추적을 추가했다. 종목 분석 리포트와 추천 로그에 `aiMetadata`를 저장하고, Supabase `recommendations`에 `ai_provider`, `ai_model`, `prompt_version`, `ai_metadata`를 별도 컬럼으로 남긴다. 주간/월간 성과 리뷰는 프롬프트/모델 조합별 승률과 평균 추천 수익률을 분리 표시한다.
 - GPT-5.6 모델 패밀리 전환 경로를 추가했다. OpenAI 기본은 비용/품질 균형형 `gpt-5.6-terra`이고, OpenAI 호출은 Responses API와 Structured Outputs를 사용한다. 다이제스트는 low, 종목 분석은 medium reasoning을 기본으로 하며 실제 응답 모델·토큰·지연·종료 상태를 `aiMetadata`에 기록한다. 다른 provider의 기존 API 경로는 유지한다.
+- 2026-07-29 GPT-5.6 기준선 마이그레이션을 보강했다. OpenAI 요청은 작업별 `text.verbosity`를 명시하고 reasoning/verbosity 값을 호출 전에 검증한다. 응답의 캐시 읽기·쓰기 토큰, reasoning context, 미완료 사유를 `aiMetadata`에 추가했으며, 성과 분석은 같은 모델이라도 reasoning/verbosity 설정이 다르면 별도 조합으로 집계한다. 선택적 `OPENAI_SAFETY_IDENTIFIER`는 요청에만 전달하고 기록하지 않는다.
 - 운영 추천 생성이 `claude-sonnet-4-20250514` 404를 성공 workflow로 숨기던 문제를 확인했다. AI provider 오류는 workflow 실패로 전파하고, OpenAI key 등록 전 Anthropic 안전망은 공식 현재 ID `claude-sonnet-5`를 사용한다. 주간 리뷰는 Supabase 조회 실패를 추천 0건이나 수집기 stale로 표시하지 않고 `데이터 조회 불가`로 구분한다.
-- GPT-5.6 프롬프트 계약을 보강했다. 다이제스트에도 외부 기사 prompt-injection 경계를 추가했고, 종목 분석은 근거가 부족할 때 억지로 3개 이상 추천하지 않고 빈 `stocks`를 허용한다. 종목 프롬프트는 `stock-analysis-v2.2`, 다이제스트는 `digest-v1.1`로 구분한다.
+- GPT-5.6 프롬프트 계약을 보강했다. 다이제스트에도 외부 기사 prompt-injection 경계를 추가했고, 종목 분석은 근거가 부족할 때 억지로 3개 이상 추천하지 않고 빈 `stocks`를 허용한다. 종목 프롬프트는 최신 거시 위험 규칙을 반영한 `stock-analysis-v2.3`, 다이제스트는 `digest-v1.1`로 구분한다.
+- 저비용 중국 모델 canary 경로를 추가했다. `AI_PROVIDER=qwen`은 Alibaba Cloud 국제 OpenAI 호환 endpoint와 `qwen3.7-flash`, `AI_PROVIDER=deepseek`은 `deepseek-v4-flash`를 사용한다. 두 provider는 JSON object 모드와 작업별 thinking on/off를 지원하며 기본은 비용 통제를 위해 `disabled`다. 실제 운영 provider와 비밀키는 자동 변경하지 않았다.
+- 2026-07-29 공식 지표를 기준으로 거시 레짐을 재검토했다. 한국은 Q2 GDP +0.6% QoQ, 6월 CPI 3.2%, 기준금리 2.75%와 추가 인상 편향, 강한 수출·반도체 집중이 동시에 나타났고 제조업/건설 고용은 감소했다. 미국은 6월 CPI 3.5%, 실업률 4.2%, 6월 신규고용 +57천명으로 물가와 고용 둔화가 겹쳤으며, 중국은 첨단 제조/무역과 부동산/내수의 양극화가 지속됐다. 이를 날짜별 상수로 고정하지 않고 현재 FRED 지표와 기사 조합에서 `STAGFLATION_RISK`, `KOREA_TIGHTENING_RISK`, `EXPORT_CONCENTRATION`, `CHINA_DEMAND_RISK`, `OIL_GEOPOLITICAL_TAIL_RISK`를 동적으로 생성하도록 했다.
+- FRED `CPIAUCSL` 원지수(예: 300대)를 물가상승률처럼 프롬프트에 전달하던 의미 오류를 수정했다. FRED의 `units=pc1`을 사용해 전년동월비를 가져오고 지표 날짜와 `%` 단위를 명시한다.
 - 2026-07-13 운영 AI canary에서 현재 안전망인 Anthropic `claude-sonnet-5`가 실제 응답 모델과 `end_turn`을 반환해 과거 404 모델 ID 장애가 해소됐음을 확인했다. GPT-5.6 실운영 비교는 GitHub Actions에 `OPENAI_API_KEY`가 등록된 뒤 시작한다.
 - 종목 분석 `related_news` 인덱스가 전체 기사 배열의 다른 기사 ID로 저장될 수 있던 문제를 수정했다. AI에 실제 제공한 선택 기사 배열에서 즉시 `related_article_ids`를 확정하고 추천 로그는 이 ID를 우선 사용한다.
 - 속보 정책을 실제 발송 이력 기준으로 강화했다. 로컬 미러의 과거 즉시 전송 164건은 모두 관련성 없는 DART 공시였고 새 정책을 재적용하면 164건 모두 다이제스트 대상이다. 앞으로 보유·명시적 critical 종목의 치명 공시와 시장 전체 긴급 사건만 즉시 허용하며 실행당 기본 상한은 1건, 일일 상한은 2건이다. 같은 금리 결정·서킷브레이커·동일 기업의 같은 치명 공시 후속 기사는 24시간 동안 한 사건으로 묶고 나머지는 정기 다이제스트로 이월한다.
@@ -282,15 +286,23 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - Cloud Run source deploy 업로드 범위를 명시하기 위해 `.gcloudignore`를 추가했다. `.env`, `data/`, `.cache/`, `node_modules/`, 로컬 포트폴리오 문서가 배포 소스 tarball에 들어가지 않도록 `.dockerignore`와 같은 기준으로 관리한다.
 - Cloud Run 자동 배포가 최신 이미지를 사용하면서도 `COMMIT_SHA` 환경변수만 과거 값으로 남겨 배포 최신성 점검이 실패하던 문제를 수정했다. 저장소 `cloudbuild.yaml`이 이미지 태그, revision label, 런타임 `COMMIT_SHA`를 같은 `$COMMIT_SHA`로 갱신하도록 하고 회귀 테스트를 추가했다.
 - 2026-07-13 Supabase REST 재점검에서도 `PGRST002` 503이 3회 재시도 후 계속됐고, pooler 직접 연결 dry-run도 인증 단계 시간 초과로 실패했다. 애플리케이션 코드 문제가 아니라 프로젝트 DB/Data API 상태 또는 DB 접속 자격 증명을 Supabase Dashboard에서 복구해야 하는 외부 장애로 분리했다.
+- 2026-07-29 Unified Logs에서 Auth migrator, PostgREST, PgBouncer가 모두 내부 `localhost (::1/127.0.0.1):5432 connection refused`를 반복하고 Postgres 로그는 0건인 상태를 확인했다. SQL/키/클라이언트 연결 문제가 아니라 관리형 PostgreSQL 프로세스가 기동하지 못한 장애다. Compute and Disk에는 2GB provisioned disk에 `System 7.75GB`, available 0, Database/WAL 0이라는 비정상 표시가 함께 있었으므로 관리형 system disk/compute 이상이 강하게 의심되지만, 최종 원인은 Supabase 지원팀의 인프라 확인이 필요하다. Dashboard의 `Restart project` 후 REST/Auth/Storage와 `articles`, `collector_runs`, `daily_summaries`, `stock_reports`, `recommendations` 실조회가 모두 200으로 복구됐다.
+- 같은 장애가 다시 장시간 숨지 않도록 공통 Supabase REST 요청에 기본 10초 timeout, 429 `Retry-After`, jitter가 있는 capped backoff를 추가했다. 정기 Telegram 승인 smoke는 더 이상 Supabase 408/429/5xx를 성공으로 스킵하지 않으며, 운영용 Telegram 알림은 자격정보 누락을 미리보기 성공으로 처리하지 않고 실패시킨다. Collector Ops 장애 메시지에는 프로젝트 재시작 화면과 `localhost:5432` 확인 절차를 포함한다.
 - Telegram 승인 smoke에 Supabase persistence preflight를 추가했다. DB/API 장애가 있으면 `/buy` assertion diff 대신 `Supabase persistence unavailable for Telegram smoke`로 초반에 실패해 코드 회귀와 외부 저장소 장애를 구분한다.
 - `npm audit` 경고로 다시 올라온 transitive `protobufjs <=7.6.2`, `tar <=7.5.15` moderate 취약점을 `overrides`와 lockfile 갱신으로 해소했다. 현재 `npm audit` 기준 0 vulnerabilities다.
+- 2026-07-29 목표 정렬 감사를 진행했다. Supabase 미러에는 기사 26,747건과 수집 실행 4,768건이 있지만 추천은 11건, 평가 가능 8건, 실제 거래 0건이고 추천/평가는 5월 이후 멈춰 있어 수집 기능보다 검증 가능한 의사결정 루프가 뒤처진 상태로 판단했다.
+- 추천 성과 계약을 수정했다. 1/5/20 평가는 달력일이 아니라 거래 세션을 사용하고, Yahoo chart historical EOD를 정식 fallback으로 추가했으며 KOSPI도 종목과 같은 평가일 종가로 비교한다. 정확한 EOD가 없을 때 현재가로 과거 평가를 만드는 fallback은 기본 비활성화했다. 중립 신호는 방향 성과에서 제외하고 당일에 손절·목표가가 모두 닿으면 `stop_first_assumed`로 보수 처리한다.
+- 성과 학습 표본을 엄격히 분리했다. `risk_review.approved=true`, `action=candidate`, 진입가·손익비·손절 기준이 있는 추천만 검증 코호트로 사용하며, 기본 20거래일 평가 30건과 AI 메타데이터 커버리지 80% 전에는 소수 실패로 운영 규칙을 자동 조정하지 않는다. 목표 기여 검증에는 추천과 연결한 실제 거래 10건도 별도로 요구한다.
+- 현재와 같은 시장 급락을 뉴스보다 먼저 감지하도록 5분 수집기에 KOSPI/KOSDAQ 장중 가격 감시를 추가했다. -3% 경계, -5% 위기, -8% KRX 1단계 서킷브레이커 가격 기준을 하루 단계별 한 번만 private Telegram으로 보내며, -8% 알림은 실제 1분 지속/거래소 발동 확인과 구분한다.
+- 장마감 분석에 글로벌 ETF 19개 자금이동 레이더를 추가했다. 미국·지역·섹터·회사채·국채·금·원유·달러의 5일/20일 가격과 거래량 배율을 비교해 위험선호/위험회피를 레짐에 반영하되, 실제 creation/redemption 순유입이 아닌 가격·거래량 프록시임을 데이터와 프롬프트에 명시한다.
+- 정기 Telegram 전송을 fail-closed로 바꿨다. 다이제스트, 종목/행동/타이밍/선행신호/성과/경제적 자유 리포트는 자격정보 누락을 미리보기 성공으로 간주하지 않으며, 장마감 종목 리포트 전송이 실패하면 추천 로그 생성을 중단한다.
 
 ## 다음 작업
 
 1. 이번 Supabase 장애 완화 변경을 원격 main과 Cloud Run에 반영한 뒤 `npm run deploy:freshness`와 다음 scheduled workflow 성공 여부를 재확인한다.
-2. Supabase `PGRST002`가 반복되면 Supabase 프로젝트 상태, PostgREST schema cache reload, 최근 migration 적용 여부를 별도로 점검한다.
+2. `PGRST000/PGRST002`와 내부 `localhost:5432 connection refused`가 함께 반복되면 SQL/schema 변경을 중단하고 Project availability에서 재시작을 한 번만 시도한다. Compute and Disk의 `System` 사용량이 다시 비정상이면 티켓 `SU-419701`에 로그와 디스크 화면을 첨부해 managed compute/disk 복구를 요청한다.
 3. 내일 DRAM ETF 30주 매도 체결 시 실제 체결가로 `trade:record`, `portfolio:sync-secret`, `action:report -- --no-telegram` 순서로 반영하고 수량 170주/비중 변화를 검증한다. 체결 전 계획은 `trade:plan`으로 남겨 행동 리포트에서 누락 여부를 확인한다.
-4. 메타데이터가 붙은 추천의 평가 완료 건이 5건 이상 쌓이면 `npm run db:pull && npm run model:performance`로 Claude Sonnet 전환 효과를 다시 평가한다.
+4. Qwen 메타데이터가 붙고 리스크 승인을 받은 추천의 20거래일 평가가 30건 이상 쌓이면 `npm run db:pull && npm run model:performance`로 모델 효과를 평가한다. 그 전에는 지연·JSON 준수율·비용만 canary 지표로 본다.
 5. 가격 provider의 `해외/글로벌 가격 API 보강 검토` 판단이 주간/월간 리뷰에서 반복되는지 모니터링하되, 최근 1일 점검은 정상이라 Massive 과금은 필요성이 명확해질 때까지 보류
 6. 다음 실제 workflow 실패 시 private 알림 도착 여부 재확인
 7. `/dashboard` 실제 사용 빈도에 따라 탭 분리와 상세 차트 추가 여부 결정

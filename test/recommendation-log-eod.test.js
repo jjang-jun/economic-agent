@@ -6,6 +6,7 @@ const {
   buildEodEvaluationQuote,
   shouldLogRecommendation,
   resolveRecommendationAiMetadata,
+  selectTradingSessionRows,
 } = require('../src/utils/recommendation-log');
 
 test('addKstDays returns KST calendar target date', () => {
@@ -45,6 +46,19 @@ test('buildEodEvaluationQuote uses latest EOD row with history', () => {
   assert.deepEqual(historyFromEodRows([quote]).map(row => row.close), [11000]);
   assert.equal(quote.history.length, 2);
   assert.equal(quote.history[0].high, 10300);
+});
+
+test('evaluation horizons use exchange sessions instead of calendar days', () => {
+  const selected = selectTradingSessionRows([
+    { price: 100, marketTime: '2026-05-07T06:30:00.000Z' },
+    { price: 101, marketTime: '2026-05-08T06:30:00.000Z' },
+    { price: 102, marketTime: '2026-05-11T06:30:00.000Z' },
+    { price: 103, marketTime: '2026-05-12T06:30:00.000Z' },
+  ], '2026-05-07', 2);
+
+  assert.equal(selected.targetDate, '2026-05-11');
+  assert.equal(selected.rows.length, 2);
+  assert.equal(selected.rows.at(-1).price, 102);
 });
 
 test('shouldLogRecommendation excludes watch-only risk review candidates', () => {

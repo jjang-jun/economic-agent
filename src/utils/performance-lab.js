@@ -12,9 +12,21 @@ function latestEvaluation(recommendation) {
   return entries[0] || null;
 }
 
-function summarizeEvaluated(items) {
+function evaluationAtHorizon(recommendation, horizonDays) {
+  const evaluation = recommendation.evaluations?.[String(horizonDays)];
+  return evaluation && typeof evaluation.signalReturnPct === 'number'
+    ? { day: Number(horizonDays), evaluation }
+    : null;
+}
+
+function summarizeEvaluated(items, horizonDays = null) {
   const evaluated = items
-    .map(recommendation => ({ recommendation, latest: latestEvaluation(recommendation) }))
+    .map(recommendation => ({
+      recommendation,
+      latest: horizonDays
+        ? evaluationAtHorizon(recommendation, horizonDays)
+        : latestEvaluation(recommendation),
+    }))
     .filter(item => item.latest);
   const wins = evaluated.filter(item => item.latest.evaluation.signalReturnPct > 0);
   const alphaRows = evaluated.filter(item => typeof item.latest.evaluation.alphaPct === 'number');
@@ -57,10 +69,10 @@ function groupBy(items, getKey) {
   }, {});
 }
 
-function summarizeGroups(recommendations, getKey) {
+function summarizeGroups(recommendations, getKey, horizonDays = null) {
   const groups = groupBy(recommendations, getKey);
   return Object.fromEntries(
-    Object.entries(groups).map(([key, items]) => [key, summarizeEvaluated(items)])
+    Object.entries(groups).map(([key, items]) => [key, summarizeEvaluated(items, horizonDays)])
   );
 }
 
@@ -126,7 +138,17 @@ function aiVersionKey(recommendation = {}) {
   const promptVersion = metadata.promptVersion || metadata.prompt_version || recommendation.promptVersion || recommendation.prompt_version || 'legacy_prompt';
   const provider = metadata.provider || recommendation.aiProvider || recommendation.ai_provider || 'unknown_provider';
   const model = metadata.model || recommendation.aiModel || recommendation.ai_model || 'unknown_model';
-  return `${promptVersion} / ${provider}:${model}`;
+  const settings = [];
+  const reasoningEffort = metadata.reasoningEffort || metadata.reasoning_effort;
+  const verbosity = metadata.verbosity;
+  const thinkingMode = metadata.thinkingMode || metadata.thinking_mode;
+  if (reasoningEffort) settings.push(`reasoning=${reasoningEffort}`);
+  if (verbosity) settings.push(`verbosity=${verbosity}`);
+  if (thinkingMode) settings.push(`thinking=${thinkingMode}`);
+  return [
+    `${promptVersion} / ${provider}:${model}`,
+    ...settings,
+  ].join(' / ');
 }
 
 function aiModelKey(recommendation = {}) {
@@ -174,8 +196,10 @@ function riskFactorKeys(recommendation = {}) {
   return [...new Set(keys)];
 }
 
-function classifyFailure(recommendation = {}) {
-  const latest = latestEvaluation(recommendation);
+function classifyFailure(recommendation = {}, horizonDays = null) {
+  const latest = horizonDays
+    ? evaluationAtHorizon(recommendation, horizonDays)
+    : latestEvaluation(recommendation);
   if (!latest) return 'not_evaluated';
   const evaluation = latest.evaluation;
   if ((evaluation.signalReturnPct ?? 0) > 0) return 'not_failure';
@@ -191,16 +215,25 @@ function classifyFailure(recommendation = {}) {
   return 'direction_failed';
 }
 
-function summarizeFailures(recommendations = []) {
+function summarizeFailures(recommendations = [], horizonDays = null) {
   const failures = recommendations
-    .map(recommendation => ({ recommendation, latest: latestEvaluation(recommendation), reason: classifyFailure(recommendation) }))
+    .map(recommendation => ({
+      recommendation,
+      latest: horizonDays
+        ? evaluationAtHorizon(recommendation, horizonDays)
+        : latestEvaluation(recommendation),
+      reason: classifyFailure(recommendation, horizonDays),
+    }))
     .filter(item => item.latest && item.reason !== 'not_failure');
   const byReason = groupBy(failures, item => item.reason);
   return Object.entries(byReason)
     .map(([reason, items]) => ({
       reason,
       count: items.length,
-      avgSignalReturnPct: summarizeEvaluated(items.map(item => item.recommendation)).avgSignalReturnPct,
+      avgSignalReturnPct: summarizeEvaluated(
+        items.map(item => item.recommendation),
+        horizonDays,
+      ).avgSignalReturnPct,
       examples: items
         .slice(0, 3)
         .map(item => item.recommendation.name || item.recommendation.ticker || item.recommendation.symbol)
@@ -209,7 +242,7 @@ function summarizeFailures(recommendations = []) {
     .sort((a, b) => b.count - a.count || (a.avgSignalReturnPct ?? 0) - (b.avgSignalReturnPct ?? 0));
 }
 
-function summarizeMultiKeyGroups(recommendations, getKeys) {
+function summarizeMultiKeyGroups(recommendations, getKeys, horizonDays = null) {
   const pairs = [];
   for (const recommendation of recommendations) {
     for (const key of getKeys(recommendation)) {
@@ -218,59 +251,143 @@ function summarizeMultiKeyGroups(recommendations, getKeys) {
   }
   const groups = groupBy(pairs, item => item.key);
   return Object.fromEntries(
-    Object.entries(groups).map(([key, items]) => [key, summarizeEvaluated(items.map(item => item.recommendation))])
+    Object.entries(groups).map(([key, items]) => [
+      key,
+      summarizeEvaluated(items.map(item => item.recommendation), horizonDays),
+    ])
   );
 }
 
-function buildPerformanceLab({ recommendations = [], trades = [] } = {}) {
+function isEligibleRecommendation(recommendation = {}) {
+  const review = getRiskReview(recommendation);
+  const risk = getRiskProfile(recommendation);
+  return ['bullish', 'bearish'].includes(recommendation.signal)
+    && review.approved === true
+    && review.action === 'candidate'
+    && typeof recommendation.entry?.price === 'number'
+    && typeof risk.riskReward === 'number'
+    && Boolean(risk.expectedLossPct || risk.stopLossPrice);
+}
+
+function buildStrategyReadiness({
+  recommendations = [],
+  trades = [],
+  primaryHorizonDays = 20,
+  minEvaluated = Number(process.env.STRATEGY_MIN_EVALUATED || 30),
+  minLinkedTrades = Number(process.env.STRATEGY_MIN_LINKED_TRADES || 10),
+} = {}) {
+  const evaluated = recommendations.filter(item => evaluationAtHorizon(item, primaryHorizonDays));
+  const withMetadata = evaluated.filter(item => (
+    aiModelKey(item) !== 'unknown_provider:unknown_model'
+    && promptVersionKey(item) !== 'legacy_prompt'
+  ));
+  const recommendationIds = new Set(recommendations.map(item => item.id).filter(Boolean));
+  const linkedTrades = trades.filter(trade => (
+    trade.recommendationId && recommendationIds.has(trade.recommendationId)
+  )).length;
+  const metadataCoveragePct = evaluated.length
+    ? round((withMetadata.length / evaluated.length) * 100)
+    : null;
+  const blockers = [];
+  if (evaluated.length < minEvaluated) {
+    blockers.push(`approved_evaluations:${evaluated.length}/${minEvaluated}`);
+  }
+  if ((metadataCoveragePct ?? 0) < 80) {
+    blockers.push(`metadata_coverage:${metadataCoveragePct ?? 0}/80`);
+  }
+
+  return {
+    primaryHorizonDays,
+    eligibleRecommendations: recommendations.length,
+    evaluatedRecommendations: evaluated.length,
+    minEvaluated,
+    metadataCoveragePct,
+    linkedTrades,
+    minLinkedTrades,
+    readyForRuleLearning: blockers.length === 0,
+    readyForGoalValidation: blockers.length === 0 && linkedTrades >= minLinkedTrades,
+    ready: blockers.length === 0,
+    blockers: [
+      ...blockers,
+      ...(linkedTrades < minLinkedTrades ? [`linked_trades:${linkedTrades}/${minLinkedTrades}`] : []),
+    ],
+  };
+}
+
+function buildPerformanceLab({
+  recommendations = [],
+  trades = [],
+  primaryHorizonDays = 20,
+  groupMinEvaluated = 5,
+} = {}) {
+  const eligibleRecommendations = recommendations.filter(isEligibleRecommendation);
   const linkedRecommendationIds = new Set(
     trades.map(trade => trade.recommendationId).filter(Boolean)
   );
-  const executedRecommendations = recommendations.filter(item => linkedRecommendationIds.has(item.id));
-  const missedRecommendations = recommendations.filter(item => !linkedRecommendationIds.has(item.id));
-  const evaluatedMissed = missedRecommendations.filter(item => latestEvaluation(item));
-  const evaluatedExecuted = executedRecommendations.filter(item => latestEvaluation(item));
+  const executedRecommendations = eligibleRecommendations.filter(item => linkedRecommendationIds.has(item.id));
+  const missedRecommendations = eligibleRecommendations.filter(item => !linkedRecommendationIds.has(item.id));
+  const evaluatedMissed = missedRecommendations.filter(item => evaluationAtHorizon(item, primaryHorizonDays));
+  const evaluatedExecuted = executedRecommendations.filter(item => evaluationAtHorizon(item, primaryHorizonDays));
 
   const aiVersionLeaders = addSampleConfidence(
-    topGroups(summarizeGroups(recommendations, aiVersionKey), 5),
-    5
+    topGroups(summarizeGroups(eligibleRecommendations, aiVersionKey, primaryHorizonDays), 5),
+    groupMinEvaluated
   );
   const aiModelLeaders = addSampleConfidence(
-    topGroups(summarizeGroups(recommendations, aiModelKey), 5),
-    5
+    topGroups(summarizeGroups(eligibleRecommendations, aiModelKey, primaryHorizonDays), 5),
+    groupMinEvaluated
   );
   const promptVersionLeaders = addSampleConfidence(
-    topGroups(summarizeGroups(recommendations, promptVersionKey), 5),
-    5
+    topGroups(summarizeGroups(eligibleRecommendations, promptVersionKey, primaryHorizonDays), 5),
+    groupMinEvaluated
+  );
+  const byHorizon = Object.fromEntries(
+    [1, 5, 20].map(day => [String(day), summarizeEvaluated(eligibleRecommendations, day)])
   );
 
   return {
     generatedAt: new Date().toISOString(),
-    recommendationQuality: summarizeEvaluated(recommendations),
-    executedRecommendationQuality: summarizeEvaluated(executedRecommendations),
-    missedRecommendationQuality: summarizeEvaluated(missedRecommendations),
+    primaryHorizonDays,
+    eligibility: {
+      totalRecommendations: recommendations.length,
+      eligibleRecommendations: eligibleRecommendations.length,
+      excludedRecommendations: recommendations.length - eligibleRecommendations.length,
+    },
+    strategyReadiness: buildStrategyReadiness({
+      recommendations: eligibleRecommendations,
+      trades,
+      primaryHorizonDays,
+    }),
+    allRecommendationQuality: summarizeEvaluated(recommendations, primaryHorizonDays),
+    recommendationQuality: summarizeEvaluated(eligibleRecommendations, primaryHorizonDays),
+    executedRecommendationQuality: summarizeEvaluated(executedRecommendations, primaryHorizonDays),
+    missedRecommendationQuality: summarizeEvaluated(missedRecommendations, primaryHorizonDays),
+    byHorizon,
     executionGap: {
-      recommendationsTotal: recommendations.length,
+      recommendationsTotal: eligibleRecommendations.length,
       linkedTrades: trades.filter(trade => trade.recommendationId).length,
       executedRecommendations: executedRecommendations.length,
       missedEvaluatedRecommendations: evaluatedMissed.length,
       executedEvaluatedRecommendations: evaluatedExecuted.length,
     },
-    byConviction: summarizeGroups(recommendations, item => item.conviction || 'unknown'),
-    bySignal: summarizeGroups(recommendations, item => item.signal || 'unknown'),
-    byRiskReward: summarizeGroups(recommendations, riskRewardBucket),
-    bySector: summarizeGroups(recommendations, sectorKey),
-    byAiVersion: summarizeGroups(recommendations, aiVersionKey),
-    byAiModel: summarizeGroups(recommendations, aiModelKey),
-    byPromptVersion: summarizeGroups(recommendations, promptVersionKey),
-    byRiskFactor: summarizeMultiKeyGroups(recommendations, riskFactorKeys),
-    failureAnalysis: summarizeFailures(recommendations),
+    byConviction: summarizeGroups(eligibleRecommendations, item => item.conviction || 'unknown', primaryHorizonDays),
+    bySignal: summarizeGroups(eligibleRecommendations, item => item.signal || 'unknown', primaryHorizonDays),
+    byRiskReward: summarizeGroups(eligibleRecommendations, riskRewardBucket, primaryHorizonDays),
+    bySector: summarizeGroups(eligibleRecommendations, sectorKey, primaryHorizonDays),
+    byAiVersion: summarizeGroups(eligibleRecommendations, aiVersionKey, primaryHorizonDays),
+    byAiModel: summarizeGroups(eligibleRecommendations, aiModelKey, primaryHorizonDays),
+    byPromptVersion: summarizeGroups(eligibleRecommendations, promptVersionKey, primaryHorizonDays),
+    byRiskFactor: summarizeMultiKeyGroups(eligibleRecommendations, riskFactorKeys, primaryHorizonDays),
+    failureAnalysis: summarizeFailures(eligibleRecommendations, primaryHorizonDays),
     leaders: {
-      sectors: topGroups(summarizeGroups(recommendations, sectorKey), 5),
+      sectors: topGroups(summarizeGroups(eligibleRecommendations, sectorKey, primaryHorizonDays), 5),
       aiVersions: aiVersionLeaders,
       aiModels: aiModelLeaders,
       promptVersions: promptVersionLeaders,
-      riskFactors: topGroups(summarizeMultiKeyGroups(recommendations, riskFactorKeys), 5),
+      riskFactors: topGroups(
+        summarizeMultiKeyGroups(eligibleRecommendations, riskFactorKeys, primaryHorizonDays),
+        5,
+      ),
     },
   };
 }
@@ -288,4 +405,7 @@ module.exports = {
   riskFactorKeys,
   classifyFailure,
   summarizeFailures,
+  evaluationAtHorizon,
+  isEligibleRecommendation,
+  buildStrategyReadiness,
 };

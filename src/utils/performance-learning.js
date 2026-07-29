@@ -43,6 +43,24 @@ function buildPerformanceLearningFromReview(review = null) {
     };
   }
 
+  const readiness = review.performanceLab?.strategyReadiness || {};
+  if (readiness.readyForRuleLearning !== true) {
+    actions.push(
+      `검증 가능한 승인 후보 표본이 부족해 성과 기반 규칙 자동 조정을 보류합니다. `
+      + `(${readiness.evaluatedRecommendations || 0}/${readiness.minEvaluated || 30}건)`
+    );
+    sources.push('insufficient_strategy_evidence');
+    return {
+      generatedAt: new Date().toISOString(),
+      sourceReviewId: review.id || '',
+      sourcePeriod: review.period || '',
+      readyForRuleLearning: false,
+      rules,
+      actions,
+      sources,
+    };
+  }
+
   const behavior = review.behaviorReview || {};
   const hygiene = behavior.recommendationHygiene || {};
   const collector = review.collectorOps || {};
@@ -71,6 +89,7 @@ function buildPerformanceLearningFromReview(review = null) {
     generatedAt: new Date().toISOString(),
     sourceReviewId: review.id || '',
     sourcePeriod: review.period || '',
+    readyForRuleLearning: true,
     rules,
     actions: [...new Set(actions)].slice(0, 6),
     sources: [...new Set(sources)],
