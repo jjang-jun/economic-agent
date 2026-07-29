@@ -97,3 +97,30 @@ test('Telegram delivery uses a bounded request timeout', async () => {
     global.fetch = previousFetch;
   }
 });
+
+test('timing and pre-news wrappers return an explicit delivery success result', async () => {
+  const previousFetch = global.fetch;
+  global.fetch = async () => ({ ok: true });
+  const { telegram, restore } = loadFreshTelegram({
+    TELEGRAM_BOT_TOKEN: 'bot-token',
+    TELEGRAM_CHAT_ID: '1234',
+    TELEGRAM_PRIVATE_CHAT_ID: '5678',
+  });
+
+  try {
+    assert.equal(await telegram.sendTimingAlertReport({
+      mode: 'intraday',
+      date: '2026-07-29',
+      candidates: [],
+    }), true);
+    assert.equal(await telegram.sendPreNewsSignalReport({
+      date: '2026-07-29',
+      universeCount: 0,
+      candidates: [],
+      watch: [],
+    }), true);
+  } finally {
+    restore();
+    global.fetch = previousFetch;
+  }
+});

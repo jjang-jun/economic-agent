@@ -861,6 +861,7 @@ function formatTimingAlertReport(report = {}) {
 async function sendTimingAlertReport(report) {
   const message = formatTimingAlertReport(report);
   await sendTelegramMessage(message, { channel: 'private', requireDelivery: true });
+  return true;
 }
 
 function formatPreNewsSignal(signal) {
@@ -909,6 +910,7 @@ function formatPreNewsSignalReport(report = {}) {
 async function sendPreNewsSignalReport(report) {
   const message = formatPreNewsSignalReport(report);
   await sendTelegramMessage(message, { channel: 'private', requireDelivery: true });
+  return true;
 }
 
 const SESSION_EMOJI = {
