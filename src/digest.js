@@ -7,6 +7,10 @@ const { saveDailySummary } = require('./utils/daily-summary');
 const { archiveScoredArticles } = require('./utils/article-archive');
 const { fetchMarketSnapshot } = require('./utils/market-snapshot');
 const {
+  detectDigestSession,
+  resolveDigestSession,
+} = require('./utils/digest-market');
+const {
   persistArticles,
   persistDailySummary,
   persistMarketSnapshots,
@@ -19,21 +23,20 @@ const {
 
 // 세션 자동 판별 (KST 기준)
 function detectSession() {
-  const hour = parseInt(new Date().toLocaleString('en-US', {
-    timeZone: 'Asia/Seoul',
-    hour: 'numeric',
-    hour12: false,
-  }));
-
-  if (hour < 9) return 'preopen';
-  if (hour < 13) return 'midday';
-  if (hour < 16) return 'close';
-  if (hour < 20) return 'europe';
-  return 'usopen';
+  return detectDigestSession();
 }
 
 async function main() {
-  const session = process.argv[2] || detectSession();
+  const requestedSession = process.argv[2] || detectSession();
+  const sessionResolution = resolveDigestSession(requestedSession, {
+    scheduled: process.env.GITHUB_EVENT_NAME === 'schedule',
+  });
+  const session = sessionResolution.session;
+  if (sessionResolution.adjusted) {
+    console.warn(
+      `[다이제스트] 예약 세션 조정: ${requestedSession} -> ${session} (${sessionResolution.reason})`
+    );
+  }
   console.log(`[${new Date().toISOString()}] 다이제스트 생성: ${session}`);
 
   // 버퍼에 쌓인 기사 가져오기. Cloud Run/Actions 간 상태 공유를 위해
@@ -69,6 +72,7 @@ async function main() {
     console.error('[완료] 다이제스트 생성 실패, 버퍼를 보존합니다.');
     return;
   }
+  digest.sessionResolution = sessionResolution;
 
   // Telegram 전송
   const sent = await sendDigest(digest);
@@ -77,7 +81,7 @@ async function main() {
   }
 
   // 일일 요약 저장
-  const summary = saveDailySummary({ articles, indicators });
+  const summary = saveDailySummary({ articles, indicators, digest });
   await persistDailySummary(summary);
   await persistAlertEvents(
     supabaseArticles.map(article => ({

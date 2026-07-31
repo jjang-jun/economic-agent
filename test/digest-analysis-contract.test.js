@@ -7,7 +7,7 @@ const {
 } = require('../src/analysis/digest');
 
 test('digest prompt version advances for GPT-5.6 contract changes', () => {
-  assert.equal(DIGEST_PROMPT_VERSION, 'digest-v1.1');
+  assert.equal(DIGEST_PROMPT_VERSION, 'digest-v1.2');
 });
 
 test('digest generation propagates provider failures so workflow cannot report false success', async () => {

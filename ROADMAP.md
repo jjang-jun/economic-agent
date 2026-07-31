@@ -163,6 +163,7 @@ Codex 작업 위임 원칙:
 - [x] KOSPI 벤치마크 대비 초과수익률
 - [x] 다이제스트 시간 최적화
 - [x] 프리마켓/시장 스냅샷
+- [x] 다이제스트 지연 세션 보정, 가격 신선도 표시, AI 시장 분위기 교차검증
 - [x] 시장 레짐 초안: `RISK_ON`, `NEUTRAL`, `RISK_OFF`
 - [x] 강세장 세부 태그: `OVERHEATED`, `CONCENTRATED_LEADERSHIP`, `SEMICONDUCTOR_LEADERSHIP`, `MOMENTUM_ALLOWED`
 - [x] 포트폴리오 설정 초안

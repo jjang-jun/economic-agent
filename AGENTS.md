@@ -102,6 +102,7 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - `src/utils/local-research-worker.js`: optional monthly review sidecar for local Python OHLCV research; disabled unless `LOCAL_RESEARCH_WORKER_ENABLED=true`
 - `src/utils/trade-log.js`: stores actual manual trade executions in ignored local data and Supabase
 - `src/utils/decision-engine.js`: rule-based market regime, index trend scoring, and action guardrails
+- `src/utils/digest-market.js`: resolves delayed digest sessions, labels snapshot freshness, builds deterministic short-term price mood, and reconciles contradictory AI digest mood
 - Market regime can include tags such as `OVERHEATED`, `CONCENTRATED_LEADERSHIP`, `SEMICONDUCTOR_LEADERSHIP`, `AI_SEMICONDUCTOR_CYCLE`, `GROWTH_CONCENTRATION`, and `MOMENTUM_ALLOWED`. Treat these as risk controls, not pure buy signals.
 - Macro overlays include `STAGFLATION_RISK`, `KOREA_TIGHTENING_RISK`, `EXPORT_CONCENTRATION`, `CHINA_DEMAND_RISK`, and `OIL_GEOPOLITICAL_TAIL_RISK`. They are derived from current indicators/news, not a permanently hardcoded market view.
 - Stock recommendations should be framed as expected-value trades. Prefer risk/reward, stop-loss width, invalidation, suggested amount, and account weight over plain buy/sell wording.

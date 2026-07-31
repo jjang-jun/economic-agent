@@ -921,6 +921,30 @@ const SESSION_EMOJI = {
   usopen: '🇺🇸',
 };
 
+function formatDigestMarketSignal(digest) {
+  const signal = digest.marketSignal;
+  if (!signal) return null;
+
+  const shortTerm = SENTIMENT[signal.mood] || SENTIMENT.neutral;
+  const trendLabel = {
+    bullish: '중기 상승 추세',
+    bearish: '중기 하락 추세 경계',
+    neutral: '중기 혼조',
+  }[signal.trendMood] || '중기 확인 필요';
+  const review = digest.marketMoodReview || {};
+  const aiMood = SENTIMENT[review.aiMood] || SENTIMENT.neutral;
+  const finalMood = SENTIMENT[review.finalMood] || shortTerm;
+  const audit = [
+    signal.staleCount > 0 ? `오래된 시세 ${signal.staleCount}개 제외` : '',
+    review.overridden ? `AI 초안 ${aiMood.label}→${finalMood.label} 보정` : '',
+  ].filter(Boolean);
+
+  return [
+    `가격판정: ${shortTerm.bar} 단기 ${shortTerm.label} · ${trendLabel}`,
+    audit.length > 0 ? `데이터 점검: ${audit.join(' · ')}` : '',
+  ].filter(Boolean).join('\n');
+}
+
 function formatDigest(digest) {
   const now = new Date().toLocaleString('ko-KR', {
     timeZone: 'Asia/Seoul',
@@ -954,6 +978,8 @@ function formatDigest(digest) {
     ].join('\n'),
 
     `핵심: <b>${escapeHtml(digest.headline || '')}</b>`,
+
+    formatDigestMarketSignal(digest),
 
     sectionLines.join('\n\n'),
 
@@ -1348,5 +1374,5 @@ async function sendPerformanceReview(review) {
 
 module.exports = {
   notifyArticles, sendStockReport, sendDigest, sendPerformanceReport, sendTradePerformanceReport, sendPerformanceReview, sendActionReport, sendTimingAlertReport, sendPreNewsSignalReport, sendFreedomStatus, sendTelegramMessage, answerTelegramCallbackQuery, getTelegramChatId,
-  formatMessage, formatStockReport, formatDigest, formatPerformanceReport, formatTradePerformanceReport, formatPerformanceReview, formatActionReport, formatTimingAlertReport, formatPreNewsSignalReport, formatFreedomStatus,
+  formatMessage, formatStockReport, formatDigest, formatDigestMarketSignal, formatPerformanceReport, formatTradePerformanceReport, formatPerformanceReview, formatActionReport, formatTimingAlertReport, formatPreNewsSignalReport, formatFreedomStatus,
 };

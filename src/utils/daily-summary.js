@@ -7,7 +7,37 @@ function getTodayKST() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
 }
 
-function saveDailySummary({ articles, indicators, stockReport }) {
+function buildDigestAudit(digest) {
+  if (!digest) return null;
+  return {
+    session: digest.session || '',
+    sessionName: digest.sessionName || '',
+    headline: digest.headline || '',
+    marketMood: digest.market_mood || 'neutral',
+    aiMarketMood: digest.marketMoodReview?.aiMood || digest.market_mood || 'neutral',
+    marketMoodReview: digest.marketMoodReview || null,
+    marketSignal: digest.marketSignal || null,
+    sections: digest.sections || [],
+    keyNumbers: digest.key_numbers || [],
+    watchList: digest.watch_list || [],
+    aiMetadata: digest.aiMetadata || null,
+    sessionResolution: digest.sessionResolution || null,
+    generatedAt: digest.aiMetadata?.generatedAt || new Date().toISOString(),
+  };
+}
+
+function mergeDigestAudits(current, existing = []) {
+  const audits = current ? [current, ...existing] : [...existing];
+  const seen = new Set();
+  return audits.filter(item => {
+    const key = item?.session || item?.sessionName || item?.generatedAt;
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 5);
+}
+
+function saveDailySummary({ articles, indicators, stockReport, digest }) {
   fs.mkdirSync(SUMMARY_DIR, { recursive: true });
 
   const date = getTodayKST();
@@ -37,6 +67,7 @@ function saveDailySummary({ articles, indicators, stockReport }) {
         source: a.source,
       })),
     stockReport: stockReport || null,
+    digests: mergeDigestAudits(buildDigestAudit(digest)),
   };
 
   // 같은 날 기존 데이터가 있으면 병합
@@ -55,6 +86,7 @@ function saveDailySummary({ articles, indicators, stockReport }) {
     if (!summary.stockReport && existing.stockReport) {
       summary.stockReport = existing.stockReport;
     }
+    summary.digests = mergeDigestAudits(buildDigestAudit(digest), existing.digests || []);
   } catch {
     // 파일 없으면 무시
   }
@@ -64,4 +96,8 @@ function saveDailySummary({ articles, indicators, stockReport }) {
   return summary;
 }
 
-module.exports = { saveDailySummary };
+module.exports = {
+  buildDigestAudit,
+  mergeDigestAudits,
+  saveDailySummary,
+};

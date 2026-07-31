@@ -2,7 +2,9 @@ const WATCHLIST = require('../config/watchlist');
 const { fetchCurrentPrice } = require('../sources/price-provider');
 
 function getSymbolsForSession(session) {
-  const primary = WATCHLIST[session] || [];
+  const primary = WATCHLIST[session]
+    || (session === 'midday' ? WATCHLIST.preopen : [])
+    || [];
   const bySymbol = new Map();
   for (const item of [...primary, ...WATCHLIST.global]) {
     if (!bySymbol.has(item.symbol)) bySymbol.set(item.symbol, item);
@@ -38,4 +40,7 @@ async function fetchMarketSnapshot(session) {
     .map(result => result.value);
 }
 
-module.exports = { fetchMarketSnapshot };
+module.exports = {
+  fetchMarketSnapshot,
+  getSymbolsForSession,
+};
