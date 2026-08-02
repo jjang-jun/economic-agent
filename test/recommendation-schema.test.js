@@ -9,12 +9,24 @@ test('validateRecommendationSchema passes a complete recommendation candidate', 
   const result = validateRecommendationSchema({
     name: '삼성전자',
     ticker: '005930',
+    identity_resolution: { status: 'verified', source: 'dart_disclosure' },
     thesis: 'HBM 수요 개선',
     reason: '관련 공시와 수급 개선',
     related_news: [0],
     invalidation: '20일선 이탈',
     market_profile: {
       name: '삼성전자',
+      price: 80000,
+      source: 'naver-finance',
+      marketTime: '2026-08-01T06:30:00.000Z',
+      relativeStrength20d: 4,
+      averageTurnover20d: 9000000000,
+      entryTiming: { approved: true },
+    },
+    fundamental_profile: {
+      source: 'naver-finance',
+      asOf: '2026-08-01T06:30:00.000Z',
+      marketCapKrw: 500000000000000,
     },
     risk_profile: {
       entryReferencePrice: 80000,
@@ -27,6 +39,33 @@ test('validateRecommendationSchema passes a complete recommendation candidate', 
 
   assert.equal(result.passed, true);
   assert.deepEqual(result.blockers, []);
+  assert.equal(result.quality.ready, true);
+});
+
+test('validateRecommendationSchema blocks candidates without point-in-time data quality', () => {
+  const result = validateRecommendationSchema({
+    name: '삼성전자',
+    ticker: '005930',
+    identity_resolution: { status: 'unverified' },
+    thesis: 'HBM 수요 개선',
+    reason: '관련 뉴스',
+    related_news: [0],
+    invalidation: '20일선 이탈',
+    market_profile: { name: '삼성전자', price: 80000 },
+    risk_profile: {
+      entryReferencePrice: 80000,
+      stopLossPrice: 76000,
+      riskReward: 2.2,
+      suggestedWeightPct: 5,
+    },
+  });
+
+  assert.equal(result.passed, false);
+  assert.equal(result.quality.ready, false);
+  assert.ok(result.blockers.includes('identity: unverified'));
+  assert.ok(result.blockers.includes('market_price_source: missing'));
+  assert.ok(result.blockers.includes('relative_strength_20d: missing'));
+  assert.ok(result.blockers.includes('fundamental_market_cap: missing'));
 });
 
 test('validateRecommendationSchema blocks ticker/name mismatches from official quote name', () => {

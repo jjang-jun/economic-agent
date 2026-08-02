@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const {
   buildEntryTimingProfile,
   buildFundamentalProfile,
+  buildDomesticFundamentalProfile,
   buildMarketProfile,
 } = require('../src/utils/recommendation-market');
 
@@ -63,6 +64,8 @@ test('buildMarketProfile includes moving-average entry timing', () => {
     symbol: '005930.KS',
     name: '삼성전자',
     price: 80000,
+    source: 'naver-finance',
+    marketTime: '2026-08-01T06:30:00.000Z',
     return5dPct: 3,
     return20dPct: 8,
     movingAverage5d: 79000,
@@ -84,10 +87,30 @@ test('buildMarketProfile includes moving-average entry timing', () => {
   });
 
   assert.equal(profile.name, '삼성전자');
+  assert.equal(profile.source, 'naver-finance');
+  assert.equal(profile.marketTime, '2026-08-01T06:30:00.000Z');
   assert.equal(profile.relativeStrength20d, 4);
   assert.equal(profile.entryTiming.action, 'breakout');
   assert.equal(profile.entryTiming.approved, true);
   assert.equal(profile.liquid, true);
+});
+
+test('buildDomesticFundamentalProfile records point-in-time basic coverage', () => {
+  const profile = buildDomesticFundamentalProfile({
+    symbol: '005930.KS',
+    ticker: '005930',
+    name: '삼성전자',
+    exchange: 'KS',
+    currency: 'KRW',
+    marketCap: 500000000000000,
+    isin: 'KR7005930003',
+    source: 'naver-finance',
+    marketTime: '2026-08-01T06:30:00.000Z',
+  });
+
+  assert.equal(profile.marketCapKrw, 500000000000000);
+  assert.equal(profile.coverage, 'basic');
+  assert.equal(profile.asOf, '2026-08-01T06:30:00.000Z');
 });
 
 test('mergeTechnicalQuote keeps official name when primary quote has no name', () => {

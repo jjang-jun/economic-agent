@@ -36,16 +36,20 @@ async function fetchNaverQuote(ticker) {
     const changePercent = parseNumber(row.fluctuationsRatioRaw || row.fluctuationsRatio);
     const volume = parseNumber(row.accumulatedTradingVolumeRaw || row.accumulatedTradingVolume);
     const accumulatedTradingValue = parseNumber(row.accumulatedTradingValueRaw);
+    const marketCap = parseNumber(row.marketValueFullRaw || row.marketValueFull);
 
     return {
       symbol: `${code}.KS`,
       ticker: code,
       name: row.stockName || '',
+      isin: row.isinCode || '',
+      exchange: row.stockExchangeType?.code || '',
       price,
       previousClose,
       changePercent,
       volume,
-      averageTurnover20d: accumulatedTradingValue || null,
+      tradingValue: accumulatedTradingValue,
+      marketCap,
       currency: row.currencyType?.name || 'KRW',
       marketTime: row.localTradedAt ? new Date(row.localTradedAt).toISOString() : new Date().toISOString(),
       marketStatus: row.marketStatus || '',

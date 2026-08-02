@@ -23,16 +23,44 @@ function isNameMismatch(stockName, officialName) {
 function validateRecommendationSchema(stock = {}) {
   const risk = stock.risk_profile || stock.riskProfile || {};
   const market = stock.market_profile || stock.marketProfile || {};
+  const fundamental = stock.fundamental_profile || stock.fundamentalProfile || {};
+  const identity = stock.identity_resolution || stock.identityResolution || {};
   const relatedNews = Array.isArray(stock.related_news)
     ? stock.related_news
     : (Array.isArray(stock.relatedNews) ? stock.relatedNews : []);
   const blockers = [];
+  const domestic = /^\d{6}(?:\.(?:KS|KQ))?$/i.test(String(stock.ticker || stock.symbol || ''));
+  const quality = {
+    identityVerified: !domestic || identity.status === 'verified',
+    pointInTimePrice: hasNumber(market.price) && hasText(market.source) && hasText(market.marketTime),
+    technicalHistory: hasNumber(market.relativeStrength20d)
+      && hasNumber(market.averageTurnover20d)
+      && typeof market.entryTiming?.approved === 'boolean',
+    fundamentalSnapshot: hasText(fundamental.source)
+      && hasText(fundamental.asOf)
+      && (!domestic || hasNumber(fundamental.marketCapKrw)),
+  };
+  quality.ready = Object.values(quality).every(Boolean);
 
   if (!hasText(stock.name) && !hasText(stock.ticker)) blockers.push('identity: missing');
+  if (domestic && identity.status !== 'verified') {
+    blockers.push(`identity: ${identity.status || 'unverified'}`);
+  }
   if (!hasText(stock.thesis)) blockers.push('thesis: missing');
   if (!hasText(stock.reason)) blockers.push('reason: missing');
   if (relatedNews.length === 0) blockers.push('evidence: missing related_news');
   if (!hasNumber(risk.entryReferencePrice)) blockers.push('entry_price: missing');
+  if (!hasNumber(market.price)) blockers.push('market_price: missing');
+  if (!hasText(market.source)) blockers.push('market_price_source: missing');
+  if (!hasText(market.marketTime)) blockers.push('market_price_time: missing');
+  if (!hasNumber(market.relativeStrength20d)) blockers.push('relative_strength_20d: missing');
+  if (!hasNumber(market.averageTurnover20d)) blockers.push('average_turnover_20d: missing');
+  if (typeof market.entryTiming?.approved !== 'boolean') blockers.push('entry_timing: missing');
+  if (!hasText(fundamental.source)) blockers.push('fundamental_source: missing');
+  if (!hasText(fundamental.asOf)) blockers.push('fundamental_time: missing');
+  if (domestic && !hasNumber(fundamental.marketCapKrw)) {
+    blockers.push('fundamental_market_cap: missing');
+  }
   if (!hasNumber(risk.stopLossPrice) && !hasNumber(risk.expectedLossPct)) blockers.push('stop_loss: missing');
   if (!hasNumber(risk.riskReward)) blockers.push('risk_reward: missing');
   if (!hasNumber(risk.suggestedWeightPct) && !hasNumber(risk.suggestedAmount)) blockers.push('position_size: missing');
@@ -44,6 +72,7 @@ function validateRecommendationSchema(stock = {}) {
   return {
     passed: blockers.length === 0,
     blockers,
+    quality,
   };
 }
 

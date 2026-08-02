@@ -94,6 +94,7 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - `src/utils/article-archive.js`: daily scored article archive used by stock reports and later performance review
 - `src/utils/article-identity.js`: normalized article identity keys for duplicate suppression across RSS/DART, URLs, and titles
 - `src/utils/recommendation-log.js`: stores stock signals and evaluates returns against KOSPI benchmark when available
+- `src/utils/recommendation-identity.js`: resolves Korean company names/tickers from directly related DART disclosures or fixed watchlists before quote lookup and verifies official quote names
 - `src/utils/research-candidate-log.js`: stores schema-valid but risk-blocked directional candidates in a research-only shadow cohort and evaluates them separately from live recommendations
 - `src/utils/risk-reviewer.js`: rule-based risk manager for recommendation factor pass/fail and blockers
 - `src/utils/valuation-profile.js`: PER/PSR/FCF yield plus growth/quality valuation overlay used by risk review
@@ -114,6 +115,7 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - `market_profile` also tracks 20d/60d highs and distance from the 20d high. For momentum candidates, being far below the 20d high should reduce tradeability.
 - `market_profile.entryTiming` tracks 5d/20d moving-average alignment, 20d moving-average distance/slope, breakout/pullback status, and should block chase entries even when AI text is bullish.
 - Recommendations should include `risk_review` before persistence. Treat blockers as a reason to mark a stock watch-only even when AI text sounds bullish.
+- Domestic recommendations must have verified identity plus point-in-time price/technical/basic-fundamental quality before approval. Never substitute same-day accumulated trading value for 20-day average turnover.
 - `src/utils/portfolio.js`: loads ignored local portfolio data and derives cash/position risk inputs
 - Manual portfolio prices are capture-time values and fresh quotes should replace them unless `valuationLocked=true`. `unclassifiedAssetAmount` contributes to net worth but never to cash/buying power.
 - Portfolio valuation snapshots are saved under ignored `data/portfolio-snapshots/` and persisted to Supabase `portfolio_snapshots` when configured.

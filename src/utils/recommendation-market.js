@@ -11,6 +11,7 @@ const {
   fetchFmpEarningsSummary,
   normalizeFmpSymbol,
 } = require('../sources/fmp-api');
+const { verifyIdentityFromMarketProfile } = require('./recommendation-identity');
 
 const MIN_AVG_TURNOVER_KRW = 5000000000;
 const ENTRY_TIMING_LABELS = {
@@ -134,6 +135,10 @@ function buildMarketProfile(quote, benchmark) {
   return {
     symbol: quote.symbol,
     name: quote.name || '',
+    source: quote.source || '',
+    priceType: quote.priceType || 'current',
+    marketTime: quote.marketTime || '',
+    isRealtime: quote.isRealtime ?? null,
     price: quote.price,
     currency: quote.currency,
     changePercent: quote.changePercent,
@@ -156,6 +161,9 @@ function buildMarketProfile(quote, benchmark) {
     avgVolume20d: quote.avgVolume20d,
     volumeRatio20d: quote.volumeRatio20d,
     averageTurnover20d: quote.averageTurnover20d,
+    marketCap: quote.marketCap ?? null,
+    isin: quote.isin || '',
+    exchange: quote.exchange || '',
     high20d: quote.high20d,
     high60d: quote.high60d,
     distanceFrom20dHighPct: quote.distanceFrom20dHighPct,
@@ -189,9 +197,32 @@ function buildFundamentalProfile(profile, summary = null, earnings = null) {
     isFund: profile.isFund ?? null,
     isActivelyTrading: profile.isActivelyTrading ?? null,
     ipoDate: profile.ipoDate || '',
+    asOf: profile.asOf || summary?.fiscalDate || new Date().toISOString(),
+    coverage: 'full',
     statements: summary,
     earnings,
     source: 'fmp-profile',
+  };
+}
+
+function buildDomesticFundamentalProfile(quote) {
+  if (!quote || !isDomesticTicker(quote.ticker || quote.symbol)) return null;
+  return {
+    symbol: quote.symbol || '',
+    name: quote.name || '',
+    sector: '',
+    industry: '',
+    country: 'KR',
+    exchange: quote.exchange || '',
+    currency: quote.currency || 'KRW',
+    marketCap: quote.marketCap ?? null,
+    marketCapKrw: quote.marketCap ?? null,
+    isin: quote.isin || '',
+    statements: null,
+    earnings: null,
+    source: quote.source || '',
+    asOf: quote.marketTime || '',
+    coverage: 'basic',
   };
 }
 
@@ -241,6 +272,7 @@ function mergeTechnicalQuote(currentQuote, technicalQuote) {
       ? true
       : (high20d && typeof price === 'number' ? price >= high20d : technicalQuote.breakout20d),
     history: technicalQuote.history || currentQuote.history || [],
+    averageTurnover20d: technicalQuote.averageTurnover20d ?? currentQuote.averageTurnover20d,
     fallbackSource: technicalQuote.source || currentQuote.fallbackSource || '',
   };
 }
@@ -285,11 +317,15 @@ async function applyRecommendationMarketData(report) {
     Promise.all(report.stocks.map(stock => fetchFundamentalProfile(stock))),
   ]);
 
-  report.stocks = report.stocks.map((stock, index) => ({
-    ...stock,
-    market_profile: buildMarketProfile(quotes[index], benchmark),
-    fundamental_profile: fundamentals[index],
-  }));
+  report.stocks = report.stocks.map((stock, index) => {
+    const quote = quotes[index];
+    const marketProfile = buildMarketProfile(quote, benchmark);
+    return verifyIdentityFromMarketProfile({
+      ...stock,
+      market_profile: marketProfile,
+      fundamental_profile: fundamentals[index] || buildDomesticFundamentalProfile(quote),
+    }, marketProfile || {});
+  });
   return report;
 }
 
@@ -299,6 +335,7 @@ module.exports = {
   buildEntryTimingProfile,
   buildMarketProfile,
   buildFundamentalProfile,
+  buildDomesticFundamentalProfile,
   mergeTechnicalQuote,
   fetchRecommendationQuote,
   applyRecommendationMarketData,

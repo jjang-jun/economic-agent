@@ -301,12 +301,13 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 월간 운영 품질 오탐도 정리했다. 주말/비수집 시간대는 collector stale로 경고하지 않고, digest `buffered`는 실제 `pending`과 분리한다. 가격 stale은 전체 과거 행이 아니라 종목별 최신 스냅샷만 평가하고, 설정되지 않은 유료 provider 호출은 `empty` 대신 `skipped`로 기록한다. 포트폴리오 수동 현재가는 `valuationLocked=true`가 아니면 최신 시세로 갱신하며 미분류 자산은 총자산에는 포함하되 현금으로 보지 않는다.
 - AI 추천 성과 상태를 재점검했다. 2026-07-31까지 추천 평가 workflow는 연속 성공했고, 저장 신호 11건 중 8건은 1/5/20거래일 평가 이력이 있으므로 평가 엔진 중단은 아니다. 최신 승인 추천은 2026-05-08이며 7월 장마감 후보는 리스크 승인에서 모두 관찰/차단되어 새 평가 입력이 없었다. 월간 Telegram은 평가기 이력, 이번 달 신규 승인, 레거시 저장 신호, 엄격한 검증 코호트를 분리하고 6개 핵심 섹션으로 축약했다. 추천·평가 Supabase 저장 오류도 workflow 성공으로 숨기지 않도록 fail-closed 처리했다.
 - 2026-08-02 shadow 연구 코호트를 추가했다. 스키마를 통과했지만 리스크 규칙에 차단된 bullish/bearish 후보는 실제 추천과 다른 `research_candidates`에 저장하고 `researchOnly=true`, `tradeEligible=false`로 고정한다. 동일한 거래일 EOD 평가기를 사용하되 shadow 성과는 실제 추천 성과와 자동 규칙 학습 표본에 섞지 않는다.
+- 2026-08-02 종목 식별과 시점 데이터 게이트를 강화했다. 관련 DART 공시와 고정 관찰목록으로 회사명/6자리 코드를 가격 조회 전에 결정하고, 공식 가격명과 충돌하면 승인하지 않는다. 가격 출처/시점, 20일 상대강도·평균 거래대금·진입 타이밍, 펀더멘털 출처/시점과 국내 시가총액이 모두 있어야 스키마를 통과한다. 네이버 당일 누적 거래대금을 20일 평균 거래대금으로 오인하던 필드도 분리했다.
 
 ## 다음 작업
 
-1. shadow 후보 migration을 적용하고 다음 장마감/추천평가 workflow에서 `research_candidates`, `research_candidate_evaluations` 행 생성과 fail-closed 저장을 확인한다.
+1. 다음 장마감/추천평가 workflow에서 `research_candidates`, `research_candidate_evaluations` 행 생성과 fail-closed 저장을 확인한다. migration과 Cloud Run 배포는 완료했다.
 2. `PGRST000/PGRST002`와 내부 `localhost:5432 connection refused`가 함께 반복되면 SQL/schema 변경을 중단하고 Project availability에서 재시작을 한 번만 시도한다. Compute and Disk의 `System` 사용량이 다시 비정상이면 티켓 `SU-419701`에 로그와 디스크 화면을 첨부해 managed compute/disk 복구를 요청한다.
-3. 내일 DRAM ETF 30주 매도 체결 시 실제 체결가로 `trade:record`, `portfolio:sync-secret`, `action:report -- --no-telegram` 순서로 반영하고 수량 170주/비중 변화를 검증한다. 체결 전 계획은 `trade:plan`으로 남겨 행동 리포트에서 누락 여부를 확인한다.
+3. 입출금/배당/수수료/세금 현금흐름 원장과 TWR/MWR·벤치마크 성과를 추가해 자산 증감과 운용 성과를 분리한다.
 4. Qwen 메타데이터가 붙고 리스크 승인을 받은 추천의 20거래일 평가가 30건 이상 쌓이면 `npm run db:pull && npm run model:performance`로 모델 효과를 평가한다. 그 전에는 지연·JSON 준수율·비용만 canary 지표로 본다.
 5. 가격 provider의 `해외/글로벌 가격 API 보강 검토` 판단이 주간/월간 리뷰에서 반복되는지 모니터링하되, 최근 1일 점검은 정상이라 Massive 과금은 필요성이 명확해질 때까지 보류
 6. 다음 실제 workflow 실패 시 private 알림 도착 여부 재확인

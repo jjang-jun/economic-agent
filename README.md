@@ -278,6 +278,7 @@ npm run review:weekly -- --dry-run
 - 손익비
 - 제안 매수금액과 계좌 비중
 - 리스크 리뷰 통과 여부와 차단 사유
+- DART/공식 가격명에 근거한 종목 식별 상태와 데이터 품질 상태
 
 ## 리스크 가드레일
 
@@ -298,7 +299,9 @@ suggested_buy_amount = min(position_by_risk, position_by_cap, available_cash)
 
 신규 매수 후보는 기본적으로 손익비 1:2 미만, 손절폭 과다, 유동성 기준 미달, 시장 대비 상대강도 약세, RISK_OFF 레짐에서는 차단 또는 강등됩니다.
 
-`recommendation-schema.js`는 추천 저장 전 최소 계약을 검증합니다. 근거 기사, 기준 가격, 손절 기준, 손익비, 제안 비중/금액, 무효화 조건이 없으면 `schema_validation.passed=false`로 표시하고 `risk_review`를 `watch_only`로 강등합니다. 이런 후보는 Telegram 리포트에는 차단 사유로 보이지만 추천 성과 로그에는 저장하지 않습니다.
+`recommendation-identity.js`는 가격 조회 전에 관련 DART 공시의 회사명/종목코드 또는 고정 관찰목록으로 국내 종목을 결정합니다. 이후 공식 가격 응답의 회사명도 재검증하며, 근거가 충돌하면 임의 교정하지 않고 차단합니다.
+
+`recommendation-schema.js`는 추천 저장 전 최소 계약과 데이터 품질을 검증합니다. 근거 기사, 기준 가격, 손절 기준, 손익비, 제안 비중/금액, 무효화 조건뿐 아니라 검증된 국내 종목 식별자, 가격 출처/시점, 20일 상대강도·평균 거래대금·진입 타이밍, 펀더멘털 출처/시점이 없으면 `schema_validation.passed=false`로 표시하고 `risk_review`를 `watch_only`로 강등합니다. 국내 기본 펀더멘털 스냅샷은 공식 가격 응답 시점의 시가총액·ISIN·거래소를 기록합니다. 이런 후보는 Telegram 리포트에는 차단 사유로 보이지만 추천 성과 로그에는 저장하지 않습니다.
 
 ## 성과 평가 기준
 
