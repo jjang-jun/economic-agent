@@ -119,17 +119,28 @@ async function buildRecommendation(stock, articles, indicators, date, aiMetadata
   const riskProfile = stock.risk_profile || stock.riskProfile || null;
   const marketProfile = stock.market_profile || stock.marketProfile || null;
   const analysisEntryPrice = riskProfile?.entryReferencePrice || marketProfile?.price || null;
+  const useAnalysisEntry = options.useAnalysisEntry !== false && analysisEntryPrice;
+  const analysisBenchmark = marketProfile?.benchmarkPrice ? {
+    symbol: marketProfile.benchmarkSymbol || '^KS11',
+    price: marketProfile.benchmarkPrice,
+    currency: marketProfile.benchmarkCurrency || '',
+    marketTime: marketProfile.benchmarkMarketTime || marketProfile.marketTime || options.analysisTimestamp || '',
+    source: marketProfile.benchmarkSource || '',
+  } : null;
   const [quote, benchmark] = await Promise.all([
-    symbol && !(options.useAnalysisEntry && analysisEntryPrice) ? fetchCurrentPrice(symbol) : null,
-    fetchBenchmarkQuote(),
+    symbol && !useAnalysisEntry ? fetchCurrentPrice(symbol) : null,
+    analysisBenchmark || (marketProfile && options.allowBenchmarkFetch !== true)
+      ? null
+      : fetchBenchmarkQuote(),
   ]);
   const entryQuote = quote || (analysisEntryPrice ? {
     price: analysisEntryPrice,
     currency: marketProfile?.currency || '',
-    marketTime: options.analysisTimestamp || new Date().toISOString(),
-    source: 'analysis_snapshot',
-    priceType: 'analysis_snapshot',
+    marketTime: marketProfile?.marketTime || options.analysisTimestamp || new Date().toISOString(),
+    source: marketProfile?.source || 'analysis_snapshot',
+    priceType: marketProfile?.priceType || 'analysis_snapshot',
   } : null);
+  const benchmarkQuote = analysisBenchmark || benchmark;
 
   return {
     id: getRecommendationId(date, stock),
@@ -167,12 +178,13 @@ async function buildRecommendation(stock, articles, indicators, date, aiMetadata
           priceType: entryQuote.priceType || 'current',
         }
       : null,
-    benchmark: benchmark
+    benchmark: benchmarkQuote
       ? {
-          symbol: benchmark.symbol,
-          entryPrice: benchmark.price,
-          currency: benchmark.currency,
-          marketTime: benchmark.marketTime,
+          symbol: benchmarkQuote.symbol,
+          entryPrice: benchmarkQuote.price,
+          currency: benchmarkQuote.currency,
+          marketTime: benchmarkQuote.marketTime,
+          source: benchmarkQuote.source || '',
         }
       : null,
     evaluations: {},
@@ -240,8 +252,10 @@ function buildEodEvaluationQuote(rows = [], requestedSymbol = '') {
   };
 }
 
-async function fetchEvaluationQuote(recommendation, day) {
-  const requestedEndDate = tradingWindowEnd(recommendation.date, day);
+async function fetchEvaluationQuotes(recommendation, days = []) {
+  const targets = [...new Set(days)].sort((a, b) => a - b);
+  if (targets.length === 0) return new Map();
+  const requestedEndDate = tradingWindowEnd(recommendation.date, targets.at(-1));
   const symbol = recommendation.symbol || recommendation.ticker;
   let rows = [];
 
@@ -251,23 +265,33 @@ async function fetchEvaluationQuote(recommendation, day) {
     rows = await fetchGlobalDailyOhlcv(symbol, recommendation.date, requestedEndDate);
   }
 
-  const selected = selectTradingSessionRows(rows, recommendation.date, day);
-  const quote = selected ? buildEodEvaluationQuote(selected.rows, symbol) : null;
-  if (quote) {
-    return {
-      ...quote,
-      evaluationTargetDate: selected.targetDate,
-      evaluationPriceMode: 'official_eod',
-    };
+  const quotes = new Map();
+  for (const day of targets) {
+    const selected = selectTradingSessionRows(rows, recommendation.date, day);
+    const quote = selected ? buildEodEvaluationQuote(selected.rows, symbol) : null;
+    if (quote) {
+      quotes.set(day, {
+        ...quote,
+        evaluationTargetDate: selected.targetDate,
+        evaluationPriceMode: 'official_eod',
+      });
+    }
   }
-
-  if (process.env.EVALUATION_ALLOW_CURRENT_FALLBACK !== 'true') return null;
+  if (quotes.size > 0 || process.env.EVALUATION_ALLOW_CURRENT_FALLBACK !== 'true') return quotes;
   const current = await fetchCurrentPrice(symbol);
-  return current ? {
-    ...current,
-    evaluationTargetDate: addKstDays(recommendation.date, day),
-    evaluationPriceMode: 'current_fallback',
-  } : null;
+  if (!current) return quotes;
+  for (const day of targets) {
+    quotes.set(day, {
+      ...current,
+      evaluationTargetDate: addKstDays(recommendation.date, day),
+      evaluationPriceMode: 'current_fallback',
+    });
+  }
+  return quotes;
+}
+
+async function fetchEvaluationQuote(recommendation, day) {
+  return (await fetchEvaluationQuotes(recommendation, [day])).get(day) || null;
 }
 
 async function fetchHistoricalQuoteAtDate(symbol, fromDate, targetDate) {
@@ -343,6 +367,11 @@ function calculateBenchmarkReturn(entryPrice, currentPrice) {
   return Number((((currentPrice - entryPrice) / entryPrice) * 100).toFixed(2));
 }
 
+function calculateBenchmarkSignalReturn(signal, benchmarkReturnPct) {
+  if (typeof benchmarkReturnPct !== 'number') return null;
+  return signal === 'bearish' ? -benchmarkReturnPct : benchmarkReturnPct;
+}
+
 function roundPct(value) {
   return Number(value.toFixed(2));
 }
@@ -411,9 +440,10 @@ async function evaluateRecommendationCollection(recommendations, options = {}) {
       day => ageDays >= day && !recommendation.evaluations[String(day)]
     );
     if (dueTargets.length === 0) continue;
+    const quotes = await fetchEvaluationQuotes(recommendation, dueTargets);
 
     for (const day of dueTargets) {
-      const quote = await fetchEvaluationQuote(recommendation, day);
+      const quote = quotes.get(day);
       if (!quote) continue;
       const result = calculateReturn(
         recommendation.signal,
@@ -449,13 +479,18 @@ async function evaluateRecommendationCollection(recommendations, options = {}) {
           recommendation.benchmark.entryPrice,
           benchmarkQuote.price
         );
+        const benchmarkSignalReturnPct = calculateBenchmarkSignalReturn(
+          recommendation.signal,
+          benchmarkReturnPct,
+        );
         recommendation.evaluations[String(day)].benchmark = {
           symbol: recommendation.benchmark.symbol,
           price: benchmarkQuote.price,
           returnPct: benchmarkReturnPct,
+          signalReturnPct: benchmarkSignalReturnPct,
         };
         recommendation.evaluations[String(day)].alphaPct = Number(
-          (result.signalReturnPct - benchmarkReturnPct).toFixed(2)
+          (result.signalReturnPct - benchmarkSignalReturnPct).toFixed(2)
         );
       }
       recommendation.evaluations[String(day)].resultLabel = getResultLabel(
@@ -502,6 +537,7 @@ module.exports = {
   evaluateRecommendations,
   calculateReturn,
   calculateBenchmarkReturn,
+  calculateBenchmarkSignalReturn,
   addKstDays,
   toKstDate,
   tradingWindowEnd,
@@ -509,6 +545,7 @@ module.exports = {
   selectTradingSessionRows,
   buildEodEvaluationQuote,
   fetchEvaluationQuote,
+  fetchEvaluationQuotes,
   fetchHistoricalQuoteAtDate,
   getEvaluationStats,
   getResultLabel,

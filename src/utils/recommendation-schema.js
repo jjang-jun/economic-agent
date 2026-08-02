@@ -25,9 +25,9 @@ function validateRecommendationSchema(stock = {}) {
   const market = stock.market_profile || stock.marketProfile || {};
   const fundamental = stock.fundamental_profile || stock.fundamentalProfile || {};
   const identity = stock.identity_resolution || stock.identityResolution || {};
-  const relatedNews = Array.isArray(stock.related_news)
-    ? stock.related_news
-    : (Array.isArray(stock.relatedNews) ? stock.relatedNews : []);
+  const relatedNews = Array.isArray(stock.related_article_ids)
+    ? stock.related_article_ids
+    : (Array.isArray(stock.relatedArticleIds) ? stock.relatedArticleIds : []);
   const blockers = [];
   const domestic = /^\d{6}(?:\.(?:KS|KQ))?$/i.test(String(stock.ticker || stock.symbol || ''));
   const quality = {
@@ -48,7 +48,7 @@ function validateRecommendationSchema(stock = {}) {
   }
   if (!hasText(stock.thesis)) blockers.push('thesis: missing');
   if (!hasText(stock.reason)) blockers.push('reason: missing');
-  if (relatedNews.length === 0) blockers.push('evidence: missing related_news');
+  if (relatedNews.length === 0) blockers.push('evidence: no resolved article ids');
   if (!hasNumber(risk.entryReferencePrice)) blockers.push('entry_price: missing');
   if (!hasNumber(market.price)) blockers.push('market_price: missing');
   if (!hasText(market.source)) blockers.push('market_price_source: missing');

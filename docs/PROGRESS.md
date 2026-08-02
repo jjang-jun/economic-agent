@@ -303,10 +303,13 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 2026-08-02 shadow 연구 코호트를 추가했다. 스키마를 통과했지만 리스크 규칙에 차단된 bullish/bearish 후보는 실제 추천과 다른 `research_candidates`에 저장하고 `researchOnly=true`, `tradeEligible=false`로 고정한다. 동일한 거래일 EOD 평가기를 사용하되 shadow 성과는 실제 추천 성과와 자동 규칙 학습 표본에 섞지 않는다.
 - 2026-08-02 종목 식별과 시점 데이터 게이트를 강화했다. 관련 DART 공시와 고정 관찰목록으로 회사명/6자리 코드를 가격 조회 전에 결정하고, 공식 가격명과 충돌하면 승인하지 않는다. 가격 출처/시점, 20일 상대강도·평균 거래대금·진입 타이밍, 펀더멘털 출처/시점과 국내 시가총액이 모두 있어야 스키마를 통과한다. 네이버 당일 누적 거래대금을 20일 평균 거래대금으로 오인하던 필드도 분리했다.
 - 2026-08-02 포트폴리오 현금흐름 원장을 추가했다. 입금/출금은 외부 흐름, 배당/이자/수수료/세금은 운용 수익·비용으로 구분하고 월간 리뷰에서 일별 스냅샷 TWR, 연환산 MWR(XIRR), 같은 구간 KOSPI 초과수익을 계산한다. 원장 조회 실패는 입출금 0원으로 간주하지 않고 성과 판단 보류로 표시한다.
+- 2026-08-02 전체 성과 계약을 재감사했다. 기본 성과 분석은 각 추천의 1일/1주/1개월 목표기간과 1/5/20거래일 평가를 정렬하고 bearish 신호의 KOSPI 수익률도 방향을 보정한다. 해석된 기사 ID가 없는 후보는 원본 배열 인덱스가 있어도 승인하지 않고, 추천 기준가와 벤치마크는 분석 시점 스냅샷을 유지한다.
+- 2026-08-02 실데이터 미러를 재점검한 결과 저장 추천 11건 중 엄격한 승인 계약과 20거래일 평가를 통과한 표본은 1건이고 모델 메타데이터는 없었다. 반면 과거 장마감 리포트에는 시점 가격과 AI 메타데이터가 남은 shadow 복원 가능 후보 22건이 있어 `research:backfill`로 실제 추천과 분리해 저장·평가하도록 했다. `model:performance`는 승인과 shadow 코호트를 합치지 않고 각각 표시한다.
+- 2026-08-02 외부 입출금이 있는 스냅샷 구간의 수익률을 단순 기말 흐름 차감에서 linked Modified Dietz로 바꾸어 현금흐름 시점을 가중했다. 외부 흐름이 있는 경우는 `daily_weighted_estimate`, 없는 경우는 `exact_without_external_flows`로 계산 품질을 구분한다.
 
 ## 다음 작업
 
-1. 다음 장마감/추천평가 workflow에서 `research_candidates`, `research_candidate_evaluations` 행 생성과 fail-closed 저장을 확인한다. migration과 Cloud Run 배포는 완료했다.
+1. shadow 백필 22건과 1/5/20거래일 평가 63행은 생성됐다. 2026-07-31 Qwen 후보 1건은 아직 거래 세션이 지나지 않았으므로 다음 평일 추천평가 workflow에서 1일 평가 생성을 확인한다.
 2. `PGRST000/PGRST002`와 내부 `localhost:5432 connection refused`가 함께 반복되면 SQL/schema 변경을 중단하고 Project availability에서 재시작을 한 번만 시도한다. Compute and Disk의 `System` 사용량이 다시 비정상이면 티켓 `SU-419701`에 로그와 디스크 화면을 첨부해 managed compute/disk 복구를 요청한다.
 3. 실제 입출금이 발생할 때 `cashflow:record`로 기록하고, 다음 월간 리뷰에서 TWR/MWR와 KOSPI 비교가 생성되는지 확인한다.
 4. Qwen 메타데이터가 붙고 리스크 승인을 받은 추천의 20거래일 평가가 30건 이상 쌓이면 `npm run db:pull && npm run model:performance`로 모델 효과를 평가한다. 그 전에는 지연·JSON 준수율·비용만 canary 지표로 본다.

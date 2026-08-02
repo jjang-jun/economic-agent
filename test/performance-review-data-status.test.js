@@ -156,7 +156,7 @@ test('portfolio performance separates external cash flow from operating return',
   assert.equal(summary.rawChangeAmount, 2000000);
   assert.equal(summary.netExternalFlow, 1000000);
   assert.equal(summary.cashFlowAdjustedChangeAmount, 1000000);
-  assert.equal(summary.returnMetrics.twrPct, 10);
+  assert.equal(summary.returnMetrics.twrPct, 9.4801);
   assert.equal(summary.returnMetrics.benchmarkReturnPct, 1);
-  assert.equal(summary.returnMetrics.excessReturnPct, 9);
+  assert.equal(summary.returnMetrics.excessReturnPct, 8.4801);
 });

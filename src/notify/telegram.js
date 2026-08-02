@@ -1331,7 +1331,7 @@ function formatPerformanceReview(review) {
       ? `▸ 외부 현금흐름: ${fmtKRW(portfolio.netExternalFlow)} · 현금흐름 조정 손익 ${fmtKRW(portfolio.cashFlowAdjustedChangeAmount)}`
       : '▸ 외부 현금흐름: 원장 조회 실패 · TWR/MWR 판단 보류',
     portfolio.returnMetrics?.dataAvailable && portfolio.cashFlowDataAvailable
-      ? `▸ 운용 성과: TWR ${fmtPct(portfolio.returnMetrics.twrPct)} · MWR 연환산 ${fmtPct(portfolio.returnMetrics.moneyWeightedAnnualizedPct)}`
+      ? `▸ 운용 성과: ${portfolio.returnMetrics.calculationQuality === 'daily_weighted_estimate' ? 'TWR 추정(Modified Dietz)' : 'TWR'} ${fmtPct(portfolio.returnMetrics.twrPct)} · MWR 연환산 ${fmtPct(portfolio.returnMetrics.moneyWeightedAnnualizedPct)}`
       : '▸ 운용 성과: 비교 스냅샷 또는 현금흐름 부족',
     portfolio.returnMetrics?.dataAvailable
       ? `▸ KOSPI ${fmtPct(portfolio.returnMetrics.benchmarkReturnPct)} · 초과수익 ${fmtPct(portfolio.returnMetrics.excessReturnPct)}`

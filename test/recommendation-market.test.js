@@ -82,6 +82,10 @@ test('buildMarketProfile includes moving-average entry timing', () => {
     breakout20d: true,
   }, {
     symbol: '^KS11',
+    price: 3250,
+    currency: 'KRW',
+    marketTime: '2026-08-01T06:30:00.000Z',
+    source: 'naver-finance',
     return5dPct: 1,
     return20dPct: 4,
   });
@@ -90,6 +94,8 @@ test('buildMarketProfile includes moving-average entry timing', () => {
   assert.equal(profile.source, 'naver-finance');
   assert.equal(profile.marketTime, '2026-08-01T06:30:00.000Z');
   assert.equal(profile.relativeStrength20d, 4);
+  assert.equal(profile.benchmarkPrice, 3250);
+  assert.equal(profile.benchmarkMarketTime, '2026-08-01T06:30:00.000Z');
   assert.equal(profile.entryTiming.action, 'breakout');
   assert.equal(profile.entryTiming.approved, true);
   assert.equal(profile.liquid, true);

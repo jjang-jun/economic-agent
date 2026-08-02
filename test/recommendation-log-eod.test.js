@@ -6,6 +6,8 @@ const {
   buildEodEvaluationQuote,
   shouldLogRecommendation,
   resolveRecommendationAiMetadata,
+  calculateBenchmarkSignalReturn,
+  buildRecommendation,
   selectTradingSessionRows,
 } = require('../src/utils/recommendation-log');
 
@@ -61,6 +63,11 @@ test('evaluation horizons use exchange sessions instead of calendar days', () =>
   assert.equal(selected.rows.at(-1).price, 102);
 });
 
+test('domestic EOD policy keeps Yahoo as the final historical fallback', () => {
+  const { PRICE_SOURCE_POLICY } = require('../src/config/price-source-policy');
+  assert.equal(PRICE_SOURCE_POLICY.eodOfficial.domestic.at(-1), 'yahoo-finance');
+});
+
 test('shouldLogRecommendation excludes watch-only risk review candidates', () => {
   assert.equal(shouldLogRecommendation({
     schema_validation: { passed: true },
@@ -100,4 +107,45 @@ test('resolveRecommendationAiMetadata carries report model metadata into recomme
   );
 
   assert.equal(resolveRecommendationAiMetadata({}, { aiMetadata: {} }, {}), null);
+});
+
+test('calculateBenchmarkSignalReturn aligns benchmark direction for bearish signals', () => {
+  assert.equal(calculateBenchmarkSignalReturn('bullish', -5), -5);
+  assert.equal(calculateBenchmarkSignalReturn('bearish', -5), 5);
+});
+
+test('buildRecommendation preserves analysis-time stock and benchmark snapshots', async () => {
+  const recommendation = await buildRecommendation({
+    name: '삼성전자',
+    ticker: '005930',
+    signal: 'bullish',
+    risk_profile: { entryReferencePrice: 80000 },
+    market_profile: {
+      price: 80000,
+      currency: 'KRW',
+      source: 'naver-finance',
+      priceType: 'delayed',
+      marketTime: '2026-08-01T06:30:00.000Z',
+      benchmarkSymbol: '^KS11',
+      benchmarkPrice: 3250,
+      benchmarkCurrency: 'KRW',
+      benchmarkMarketTime: '2026-08-01T06:30:00.000Z',
+      benchmarkSource: 'naver-finance',
+    },
+  }, [], {}, '2026-08-01');
+
+  assert.deepEqual(recommendation.entry, {
+    price: 80000,
+    currency: 'KRW',
+    marketTime: '2026-08-01T06:30:00.000Z',
+    source: 'naver-finance',
+    priceType: 'delayed',
+  });
+  assert.deepEqual(recommendation.benchmark, {
+    symbol: '^KS11',
+    entryPrice: 3250,
+    currency: 'KRW',
+    marketTime: '2026-08-01T06:30:00.000Z',
+    source: 'naver-finance',
+  });
 });

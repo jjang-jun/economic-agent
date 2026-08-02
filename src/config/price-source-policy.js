@@ -8,7 +8,7 @@ const PRICE_SOURCE_POLICY = {
     global: ['alpaca-websocket', 'massive-websocket'],
   },
   eodOfficial: {
-    domestic: ['krx-openapi', 'data-go-kr', 'kis-rest'],
+    domestic: ['krx-openapi', 'data-go-kr', 'kis-rest', 'yahoo-finance'],
     global: ['fmp', 'yahoo-finance', 'tiingo-eod'],
   },
   backtest: {

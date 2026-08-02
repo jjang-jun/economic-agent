@@ -27,6 +27,7 @@
     "review:weekly": "node --env-file-if-exists=.env scripts/performance-review.js weekly",
     "review:monthly": "node --env-file-if-exists=.env scripts/performance-review.js monthly",
     "model:performance": "node scripts/model-performance-readiness.js",
+    "research:backfill": "node --env-file-if-exists=.env scripts/backfill-research-candidates.js",
     "dashboard": "node scripts/dashboard.js",
     "freedom:report": "node --env-file-if-exists=.env scripts/freedom-report.js",
     "portfolio:snapshot": "node --env-file-if-exists=.env scripts/portfolio-snapshot.js",

@@ -36,6 +36,7 @@ RSS feeds
 - Detect low-cost pre-news signals: `npm run pre-news:signal`
 - Build weekly/monthly performance reviews: `npm run review:weekly`, `npm run review:monthly`
 - Check model/prompt performance sample readiness: `npm run model:performance` after `npm run db:pull`
+- Backfill research-only shadow candidates from pulled historical stock reports: `npm run research:backfill`
 - Build local HTML dashboard from pulled Supabase mirrors: `npm run dashboard`
 - Create a current portfolio valuation snapshot: `npm run portfolio:snapshot`
 - Sync ignored local portfolio to GitHub Actions secret: `npm run portfolio:sync-secret`
@@ -56,6 +57,7 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - Optional deploy freshness check: `AGENT_SERVER_URL` or `CLOUD_RUN_SERVICE_URL`, with `EXPECTED_DEPLOY_SHA` when running outside GitHub Actions
 - Optional Supabase resilience tuning: `SUPABASE_REQUEST_TIMEOUT_MS`, `SUPABASE_RETRY_COUNT`, `SUPABASE_RETRY_DELAY_MS`, `SUPABASE_RETRY_MAX_DELAY_MS`, `SUPABASE_CIRCUIT_BREAKER_MS`
 - Optional Telegram network timeout: `TELEGRAM_REQUEST_TIMEOUT_MS`
+- Optional public EOD timeouts: `KRX_REQUEST_TIMEOUT_MS`, `KRX_CIRCUIT_BREAKER_MS`, `DATA_GO_KR_REQUEST_TIMEOUT_MS`
 - Optional private portfolio file: `PORTFOLIO_FILE`, defaulting to ignored `data/portfolio.json`
 - Optional private portfolio env for GitHub Actions: `PORTFOLIO_JSON_BASE64` or `PORTFOLIO_JSON`
 - Optional urgent-alert tuning: `MAX_URGENT_ALERTS_PER_RUN`, `MAX_URGENT_ALERTS_PER_DAY`, `URGENT_EVENT_DEDUP_HOURS`, `IMMEDIATE_ALERT_MIN_IMPORTANCE`, `IMMEDIATE_ALERT_MIN_URGENCY`

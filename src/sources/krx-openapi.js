@@ -7,6 +7,9 @@ const KRX_API_KEY = process.env.KRX_OPENAPI_KEY
   || '';
 const KRX_BASE_URL = String(process.env.KRX_OPENAPI_BASE_URL || 'https://data-dbg.krx.co.kr/svc/apis')
   .replace(/\/+$/, '');
+const KRX_REQUEST_TIMEOUT_MS = Math.max(1000, Number(process.env.KRX_REQUEST_TIMEOUT_MS || 8000));
+const KRX_CIRCUIT_BREAKER_MS = Math.max(1000, Number(process.env.KRX_CIRCUIT_BREAKER_MS || 60000));
+let krxUnavailableUntil = 0;
 
 const MARKET_ENDPOINTS = [
   { market: 'KOSPI', path: '/sto/stk_bydd_trd' },
@@ -85,13 +88,14 @@ function rowToQuote(row = {}, options = {}) {
 
 async function fetchKrxMarketDailyQuotes({ basDd, market, path, ticker = '' }) {
   const date = compactDate(basDd);
-  if (!date || !isKrxConfigured()) return [];
+  if (!date || !isKrxConfigured() || Date.now() < krxUnavailableUntil) return [];
 
   try {
     const url = new URL(`${KRX_BASE_URL}${path}`);
     url.searchParams.set('basDd', date);
 
     const res = await fetch(url, {
+      signal: AbortSignal.timeout(KRX_REQUEST_TIMEOUT_MS),
       headers: {
         AUTH_KEY: KRX_API_KEY,
         Accept: 'application/json',
@@ -105,6 +109,7 @@ async function fetchKrxMarketDailyQuotes({ basDd, market, path, ticker = '' }) {
       .map(row => rowToQuote(row, { basDd: date, market, ticker }))
       .filter(Boolean);
   } catch (err) {
+    krxUnavailableUntil = Date.now() + KRX_CIRCUIT_BREAKER_MS;
     console.warn(`[KRX] ${market} ${date} 일별매매정보 조회 실패: ${err.message}`);
     return [];
   }
@@ -163,6 +168,7 @@ async function fetchKrxDailyOhlcv(ticker, from, to) {
   for (const basDd of eachWeekday(from, to || from)) {
     const dayRows = await fetchKrxDailyQuotesByDate(basDd, code);
     rows.push(...dayRows);
+    if (Date.now() < krxUnavailableUntil) break;
   }
 
   return rows.sort((a, b) => new Date(a.marketTime) - new Date(b.marketTime));

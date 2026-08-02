@@ -73,6 +73,62 @@ function getResearchCandidateId(date, stock) {
   return `shadow:${date}:${key}:${stock.signal || 'neutral'}`;
 }
 
+async function buildResearchCandidate(stock, report, context, date) {
+  const blockers = [...new Set(stock.risk_review?.blockers || [])];
+  const candidate = await buildRecommendation(
+    stock,
+    context.articles || [],
+    context.indicators || {},
+    date,
+    resolveRecommendationAiMetadata(stock, report, context),
+    {
+      useAnalysisEntry: true,
+      analysisTimestamp: report.generatedAt || report.createdAt || context.createdAt || new Date().toISOString(),
+      trackingCohort: 'shadow',
+      decisionStatus: 'rejected',
+      rejectionReasons: blockers,
+      researchOnly: true,
+      tradeEligible: false,
+    },
+  );
+  candidate.id = getResearchCandidateId(date, stock);
+  candidate.marketRegime = report.decision?.market?.regime || context.decision?.market?.regime || '';
+  candidate.marketScore = report.decision?.market?.score ?? context.decision?.market?.score ?? null;
+  return candidate;
+}
+
+async function buildResearchCandidatesFromReports(reportRows = [], existing = []) {
+  const byId = new Map(existing.filter(item => item?.id).map(item => [item.id, item]));
+  let added = 0;
+  let skipped = 0;
+  for (const row of reportRows) {
+    const report = row.report || row.payload || row;
+    const date = row.date || report.date;
+    if (!date) {
+      skipped += (report.stocks || []).length;
+      continue;
+    }
+    for (const stock of report.stocks || []) {
+      if (!shouldTrackResearchCandidate(stock)) {
+        skipped++;
+        continue;
+      }
+      const id = getResearchCandidateId(date, stock);
+      if (byId.has(id)) {
+        skipped++;
+        continue;
+      }
+      const candidate = await buildResearchCandidate(stock, report, {
+        createdAt: row.created_at || row.createdAt || '',
+        decision: row.decision || {},
+      }, date);
+      byId.set(id, candidate);
+      added++;
+    }
+  }
+  return { candidates: [...byId.values()], added, skipped };
+}
+
 async function logResearchCandidates(report, context = {}) {
   const stocks = report?.stocks || [];
   if (stocks.length === 0) return { added: 0, skipped: 0 };
@@ -93,26 +149,7 @@ async function logResearchCandidates(report, context = {}) {
       skipped++;
       continue;
     }
-    const blockers = [...new Set(stock.risk_review?.blockers || [])];
-    const candidate = await buildRecommendation(
-      stock,
-      context.articles || [],
-      context.indicators || {},
-      date,
-      resolveRecommendationAiMetadata(stock, report, context),
-      {
-        useAnalysisEntry: true,
-        analysisTimestamp: report.generatedAt || report.createdAt || new Date().toISOString(),
-        trackingCohort: 'shadow',
-        decisionStatus: 'rejected',
-        rejectionReasons: blockers,
-        researchOnly: true,
-        tradeEligible: false,
-      },
-    );
-    candidate.id = id;
-    candidate.marketRegime = report.decision?.market?.regime || '';
-    candidate.marketScore = report.decision?.market?.score ?? null;
+    const candidate = await buildResearchCandidate(stock, report, context, date);
     byId.set(id, candidate);
     added++;
   }
@@ -141,6 +178,8 @@ module.exports = {
   loadResearchCandidates,
   shouldTrackResearchCandidate,
   getResearchCandidateId,
+  buildResearchCandidate,
+  buildResearchCandidatesFromReports,
   logResearchCandidates,
   evaluateResearchCandidates,
 };

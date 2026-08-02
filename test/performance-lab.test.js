@@ -140,3 +140,21 @@ test('classifyFailure and risk factor helpers explain common cases', () => {
   assert.ok(riskFactorKeys(recommendation).includes('blocked_or_watch'));
   assert.ok(riskFactorKeys(recommendation).includes('blocker:market_regime'));
 });
+
+test('buildPerformanceLab uses each recommendation target horizon by default', () => {
+  const recommendation = {
+    id: 'short-term',
+    signal: 'bullish',
+    targetHorizon: '1d',
+    entry: { price: 100 },
+    riskReview: { approved: true, action: 'candidate' },
+    riskProfile: { riskReward: 2.2, expectedLossPct: 5 },
+    evaluations: {
+      1: { signalReturnPct: 3, alphaPct: 2 },
+      20: { signalReturnPct: -8, alphaPct: -9 },
+    },
+  };
+
+  assert.equal(buildPerformanceLab({ recommendations: [recommendation] }).recommendationQuality.avgSignalReturnPct, 3);
+  assert.equal(buildPerformanceLab({ recommendations: [recommendation], primaryHorizonDays: 20 }).recommendationQuality.avgSignalReturnPct, -8);
+});

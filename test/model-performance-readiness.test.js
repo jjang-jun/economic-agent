@@ -49,7 +49,25 @@ test('buildModelPerformanceReadiness reports sample readiness by model and promp
     { recommendation_id: 'legacy', day: 20, signal_return_pct: 0 },
   ];
 
-  const readiness = buildModelPerformanceReadiness({ recommendationRows, evaluationRows, minEvaluated: 2 });
+  const readiness = buildModelPerformanceReadiness({
+    recommendationRows,
+    evaluationRows,
+    minEvaluated: 2,
+    researchCandidateRows: [{
+      id: 'shadow-1',
+      signal: 'bullish',
+      ai_metadata: { provider: 'qwen', model: 'qwen3.7-plus', promptVersion: 'stock-analysis-v2.3' },
+      payload: {
+        id: 'shadow-1',
+        signal: 'bullish',
+        entry: { price: 100 },
+        researchOnly: true,
+        tradeEligible: false,
+        evaluations: {},
+      },
+    }],
+    researchEvaluationRows: [{ candidate_id: 'shadow-1', day: 20, signal_return_pct: 2 }],
+  });
 
   assert.equal(readiness.totalRecommendations, 4);
   assert.equal(readiness.eligibleRecommendations, 4);
@@ -63,6 +81,9 @@ test('buildModelPerformanceReadiness reports sample readiness by model and promp
   assert.equal(readiness.promptLeaders[0].key, 'stock-analysis-v2.1');
   assert.equal(readiness.modelLeaders.find(item => item.key === 'unknown_provider:unknown_model').ready, false);
   assert.equal(readiness.modelLeaders.find(item => item.key === 'unknown_provider:unknown_model').metadataMissing, true);
+  assert.equal(readiness.shadow.totalCandidates, 1);
+  assert.equal(readiness.shadow.evaluatedCandidates, 1);
+  assert.equal(readiness.shadow.modelLeaders[0].key, 'qwen:qwen3.7-plus');
 
   const message = formatReadiness(readiness);
   assert.match(message, /메타데이터 누락 평가 추천: 1건/);
@@ -70,4 +91,5 @@ test('buildModelPerformanceReadiness reports sample readiness by model and promp
   assert.match(message, /프롬프트\+모델 설정별/);
   assert.match(message, /판단 가능/);
   assert.match(message, /unknown_provider:unknown_model .* 메타데이터 누락/);
+  assert.match(message, /Shadow 연구 코호트 · 실제 추천과 분리/);
 });

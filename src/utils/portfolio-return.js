@@ -38,11 +38,20 @@ function calculateTimeWeightedReturn(snapshots = [], cashFlows = []) {
     const end = rows[index];
     const startTime = timestamp(start, ['capturedAt']);
     const endTime = timestamp(end, ['capturedAt']);
-    const flow = cashFlows.reduce((sum, item) => {
+    let netFlow = 0;
+    let weightedFlow = 0;
+    const duration = endTime - startTime;
+    for (const item of cashFlows) {
       const time = timestamp(item, ['occurredAt', 'occurred_at']);
-      return time > startTime && time <= endTime ? sum + externalAmount(item) : sum;
-    }, 0);
-    const periodReturn = (end.totalAssetValue - flow) / start.totalAssetValue - 1;
+      if (time <= startTime || time > endTime) continue;
+      const amount = externalAmount(item);
+      netFlow += amount;
+      weightedFlow += amount * ((endTime - time) / duration);
+    }
+    const denominator = start.totalAssetValue + weightedFlow;
+    const periodReturn = denominator > 0
+      ? (end.totalAssetValue - start.totalAssetValue - netFlow) / denominator
+      : Number.NaN;
     if (!Number.isFinite(periodReturn) || periodReturn <= -1) continue;
     growth *= 1 + periodReturn;
     periods++;
@@ -136,7 +145,8 @@ function buildPortfolioReturnMetrics({ snapshots = [], cashFlows = [], benchmark
   const benchmarkReturnPct = calculateBenchmarkReturn(benchmarkWindow);
   return {
     dataAvailable: rows.length >= 2,
-    method: 'daily_snapshot_twr',
+    method: 'linked_modified_dietz',
+    calculationQuality: externalFlows.length ? 'daily_weighted_estimate' : 'exact_without_external_flows',
     snapshotCount: rows.length,
     externalFlowCount: externalFlows.length,
     netExternalFlow,

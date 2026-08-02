@@ -38,10 +38,10 @@ function recommendationFromRow(row = {}) {
   };
 }
 
-function attachLatestEvaluations(recommendations = [], evaluationRows = []) {
+function attachLatestEvaluations(recommendations = [], evaluationRows = [], foreignKey = 'recommendation_id') {
   const byRecommendation = new Map(recommendations.map(item => [item.id, item]));
   for (const row of evaluationRows || []) {
-    const recommendation = byRecommendation.get(row.recommendation_id);
+    const recommendation = byRecommendation.get(row[foreignKey]);
     if (!recommendation || typeof row.signal_return_pct !== 'number') continue;
     recommendation.evaluations = recommendation.evaluations || {};
     recommendation.evaluations[String(row.day)] = {
@@ -107,6 +107,8 @@ function metadataCoverage(recommendations = []) {
 function buildModelPerformanceReadiness({
   recommendationRows = [],
   evaluationRows = [],
+  researchCandidateRows = [],
+  researchEvaluationRows = [],
   minEvaluated = DEFAULT_MIN_EVALUATED,
   horizonDays = DEFAULT_HORIZON_DAYS,
 } = {}) {
@@ -122,6 +124,23 @@ function buildModelPerformanceReadiness({
     groupMinEvaluated: minEvaluated,
   });
   const evaluated = eligible.filter(item => evaluationAtHorizon(item, horizonDays));
+  const researchCandidates = attachLatestEvaluations(
+    researchCandidateRows.map(recommendationFromRow),
+    researchEvaluationRows,
+    'candidate_id',
+  );
+  const shadowLab = buildPerformanceLab({
+    recommendations: researchCandidates,
+    trades: [],
+    primaryHorizonDays: horizonDays,
+    groupMinEvaluated: minEvaluated,
+    eligibilityPredicate: item => (
+      item.researchOnly === true
+      && item.tradeEligible === false
+      && ['bullish', 'bearish'].includes(item.signal)
+      && typeof item.entry?.price === 'number'
+    ),
+  });
 
   return {
     generatedAt: new Date().toISOString(),
@@ -147,6 +166,14 @@ function buildModelPerformanceReadiness({
       metadataMissing: isUnknownModelKey(item.key),
       ready: !isUnknownModelKey(item.key) && (item.evaluated || 0) >= minEvaluated,
     })),
+    shadow: {
+      totalCandidates: researchCandidates.length,
+      eligibleCandidates: shadowLab.eligibility.eligibleRecommendations,
+      evaluatedCandidates: shadowLab.recommendationQuality.evaluated,
+      modelLeaders: shadowLab.leaders.aiModels,
+      promptLeaders: shadowLab.leaders.promptVersions,
+      researchOnly: true,
+    },
   };
 }
 
@@ -172,6 +199,12 @@ function formatReadiness(readiness) {
     ...(readiness.versionLeaders.length
       ? readiness.versionLeaders.map(item => summaryLine(item, readiness.minEvaluated))
       : ['데이터 부족']),
+    '',
+    '[Shadow 연구 코호트 · 실제 추천과 분리]',
+    `후보 ${readiness.shadow?.totalCandidates || 0}건 · 고정 ${readiness.horizonDays || 20}거래일 평가 ${readiness.shadow?.evaluatedCandidates || 0}건`,
+    ...((readiness.shadow?.modelLeaders || []).length
+      ? readiness.shadow.modelLeaders.map(item => summaryLine(item, readiness.minEvaluated))
+      : ['데이터 부족']),
   ];
   return lines.join('\n');
 }
@@ -182,6 +215,8 @@ function main() {
   const readiness = buildModelPerformanceReadiness({
     recommendationRows: readJson(path.join(dataDir, 'recommendations.json')),
     evaluationRows: readJson(path.join(dataDir, 'recommendation_evaluations.json')),
+    researchCandidateRows: readJson(path.join(dataDir, 'research_candidates.json')),
+    researchEvaluationRows: readJson(path.join(dataDir, 'research_candidate_evaluations.json')),
     minEvaluated,
   });
 

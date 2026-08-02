@@ -19,12 +19,26 @@ function evaluationAtHorizon(recommendation, horizonDays) {
     : null;
 }
 
+const TARGET_HORIZON_DAYS = { '1d': 1, '1w': 5, '1m': 20 };
+
+function targetHorizonDays(recommendation = {}) {
+  const horizon = recommendation.targetHorizon || recommendation.target_horizon || '';
+  return TARGET_HORIZON_DAYS[horizon] || 20;
+}
+
+function evaluationForHorizon(recommendation, horizonDays) {
+  return evaluationAtHorizon(
+    recommendation,
+    horizonDays === 'target' ? targetHorizonDays(recommendation) : horizonDays,
+  );
+}
+
 function summarizeEvaluated(items, horizonDays = null) {
   const evaluated = items
     .map(recommendation => ({
       recommendation,
       latest: horizonDays
-        ? evaluationAtHorizon(recommendation, horizonDays)
+        ? evaluationForHorizon(recommendation, horizonDays)
         : latestEvaluation(recommendation),
     }))
     .filter(item => item.latest);
@@ -198,7 +212,7 @@ function riskFactorKeys(recommendation = {}) {
 
 function classifyFailure(recommendation = {}, horizonDays = null) {
   const latest = horizonDays
-    ? evaluationAtHorizon(recommendation, horizonDays)
+    ? evaluationForHorizon(recommendation, horizonDays)
     : latestEvaluation(recommendation);
   if (!latest) return 'not_evaluated';
   const evaluation = latest.evaluation;
@@ -220,7 +234,7 @@ function summarizeFailures(recommendations = [], horizonDays = null) {
     .map(recommendation => ({
       recommendation,
       latest: horizonDays
-        ? evaluationAtHorizon(recommendation, horizonDays)
+        ? evaluationForHorizon(recommendation, horizonDays)
         : latestEvaluation(recommendation),
       reason: classifyFailure(recommendation, horizonDays),
     }))
@@ -276,7 +290,7 @@ function buildStrategyReadiness({
   minEvaluated = Number(process.env.STRATEGY_MIN_EVALUATED || 30),
   minLinkedTrades = Number(process.env.STRATEGY_MIN_LINKED_TRADES || 10),
 } = {}) {
-  const evaluated = recommendations.filter(item => evaluationAtHorizon(item, primaryHorizonDays));
+  const evaluated = recommendations.filter(item => evaluationForHorizon(item, primaryHorizonDays));
   const withMetadata = evaluated.filter(item => (
     aiModelKey(item) !== 'unknown_provider:unknown_model'
     && promptVersionKey(item) !== 'legacy_prompt'
@@ -317,17 +331,18 @@ function buildStrategyReadiness({
 function buildPerformanceLab({
   recommendations = [],
   trades = [],
-  primaryHorizonDays = 20,
+  primaryHorizonDays = 'target',
   groupMinEvaluated = 5,
+  eligibilityPredicate = isEligibleRecommendation,
 } = {}) {
-  const eligibleRecommendations = recommendations.filter(isEligibleRecommendation);
+  const eligibleRecommendations = recommendations.filter(eligibilityPredicate);
   const linkedRecommendationIds = new Set(
     trades.map(trade => trade.recommendationId).filter(Boolean)
   );
   const executedRecommendations = eligibleRecommendations.filter(item => linkedRecommendationIds.has(item.id));
   const missedRecommendations = eligibleRecommendations.filter(item => !linkedRecommendationIds.has(item.id));
-  const evaluatedMissed = missedRecommendations.filter(item => evaluationAtHorizon(item, primaryHorizonDays));
-  const evaluatedExecuted = executedRecommendations.filter(item => evaluationAtHorizon(item, primaryHorizonDays));
+  const evaluatedMissed = missedRecommendations.filter(item => evaluationForHorizon(item, primaryHorizonDays));
+  const evaluatedExecuted = executedRecommendations.filter(item => evaluationForHorizon(item, primaryHorizonDays));
 
   const aiVersionLeaders = addSampleConfidence(
     topGroups(summarizeGroups(eligibleRecommendations, aiVersionKey, primaryHorizonDays), 5),
@@ -406,6 +421,8 @@ module.exports = {
   classifyFailure,
   summarizeFailures,
   evaluationAtHorizon,
+  evaluationForHorizon,
+  targetHorizonDays,
   isEligibleRecommendation,
   buildStrategyReadiness,
 };

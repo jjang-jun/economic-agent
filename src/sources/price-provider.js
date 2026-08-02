@@ -200,6 +200,7 @@ async function fetchDomesticDailyOhlcv(ticker, from, to) {
           const kisRows = await fetchKisDailyOhlcv(ticker, from, to);
           return kisRows.map(row => kisDailyRowToQuote(row, ticker)).filter(Boolean);
         }
+        if (source === 'yahoo-finance') return fetchYahooDailyOhlcv(normalizeYahooSymbol(ticker), from, to);
         return [];
       },
     }) || [];

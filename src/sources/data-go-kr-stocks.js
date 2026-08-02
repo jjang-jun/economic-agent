@@ -6,6 +6,7 @@ const DATA_GO_KR_API_KEY = process.env.DATA_GO_KR_API_KEY
   || '';
 const STOCK_PRICE_URL = process.env.DATA_GO_KR_STOCK_PRICE_URL
   || 'https://apis.data.go.kr/1160100/service/GetStockSecuritiesInfoService/getStockPriceInfo';
+const DATA_GO_KR_REQUEST_TIMEOUT_MS = Math.max(1000, Number(process.env.DATA_GO_KR_REQUEST_TIMEOUT_MS || 10000));
 
 function isDataGoKrConfigured() {
   return Boolean(DATA_GO_KR_API_KEY);
@@ -90,6 +91,7 @@ async function fetchDataGoKrDailyOhlcv(ticker, from, to) {
     url.searchParams.set('endBasDt', end);
 
     const res = await fetch(url, {
+      signal: AbortSignal.timeout(DATA_GO_KR_REQUEST_TIMEOUT_MS),
       headers: { 'User-Agent': 'economic-agent/2.0' },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
