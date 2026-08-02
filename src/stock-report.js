@@ -9,6 +9,7 @@ const { fetchAllIndicators } = require('./utils/indicators');
 const { saveDailySummary } = require('./utils/daily-summary');
 const { archiveScoredArticles, loadScoredArticles, getKSTDate } = require('./utils/article-archive');
 const { logRecommendations } = require('./utils/recommendation-log');
+const { logResearchCandidates } = require('./utils/research-candidate-log');
 const { fetchMarketSnapshot } = require('./utils/market-snapshot');
 const { fetchCapitalFlowRadar } = require('./utils/capital-flow-radar');
 const { buildDecisionContextWithQuotes, detectMarketThemes } = require('./utils/decision-engine');
@@ -123,6 +124,9 @@ async function main() {
     throw new Error(`종목 리포트 저장 실패: ${stockReportPersistence.error.message}`);
   }
   await persistDecisionContext(report.decision);
+
+  const researchLogged = await logResearchCandidates(report, { articles: scored, indicators });
+  console.log(`[Shadow 후보] 신규 ${researchLogged.added}건, 제외/중복 ${researchLogged.skipped}건`);
 
   const sent = await sendStockReport(report);
   if (!sent) {

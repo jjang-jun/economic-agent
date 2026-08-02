@@ -1,4 +1,5 @@
 const { evaluateRecommendations } = require('./utils/recommendation-log');
+const { evaluateResearchCandidates } = require('./utils/research-candidate-log');
 const { sendPerformanceReport } = require('./notify/telegram');
 
 async function main() {
@@ -6,6 +7,9 @@ async function main() {
 
   const result = await evaluateRecommendations();
   console.log(`[성과평가] 전체 추천 ${result.total}건, 신규 평가 ${result.completed.length}건`);
+
+  const researchResult = await evaluateResearchCandidates();
+  console.log(`[Shadow 평가] 전체 후보 ${researchResult.total}건, 신규 평가 ${researchResult.completed.length}건`);
 
   if (result.completed.length > 0) {
     const sent = await sendPerformanceReport(result.completed);

@@ -16,6 +16,8 @@ const TABLES = [
   'stock_reports',
   'recommendations',
   'recommendation_evaluations',
+  'research_candidates',
+  'research_candidate_evaluations',
   'trade_executions',
   'portfolio_snapshots',
   'performance_reviews',

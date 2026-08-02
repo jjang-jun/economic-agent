@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { loadRecommendationsWithStatus } = require('./recommendation-log');
+const { loadResearchCandidatesWithStatus } = require('./research-candidate-log');
 const { loadTradeExecutionsWithStatus } = require('./trade-log');
 const { getKSTDate } = require('./article-archive');
 const { loadPortfolio, enrichPortfolio, loadLatestPortfolioSnapshot } = require('./portfolio');
@@ -174,6 +175,38 @@ function summarizeRecommendationTracker(recommendations = [], options = {}) {
   };
 }
 
+function summarizeResearchCandidates(candidates = [], options = {}) {
+  const evaluated = candidates.filter(item => (
+    typeof item.evaluations?.['20']?.signalReturnPct === 'number'
+  ));
+  const wins = evaluated.filter(item => item.evaluations['20'].signalReturnPct > 0);
+  const alphaRows = evaluated.filter(item => typeof item.evaluations['20'].alphaPct === 'number');
+  const blockerCounts = countBy(
+    candidates.flatMap(item => [...new Set((item.rejectionReasons || [])
+      .map(reason => String(reason).split(':')[0] || 'unknown'))]),
+    reason => reason,
+  );
+  return {
+    dataAvailable: options.dataAvailable !== false,
+    dataError: options.dataError || '',
+    total: candidates.length,
+    evaluated20d: evaluated.length,
+    pending: candidates.filter(item => item.status === 'open').length,
+    missingPrice: candidates.filter(item => item.status === 'missing_price').length,
+    winRatePct: evaluated.length ? round((wins.length / evaluated.length) * 100) : null,
+    avgSignalReturnPct: evaluated.length
+      ? round(evaluated.reduce((sum, item) => sum + item.evaluations['20'].signalReturnPct, 0) / evaluated.length)
+      : null,
+    avgAlphaPct: alphaRows.length
+      ? round(alphaRows.reduce((sum, item) => sum + item.evaluations['20'].alphaPct, 0) / alphaRows.length)
+      : null,
+    topRejectionReasons: Object.entries(blockerCounts)
+      .map(([reason, count]) => ({ reason, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 4),
+  };
+}
+
 function summarizePortfolioPerformance(portfolioResult = {}, snapshots = []) {
   const portfolio = portfolioResult.portfolio || null;
   const validRows = snapshots
@@ -252,15 +285,18 @@ async function resolveReviewPortfolio() {
 async function buildPerformanceReview(period = 'weekly', options = {}) {
   const days = period === 'monthly' ? 30 : 7;
   const startDate = daysAgo(days);
-  const [recommendationResult, tradeResult, stockReportResult] = await Promise.all([
+  const [recommendationResult, researchResult, tradeResult, stockReportResult] = await Promise.all([
     loadRecommendationsWithStatus(),
+    loadResearchCandidatesWithStatus(),
     loadTradeExecutionsWithStatus(),
     loadPersistedStockReports({ startDate, limit: 100 }),
   ]);
   const recommendations = recommendationResult.recommendations;
+  const researchCandidates = researchResult.candidates;
   const trades = tradeResult.trades;
   const periodRecommendations = filterByWindow(recommendations, 'date', startDate);
   const periodTrades = filterByWindow(trades, 'date', startDate);
+  const periodResearchCandidates = filterByWindow(researchCandidates, 'date', startDate);
   const recommendationSummary = summarizeRecommendations(periodRecommendations, {
     dataAvailable: recommendationResult.dataAvailable,
     persistenceAvailable: recommendationResult.persistenceAvailable,
@@ -280,6 +316,10 @@ async function buildPerformanceReview(period = 'weekly', options = {}) {
   const recommendationTracker = summarizeRecommendationTracker(recommendations, {
     dataAvailable: recommendationResult.dataAvailable,
     dataError: recommendationResult.error,
+  });
+  const researchCandidateSummary = summarizeResearchCandidates(periodResearchCandidates, {
+    dataAvailable: researchResult.dataAvailable,
+    dataError: researchResult.error,
   });
   const performanceLab = buildPerformanceLab({
     recommendations: periodRecommendations,
@@ -333,6 +373,7 @@ async function buildPerformanceReview(period = 'weekly', options = {}) {
     recommendationSummary,
     recommendationFunnel,
     recommendationTracker,
+    researchCandidateSummary,
     tradeSummary,
     portfolioSummary,
     performanceLab,
@@ -506,6 +547,7 @@ module.exports = {
   summarizeTrades,
   summarizeRecommendationFunnel,
   summarizeRecommendationTracker,
+  summarizeResearchCandidates,
   summarizePortfolioPerformance,
   resolveReviewPortfolio,
   buildImprovementActions,

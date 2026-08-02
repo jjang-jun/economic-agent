@@ -226,6 +226,12 @@ test('monthly performance review leads with portfolio results and uses continuou
       latestEvaluationAt: '2026-06-08T08:30:00.000Z',
       engineHasHistory: true,
     },
+    researchCandidateSummary: {
+      dataAvailable: true,
+      total: 12,
+      evaluated20d: 4,
+      topRejectionReasons: [{ reason: 'market_regime', count: 7 }],
+    },
     tradeSummary: { dataAvailable: true, total: 0, linked: 0 },
     performanceLab: {},
     collectorOps: {},
@@ -241,6 +247,7 @@ test('monthly performance review leads with portfolio results and uses continuou
   assert.match(message, /검증 코호트: 리스크 승인·계약 충족 1건 · 20일 완료 1건/);
   assert.match(message, /평가 제외: 기준 가격 없음 3건/);
   assert.match(message, /평가기 상태: 동작 이력 있음 · 이번 달 신규 승인 입력 없음/);
+  assert.match(message, /Shadow 연구 코호트: 후보 12건 · 20일 평가 4건 · 실제 매매 대상 아님/);
   assert.match(message, /성과 판단: 평가 표본 없음/);
   assert.match(message, /다음 달 개선/);
   assert.doesNotMatch(message, /모델별 성과/);

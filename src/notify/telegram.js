@@ -1206,6 +1206,7 @@ function formatPerformanceReview(review) {
   const rec = review.recommendationSummary || {};
   const funnel = review.recommendationFunnel || {};
   const tracker = review.recommendationTracker || {};
+  const researchCandidates = review.researchCandidateSummary || {};
   const trade = review.tradeSummary || {};
   const portfolio = review.portfolioSummary || {};
   const lab = review.performanceLab || {};
@@ -1372,6 +1373,11 @@ function formatPerformanceReview(review) {
     ] : [
       `▸ 분석: 리포트 ${funnel.reportDays ?? 0}일 · 종목 후보 ${funnel.analyzedCandidates ?? 0}건`,
       `▸ 판정: 강세 ${funnel.bullishCandidates ?? 0}건 · 관찰/차단 ${funnel.watchOnlyCandidates ?? 0}건 · 승인 ${funnel.approvedCandidates ?? 0}건`,
+      researchCandidates.dataAvailable === false
+        ? '▸ Shadow 연구 코호트: 저장소 조회 실패'
+        : `▸ Shadow 연구 코호트: 후보 ${researchCandidates.total ?? 0}건 · 20일 평가 ${researchCandidates.evaluated20d ?? 0}건 · 실제 매매 대상 아님`,
+      ...(researchCandidates.topRejectionReasons || []).slice(0, 2)
+        .map(item => `▸ Shadow 차단 사유: ${explainRiskFactorKey(item.reason)} ${item.count}건`),
       ...(funnel.topBlockers || []).slice(0, 3).map(item => `▸ 주요 차단: ${explainRiskFactorKey(item.reason)} ${item.count}건`),
       ...trackerLines,
     ];

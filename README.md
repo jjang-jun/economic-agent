@@ -23,6 +23,7 @@
 - **하루 5회 AI 다이제스트** — 시장 이벤트 시간대에 맞춘 뉴스 요약 브리핑
 - **장 마감 종목 분석** — AI 기반 섹터/종목 인사이트 리포트
 - **추천 성과 추적** — 종목 신호를 저장하고 1일/5일/20일 후 수익률 평가
+- **Shadow 후보 평가** — 실제 매매 기준은 유지하면서 스키마를 통과한 리스크 차단 후보를 별도 연구 코호트로 1일/5일/20일 평가
 - **추천 리스크 평가** — 추천 후 최대상승률, 최대하락률, 손절선/목표구간 터치 여부 추적
 - **기업가치평가 필터** — PER/PSR/FCF 수익률과 성장/현금흐름을 함께 봐 고평가 추격 후보를 관찰로 낮춤
 - **일일 행동 리포트** — 신규 매수/관찰/보유/축소/매도 후보를 포트폴리오 기준으로 분리
@@ -187,12 +188,13 @@ Telegram 채팅창에서 명령어를 실제로 쓰기 위한 배포와 webhook 
 - `data/daily-articles/YYYY-MM-DD.json`: 수집 중 점수화된 당일 기사 누적 아카이브
 - `data/daily-summary/YYYY-MM-DD.json`: 다이제스트/종목 리포트 요약
 - `data/recommendations/recommendations.json`: 추천/성과 평가 로컬 미러. 기준 저장소는 Supabase `recommendations`, `recommendation_evaluations`
+- `data/research-candidates/research-candidates.json`: 실제 매매 대상이 아닌 리스크 차단 후보의 shadow 평가 로컬 미러
 - `data/trades/trade-executions.json`: 실제 매수/매도 기록 로컬 미러. 추천과 실제 실행은 분리합니다.
 - `data/trades/trade-plans.json`: 아직 체결되지 않은 예정 매매 로컬 체크리스트
 - `data/portfolio-snapshots/YYYY-MM-DD.json`: 보유 종목 현재가/평가손익 스냅샷
 - `data/action-reports/YYYY-MM-DD.json`: 신규 매수/관찰/보유/축소/매도 후보 일일 행동 리포트
 - `data/freedom/freedom-status.json`: 경제적 자유 목표와 현재 달성률
-- Supabase tables: `articles`, `daily_summaries`, `stock_reports`, `recommendations`, `recommendation_evaluations`, `trade_executions`, `portfolio_snapshots`, `market_snapshots`, `price_snapshots`, `investor_flows`, `decision_contexts`
+- Supabase tables: `articles`, `daily_summaries`, `stock_reports`, `recommendations`, `recommendation_evaluations`, `research_candidates`, `research_candidate_evaluations`, `trade_executions`, `portfolio_snapshots`, `market_snapshots`, `price_snapshots`, `investor_flows`, `decision_contexts`
 - Agent/Supabase tables: `financial_freedom_goals`, `portfolio_accounts`, `positions`, `risk_policy`, `conversation_messages`, `pending_actions`
 - `data/supabase/*.json`: Supabase 데이터를 내려받은 로컬 JSON 미러
 - `data/economic-agent.db`: Supabase 데이터를 내려받은 로컬 SQLite 미러
@@ -301,6 +303,8 @@ suggested_buy_amount = min(position_by_risk, position_by_cap, available_cash)
 ## 성과 평가 기준
 
 추천은 단순 수익률만 보지 않습니다. `recommendation_evaluations`에는 1일/5일/20일 단위로 아래 값을 저장합니다.
+
+실제 승인 추천은 기존 `recommendations`에만 저장합니다. 스키마를 통과했지만 시장 레짐·손익비·진입 타이밍 등으로 차단된 방향성 후보는 `research_candidates`에 `researchOnly=true`, `tradeEligible=false`로 분리하고 같은 EOD 기준으로 평가합니다. Shadow 성과는 차단 규칙 연구용이며 실제 추천 성과나 자동 규칙 조정 표본에 섞지 않습니다.
 
 - 추천 후 수익률과 KOSPI 벤치마크 대비 초과수익
 - 추천 후 최대상승률(MFE)

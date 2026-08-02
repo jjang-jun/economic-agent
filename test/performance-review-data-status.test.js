@@ -5,6 +5,7 @@ const {
   summarizeTrades,
   summarizeRecommendationFunnel,
   summarizeRecommendationTracker,
+  summarizeResearchCandidates,
   summarizePortfolioPerformance,
 } = require('../src/utils/performance-review');
 
@@ -78,6 +79,31 @@ test('recommendation funnel distinguishes analysis from approved recommendations
   assert.deepEqual(summary.topBlockers, [
     { reason: 'market_regime', count: 1 },
     { reason: 'liquidity', count: 1 },
+  ]);
+});
+
+test('shadow summary evaluates rejected candidates without promoting them to live recommendations', () => {
+  const summary = summarizeResearchCandidates([
+    {
+      status: 'evaluated',
+      rejectionReasons: ['market_regime: RISK_OFF'],
+      evaluations: { 20: { signalReturnPct: 5, alphaPct: 2 } },
+    },
+    {
+      status: 'open',
+      rejectionReasons: ['entry_timing: wait'],
+      evaluations: {},
+    },
+  ]);
+
+  assert.equal(summary.total, 2);
+  assert.equal(summary.evaluated20d, 1);
+  assert.equal(summary.pending, 1);
+  assert.equal(summary.winRatePct, 100);
+  assert.equal(summary.avgSignalReturnPct, 5);
+  assert.deepEqual(summary.topRejectionReasons, [
+    { reason: 'market_regime', count: 1 },
+    { reason: 'entry_timing', count: 1 },
   ]);
 });
 

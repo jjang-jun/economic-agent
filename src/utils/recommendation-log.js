@@ -114,12 +114,22 @@ function resolveRecommendationAiMetadata(stock = {}, report = {}, context = {}) 
   return candidates.find(hasMeaningfulAiMetadata) || null;
 }
 
-async function buildRecommendation(stock, articles, indicators, date, aiMetadata = null) {
+async function buildRecommendation(stock, articles, indicators, date, aiMetadata = null, options = {}) {
   const symbol = normalizeYahooSymbol(stock.ticker);
+  const riskProfile = stock.risk_profile || stock.riskProfile || null;
+  const marketProfile = stock.market_profile || stock.marketProfile || null;
+  const analysisEntryPrice = riskProfile?.entryReferencePrice || marketProfile?.price || null;
   const [quote, benchmark] = await Promise.all([
-    symbol ? fetchCurrentPrice(symbol) : null,
+    symbol && !(options.useAnalysisEntry && analysisEntryPrice) ? fetchCurrentPrice(symbol) : null,
     fetchBenchmarkQuote(),
   ]);
+  const entryQuote = quote || (analysisEntryPrice ? {
+    price: analysisEntryPrice,
+    currency: marketProfile?.currency || '',
+    marketTime: options.analysisTimestamp || new Date().toISOString(),
+    source: 'analysis_snapshot',
+    priceType: 'analysis_snapshot',
+  } : null);
 
   return {
     id: getRecommendationId(date, stock),
@@ -136,20 +146,25 @@ async function buildRecommendation(stock, articles, indicators, date, aiMetadata
     risk: stock.risk || '',
     invalidation: stock.invalidation || stock.risk_profile?.invalidation || '',
     failureReason: stock.failure_reason || stock.failureReason || '',
-    riskProfile: stock.risk_profile || null,
-    marketProfile: stock.market_profile || null,
+    riskProfile,
+    marketProfile,
     fundamentalProfile: stock.fundamental_profile || null,
     riskReview: stock.risk_review || null,
     aiMetadata: resolveRecommendationAiMetadata(stock, { aiMetadata }) || null,
     relatedNews: getRelatedArticleIds(stock, articles),
     indicators,
-    entry: quote
+    trackingCohort: options.trackingCohort || 'approved',
+    decisionStatus: options.decisionStatus || 'approved',
+    rejectionReasons: options.rejectionReasons || [],
+    researchOnly: options.researchOnly === true,
+    tradeEligible: options.tradeEligible !== false,
+    entry: entryQuote
       ? {
-          price: quote.price,
-          currency: quote.currency,
-          marketTime: quote.marketTime,
-          source: quote.source || '',
-          priceType: quote.priceType || 'current',
+          price: entryQuote.price,
+          currency: entryQuote.currency,
+          marketTime: entryQuote.marketTime,
+          source: entryQuote.source || '',
+          priceType: entryQuote.priceType || 'current',
         }
       : null,
     benchmark: benchmark
@@ -161,7 +176,7 @@ async function buildRecommendation(stock, articles, indicators, date, aiMetadata
         }
       : null,
     evaluations: {},
-    status: quote ? 'open' : 'missing_price',
+    status: entryQuote ? 'open' : 'missing_price',
   };
 }
 
@@ -385,8 +400,7 @@ function getResultLabel(evaluation) {
   return 'negative_or_flat';
 }
 
-async function evaluateRecommendations() {
-  const recommendations = await loadRecommendations();
+async function evaluateRecommendationCollection(recommendations, options = {}) {
   const completed = [];
 
   for (const recommendation of recommendations) {
@@ -454,16 +468,26 @@ async function evaluateRecommendations() {
     recommendation.status = done ? 'evaluated' : 'open';
   }
 
-  saveRecommendations(recommendations);
-  const recommendationResult = await persistRecommendations(recommendations);
+  if (typeof options.saveItems === 'function') options.saveItems(recommendations);
+  const persistItems = options.persistItems || persistRecommendations;
+  const persistEvaluations = options.persistEvaluations || persistRecommendationEvaluations;
+  const recommendationResult = await persistItems(recommendations);
   if (recommendationResult.error) {
-    throw new Error(`추천 상태 저장 실패: ${recommendationResult.error.message}`);
+    throw new Error(`${options.itemLabel || '추천'} 상태 저장 실패: ${recommendationResult.error.message}`);
   }
-  const evaluationResult = await persistRecommendationEvaluations(completed);
+  const evaluationResult = await persistEvaluations(completed);
   if (evaluationResult.error) {
-    throw new Error(`추천 평가 저장 실패: ${evaluationResult.error.message}`);
+    throw new Error(`${options.itemLabel || '추천'} 평가 저장 실패: ${evaluationResult.error.message}`);
   }
   return { completed, total: recommendations.length };
+}
+
+async function evaluateRecommendations() {
+  const recommendations = await loadRecommendations();
+  return evaluateRecommendationCollection(recommendations, {
+    saveItems: saveRecommendations,
+    itemLabel: '추천',
+  });
 }
 
 module.exports = {
@@ -489,4 +513,6 @@ module.exports = {
   getEvaluationStats,
   getResultLabel,
   getRelatedArticleIds,
+  buildRecommendation,
+  evaluateRecommendationCollection,
 };

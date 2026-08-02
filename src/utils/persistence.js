@@ -498,6 +498,81 @@ async function persistRecommendationEvaluations(completed) {
   return upsert('recommendation_evaluations', rows, 'id');
 }
 
+function researchCandidateRow(candidate) {
+  const aiMetadata = candidate.aiMetadata || candidate.ai_metadata || null;
+  return {
+    id: candidate.id,
+    date: candidate.date,
+    name: candidate.name || '',
+    ticker: candidate.ticker || '',
+    symbol: candidate.symbol || '',
+    signal: candidate.signal || 'neutral',
+    conviction: candidate.conviction || 'low',
+    cohort: candidate.trackingCohort || 'shadow',
+    decision_status: candidate.decisionStatus || 'rejected',
+    rejection_reasons: candidate.rejectionReasons || [],
+    market_regime: candidate.marketRegime || '',
+    ai_provider: aiMetadata?.provider || null,
+    ai_model: aiMetadata?.model || null,
+    prompt_version: aiMetadata?.promptVersion || aiMetadata?.prompt_version || null,
+    entry: candidate.entry || null,
+    benchmark: candidate.benchmark || null,
+    status: candidate.status || '',
+    payload: candidate,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+async function persistResearchCandidates(candidates) {
+  const rows = (candidates || [])
+    .filter(candidate => candidate?.id && candidate?.date)
+    .map(researchCandidateRow);
+  return upsert('research_candidates', rows, 'id');
+}
+
+async function loadPersistedResearchCandidates() {
+  const result = await selectRows('research_candidates', {
+    select: 'payload',
+    order: 'date.desc,updated_at.desc',
+  });
+  if (!result.rows) return result;
+  return {
+    rows: result.rows.map(row => row.payload).filter(Boolean),
+  };
+}
+
+function researchEvaluationRow(item) {
+  const candidate = item.recommendation;
+  const evaluation = item.evaluation;
+  return {
+    id: `${candidate.id}:${item.day}`,
+    candidate_id: candidate.id,
+    day: item.day,
+    evaluated_at: evaluation.evaluatedAt || null,
+    price: evaluation.price || null,
+    return_pct: evaluation.returnPct ?? null,
+    signal_return_pct: evaluation.signalReturnPct ?? null,
+    alpha_pct: evaluation.alphaPct ?? null,
+    max_price_after: evaluation.maxPriceAfter ?? null,
+    min_price_after: evaluation.minPriceAfter ?? null,
+    max_favorable_excursion_pct: evaluation.maxFavorableExcursionPct ?? null,
+    max_adverse_excursion_pct: evaluation.maxAdverseExcursionPct ?? null,
+    max_drawdown_pct: evaluation.maxDrawdownPct ?? null,
+    stop_touched: evaluation.stopTouched ?? null,
+    target_touched: evaluation.targetTouched ?? null,
+    result_label: evaluation.resultLabel || '',
+    benchmark: evaluation.benchmark || null,
+    payload: evaluation,
+  };
+}
+
+async function persistResearchCandidateEvaluations(completed) {
+  const rows = (completed || [])
+    .filter(item => item?.recommendation?.id && item?.evaluation)
+    .map(researchEvaluationRow);
+  return upsert('research_candidate_evaluations', rows, 'id');
+}
+
 function tradeExecutionRow(trade) {
   const amount = typeof trade.amount === 'number'
     ? trade.amount
@@ -947,6 +1022,9 @@ module.exports = {
   persistRecommendations,
   loadPersistedRecommendations,
   persistRecommendationEvaluations,
+  persistResearchCandidates,
+  loadPersistedResearchCandidates,
+  persistResearchCandidateEvaluations,
   persistTradeExecutions,
   loadPersistedTradeExecutions,
   persistPortfolioSnapshot,

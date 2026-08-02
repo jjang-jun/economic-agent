@@ -7,6 +7,8 @@ const {
   persistStockReport,
   persistRecommendations,
   persistRecommendationEvaluations,
+  persistResearchCandidates,
+  persistResearchCandidateEvaluations,
   persistTradeExecutions,
   persistPortfolioSnapshot,
   persistMarketSnapshots,
@@ -123,6 +125,20 @@ async function importRecommendations() {
   return { recommendations: recommendations.length, evaluations: evaluations.length };
 }
 
+async function importResearchCandidates() {
+  const file = path.join(DATA_DIR, 'research-candidates', 'research-candidates.json');
+  const candidates = readJSON(file, []);
+  if (candidates.length === 0) return { candidates: 0, evaluations: 0 };
+
+  await persistOrThrow(persistResearchCandidates(candidates), 'research candidates');
+  const evaluations = completedEvaluationsFromRecommendations(candidates);
+  await persistOrThrow(
+    persistResearchCandidateEvaluations(evaluations),
+    'research candidate evaluations',
+  );
+  return { candidates: candidates.length, evaluations: evaluations.length };
+}
+
 async function importTradeExecutions() {
   const file = path.join(DATA_DIR, 'trades', 'trade-executions.json');
   const trades = readJSON(file, []);
@@ -152,6 +168,7 @@ async function main() {
   const articles = await importArticles();
   const summaries = await importDailySummaries();
   const recommendationResult = await importRecommendations();
+  const researchResult = await importResearchCandidates();
   const trades = await importTradeExecutions();
   const portfolioSnapshots = await importPortfolioSnapshots();
 
@@ -159,6 +176,8 @@ async function main() {
   console.log(`[DB] imported daily summaries: ${summaries}`);
   console.log(`[DB] imported recommendations: ${recommendationResult.recommendations}`);
   console.log(`[DB] imported recommendation evaluations: ${recommendationResult.evaluations}`);
+  console.log(`[DB] imported research candidates: ${researchResult.candidates}`);
+  console.log(`[DB] imported research candidate evaluations: ${researchResult.evaluations}`);
   console.log(`[DB] imported trade executions: ${trades}`);
   console.log(`[DB] imported portfolio snapshots: ${portfolioSnapshots}`);
 }
