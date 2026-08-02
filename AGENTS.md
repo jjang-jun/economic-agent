@@ -30,6 +30,7 @@ RSS feeds
 - Evaluate recommendation performance: `npm run evaluate`
 - List recent recommendations and IDs: `npm run recommendations:list`
 - Record an actual manual trade execution: `npm run trade:record -- --side buy --ticker 005930 --quantity 3 --price 266000`
+- Record a portfolio cash flow: `npm run cashflow:record -- --type deposit --amount 1000000 --occurred-at 2026-08-01T09:00:00+09:00`
 - Review actual trade performance: `npm run trade:performance`
 - Send premarket/intraday timing alerts: `npm run timing:alert -- premarket`, `npm run timing:alert -- intraday`
 - Detect low-cost pre-news signals: `npm run pre-news:signal`
@@ -103,6 +104,8 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - `src/utils/performance-review.js`: summarizes recommendation and trade performance over weekly/monthly windows
 - `src/utils/local-research-worker.js`: optional monthly review sidecar for local Python OHLCV research; disabled unless `LOCAL_RESEARCH_WORKER_ENABLED=true`
 - `src/utils/trade-log.js`: stores actual manual trade executions in ignored local data and Supabase
+- `src/utils/portfolio-cash-flow.js`: stores signed deposit/withdrawal/dividend/interest/fee/tax events separately from trades
+- `src/utils/portfolio-return.js`: calculates daily-snapshot TWR, annualized MWR/XIRR, and same-window KOSPI excess return
 - `src/utils/decision-engine.js`: rule-based market regime, index trend scoring, and action guardrails
 - `src/utils/digest-market.js`: resolves delayed digest sessions, labels snapshot freshness, builds deterministic short-term price mood, and reconciles contradictory AI digest mood
 - Market regime can include tags such as `OVERHEATED`, `CONCENTRATED_LEADERSHIP`, `SEMICONDUCTOR_LEADERSHIP`, `AI_SEMICONDUCTOR_CYCLE`, `GROWTH_CONCENTRATION`, and `MOMENTUM_ALLOWED`. Treat these as risk controls, not pure buy signals.
@@ -120,6 +123,7 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - Manual portfolio prices are capture-time values and fresh quotes should replace them unless `valuationLocked=true`. `unclassifiedAssetAmount` contributes to net worth but never to cash/buying power.
 - Portfolio valuation snapshots are saved under ignored `data/portfolio-snapshots/` and persisted to Supabase `portfolio_snapshots` when configured.
 - Monthly reviews are portfolio-first and must distinguish the stock-report candidate funnel from approved recommendation logs. Missing portfolio data must not be rendered as zero net worth.
+- Portfolio performance must not treat deposits or withdrawals as investment return. If the cash-flow ledger is unavailable, report adjusted TWR/MWR as unavailable rather than assuming zero flows.
 - Monthly recommendation reporting must distinguish evaluator history, newly approved inputs, and the strict verified cohort. A successful evaluation workflow with no new approved recommendations is not an evaluator outage; persistence errors must fail the workflow.
 - `src/utils/persistence.js`: optional Supabase REST persistence for articles, summaries, reports, recommendations, snapshots, investor flows, decisions
 - `src/config/keywords.js`: compatibility facade merging purpose-specific keyword configs

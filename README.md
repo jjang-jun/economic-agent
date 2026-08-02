@@ -28,6 +28,7 @@
 - **기업가치평가 필터** — PER/PSR/FCF 수익률과 성장/현금흐름을 함께 봐 고평가 추격 후보를 관찰로 낮춤
 - **일일 행동 리포트** — 신규 매수/관찰/보유/축소/매도 후보를 포트폴리오 기준으로 분리
 - **경제적 자유 추적** — 목표 순자산, 현재 달성률, 예상 달성 시점 계산
+- **현금흐름 조정 계좌 성과** — 입출금 원장으로 기간 TWR·연환산 MWR를 계산하고 같은 구간 KOSPI와 비교
 - **히스토리 영구 저장** — Supabase/Postgres에 기사, 리포트, 추천, 성과, 시장 스냅샷 저장
 - **로컬 분석 미러** — Supabase 데이터를 JSON과 SQLite로 내려받아 로컬 파일시스템에서 직접 질의
 - **AI 토큰 예산 관리** — 중요도 상위 기사와 핵심 가격 스냅샷만 AI 프롬프트에 투입
@@ -191,10 +192,11 @@ Telegram 채팅창에서 명령어를 실제로 쓰기 위한 배포와 webhook 
 - `data/research-candidates/research-candidates.json`: 실제 매매 대상이 아닌 리스크 차단 후보의 shadow 평가 로컬 미러
 - `data/trades/trade-executions.json`: 실제 매수/매도 기록 로컬 미러. 추천과 실제 실행은 분리합니다.
 - `data/trades/trade-plans.json`: 아직 체결되지 않은 예정 매매 로컬 체크리스트
+- `data/portfolio-cash-flows/portfolio-cash-flows.json`: 입금·출금·배당·이자·수수료·세금 원장 로컬 미러
 - `data/portfolio-snapshots/YYYY-MM-DD.json`: 보유 종목 현재가/평가손익 스냅샷
 - `data/action-reports/YYYY-MM-DD.json`: 신규 매수/관찰/보유/축소/매도 후보 일일 행동 리포트
 - `data/freedom/freedom-status.json`: 경제적 자유 목표와 현재 달성률
-- Supabase tables: `articles`, `daily_summaries`, `stock_reports`, `recommendations`, `recommendation_evaluations`, `research_candidates`, `research_candidate_evaluations`, `trade_executions`, `portfolio_snapshots`, `market_snapshots`, `price_snapshots`, `investor_flows`, `decision_contexts`
+- Supabase tables: `articles`, `daily_summaries`, `stock_reports`, `recommendations`, `recommendation_evaluations`, `research_candidates`, `research_candidate_evaluations`, `trade_executions`, `portfolio_cash_flows`, `portfolio_snapshots`, `market_snapshots`, `price_snapshots`, `investor_flows`, `decision_contexts`
 - Agent/Supabase tables: `financial_freedom_goals`, `portfolio_accounts`, `positions`, `risk_policy`, `conversation_messages`, `pending_actions`
 - `data/supabase/*.json`: Supabase 데이터를 내려받은 로컬 JSON 미러
 - `data/economic-agent.db`: Supabase 데이터를 내려받은 로컬 SQLite 미러
@@ -228,6 +230,7 @@ Supabase 내부 로그가 `localhost:5432 connection refused`, `PGRST000/PGRST00
 ```bash
 npm run trade:plan -- --side sell --ticker DRAM --name "DRAM ETF" --quantity 30 --plannedDate 2026-05-11 --targetRemainingQuantity 170
 npm run trade:record -- --side buy --ticker 005930 --name 삼성전자 --quantity 3 --price 266000 --notes "1차 분할 진입"
+npm run cashflow:record -- --type deposit --amount 1000000 --occurred-at 2026-08-01T09:00:00+09:00 --notes "추가 납입"
 npm run recommendations:list
 npm run action:report
 npm run freedom:report
@@ -245,7 +248,9 @@ npm run security:audit
 
 주간/월간 성과 리뷰는 단순 점검 메모와 별도로 `다음 개선 액션`을 생성합니다. 실제 매수한 추천보다 놓친 추천의 성과가 좋았는지, 손익비 부족 실패가 반복되는지, 손절 기준 없는 bullish 추천이 있었는지, 수집기 공백이나 가격 provider 경고가 있었는지를 행동 항목으로 분리해 Telegram에 표시합니다.
 
-월간 리뷰는 `자산 성과 → AI 추천 파이프라인 → 이번 달 AI 추천 성과 → 내 매매 실행 → 운영 상태 → 다음 달 개선`의 6개 섹션으로 구성합니다. 최신 포트폴리오의 현재 총자산, 평가손익, 기간 첫 스냅샷 대비 단순 자산 증감을 먼저 표시하며 단순 자산 증감은 입출금이 보정되지 않은 값입니다. 포트폴리오를 읽지 못하면 0원으로 계산하지 않고 데이터 오류로 표시하며 경제적 자유 계산도 생략합니다. 추천은 장마감 리포트 일수, 분석 후보, 강세 후보, 관찰/차단, 승인으로 이어지는 퍼널과 누적 1/5/20거래일 평가 상태를 함께 보여줍니다. `평가기 동작 이력 있음·이번 달 신규 승인 입력 없음`과 저장소/평가기 장애를 구분하고, 리스크 승인·추천 계약·기준가격을 모두 충족한 검증 코호트는 레거시 저장 신호와 별도로 표시합니다.
+월간 리뷰는 `자산 성과 → AI 추천 파이프라인 → 이번 달 AI 추천 성과 → 내 매매 실행 → 운영 상태 → 다음 달 개선`의 6개 섹션으로 구성합니다. 최신 포트폴리오의 현재 총자산과 평가손익, 순자산 증감, 외부 입출금, 일별 스냅샷 기반 TWR, 현금 투입 시점을 반영한 연환산 MWR(XIRR), 같은 구간 KOSPI 대비 초과수익을 먼저 표시합니다. 현금흐름 원장을 읽지 못하면 입출금을 0으로 간주하지 않고 TWR/MWR 판단을 보류합니다. 포트폴리오를 읽지 못하면 0원으로 계산하지 않고 경제적 자유 계산도 생략합니다. 추천은 장마감 리포트 일수, 분석 후보, 강세 후보, 관찰/차단, 승인으로 이어지는 퍼널과 누적 1/5/20거래일 평가 상태를 함께 보여줍니다.
+
+`cashflow:record`의 `deposit`/`withdrawal`만 기본 외부 현금흐름입니다. `dividend`, `interest`, `fee`, `tax`는 운용 수익/비용이므로 TWR에서 제거하지 않습니다. 원장은 성과 보정용이며 포트폴리오 현금 잔액을 자동 변경하지 않으므로 `/cash` 또는 포트폴리오 원본을 별도로 확인합니다.
 
 성과 리뷰의 일부 개선 액션은 다음 장마감 종목 추천에 직접 환류됩니다. 단, 리스크 승인을 받은 후보의 20거래일 평가가 기본 30건 쌓이고 AI 메타데이터 커버리지가 80% 이상일 때만 규칙을 자동 조정합니다. 그 전에는 `low_risk_reward` 같은 소수 실패가 있어도 최소 손익비를 바꾸지 않고 표본 부족으로 표시합니다.
 

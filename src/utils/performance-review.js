@@ -3,6 +3,7 @@ const path = require('path');
 const { loadRecommendationsWithStatus } = require('./recommendation-log');
 const { loadResearchCandidatesWithStatus } = require('./research-candidate-log');
 const { loadTradeExecutionsWithStatus } = require('./trade-log');
+const { loadPortfolioCashFlowsWithStatus } = require('./portfolio-cash-flow');
 const { getKSTDate } = require('./article-archive');
 const { loadPortfolio, enrichPortfolio, loadLatestPortfolioSnapshot } = require('./portfolio');
 const { loadStoredPortfolio } = require('./portfolio-store');
@@ -14,6 +15,7 @@ const { buildCollectorOpsSummary } = require('./collector-ops');
 const { buildPriceSourceQualitySummary } = require('./price-source-quality');
 const { buildLocalResearchSummary } = require('./local-research-worker');
 const { buildPerformanceLearningFromReview } = require('./performance-learning');
+const { buildPortfolioReturnMetrics } = require('./portfolio-return');
 
 const REVIEW_DIR = path.join(__dirname, '..', '..', 'data', 'performance-reviews');
 
@@ -207,7 +209,7 @@ function summarizeResearchCandidates(candidates = [], options = {}) {
   };
 }
 
-function summarizePortfolioPerformance(portfolioResult = {}, snapshots = []) {
+function summarizePortfolioPerformance(portfolioResult = {}, snapshots = [], options = {}) {
   const portfolio = portfolioResult.portfolio || null;
   const validRows = snapshots
     .map(row => ({
@@ -217,10 +219,19 @@ function summarizePortfolioPerformance(portfolioResult = {}, snapshots = []) {
     .filter(row => Number.isFinite(row.totalAssetValue) && row.totalAssetValue > 0)
     .sort((a, b) => new Date(a.capturedAt || 0) - new Date(b.capturedAt || 0));
   const currentTotal = Number(portfolio?.totalAssetValue);
+  if (portfolio?.capturedAt && Number.isFinite(currentTotal) && currentTotal > 0) {
+    validRows.push({ capturedAt: portfolio.capturedAt, totalAssetValue: currentTotal });
+    validRows.sort((a, b) => new Date(a.capturedAt || 0) - new Date(b.capturedAt || 0));
+  }
   const start = validRows[0] || null;
   const rawChangeAmount = start && Number.isFinite(currentTotal) ? currentTotal - start.totalAssetValue : null;
   const positions = portfolio?.positions || [];
   const liveValuedPositions = positions.filter(position => position.priceSource === 'quote').length;
+  const returnMetrics = buildPortfolioReturnMetrics({
+    snapshots: validRows,
+    cashFlows: options.cashFlows || [],
+    benchmarkSnapshots: options.benchmarkSnapshots || [],
+  });
   return {
     dataAvailable: portfolioResult.dataAvailable === true,
     source: portfolioResult.source || 'unavailable',
@@ -241,7 +252,14 @@ function summarizePortfolioPerformance(portfolioResult = {}, snapshots = []) {
     rawChangePct: start && rawChangeAmount !== null
       ? round((rawChangeAmount / start.totalAssetValue) * 100)
       : null,
-    changeIncludesCashFlows: true,
+    cashFlowDataAvailable: options.cashFlowDataAvailable === true,
+    cashFlowDataError: options.cashFlowDataError || '',
+    netExternalFlow: returnMetrics.netExternalFlow,
+    cashFlowAdjustedChangeAmount: rawChangeAmount !== null && options.cashFlowDataAvailable === true
+      ? rawChangeAmount - returnMetrics.netExternalFlow
+      : null,
+    changeIncludesCashFlows: options.cashFlowDataAvailable !== true,
+    returnMetrics,
     topPositions: positions
       .filter(position => typeof position.marketValue === 'number')
       .sort((a, b) => b.marketValue - a.marketValue)
@@ -285,10 +303,11 @@ async function resolveReviewPortfolio() {
 async function buildPerformanceReview(period = 'weekly', options = {}) {
   const days = period === 'monthly' ? 30 : 7;
   const startDate = daysAgo(days);
-  const [recommendationResult, researchResult, tradeResult, stockReportResult] = await Promise.all([
+  const [recommendationResult, researchResult, tradeResult, cashFlowResult, stockReportResult] = await Promise.all([
     loadRecommendationsWithStatus(),
     loadResearchCandidatesWithStatus(),
     loadTradeExecutionsWithStatus(),
+    loadPortfolioCashFlowsWithStatus(),
     loadPersistedStockReports({ startDate, limit: 100 }),
   ]);
   const recommendations = recommendationResult.recommendations;
@@ -296,6 +315,7 @@ async function buildPerformanceReview(period = 'weekly', options = {}) {
   const trades = tradeResult.trades;
   const periodRecommendations = filterByWindow(recommendations, 'date', startDate);
   const periodTrades = filterByWindow(trades, 'date', startDate);
+  const periodCashFlows = filterByWindow(cashFlowResult.flows, 'date', startDate);
   const periodResearchCandidates = filterByWindow(researchCandidates, 'date', startDate);
   const recommendationSummary = summarizeRecommendations(periodRecommendations, {
     dataAvailable: recommendationResult.dataAvailable,
@@ -343,18 +363,34 @@ async function buildPerformanceReview(period = 'weekly', options = {}) {
     : null;
   let portfolioResult = { portfolio: null, source: 'not_requested', dataAvailable: false };
   let portfolioSnapshots = [];
+  let benchmarkSnapshots = [];
   if (period === 'monthly') {
     portfolioResult = await resolveReviewPortfolio();
-    const snapshotResult = await selectRows('portfolio_snapshots', {
-      select: 'captured_at,total_asset_value,payload',
-      captured_at: `gte.${startDate}T00:00:00+09:00`,
-      order: 'captured_at.asc',
-      limit: '100',
-    });
+    const [snapshotResult, benchmarkResult] = await Promise.all([
+      selectRows('portfolio_snapshots', {
+        select: 'captured_at,total_asset_value,payload',
+        captured_at: `gte.${startDate}T00:00:00+09:00`,
+        order: 'captured_at.asc',
+        limit: '100',
+      }),
+      selectRows('price_snapshots', {
+        select: 'as_of,price,symbol',
+        symbol: 'eq.^KS11',
+        as_of: `gte.${startDate}T00:00:00+09:00`,
+        order: 'as_of.asc',
+        limit: '500',
+      }),
+    ]);
     portfolioSnapshots = snapshotResult.rows || [];
+    benchmarkSnapshots = benchmarkResult.rows || [];
   }
   const portfolioSummary = period === 'monthly'
-    ? summarizePortfolioPerformance(portfolioResult, portfolioSnapshots)
+    ? summarizePortfolioPerformance(portfolioResult, portfolioSnapshots, {
+        cashFlows: periodCashFlows,
+        cashFlowDataAvailable: cashFlowResult.persistenceAvailable === true,
+        cashFlowDataError: cashFlowResult.error,
+        benchmarkSnapshots,
+      })
     : null;
   const freedomStatus = period === 'monthly' && portfolioResult.dataAvailable
     ? buildFreedomStatus({ portfolio: portfolioResult.portfolio })

@@ -206,6 +206,16 @@ test('monthly performance review leads with portfolio results and uses continuou
       rawChangeAmount: 1000000,
       rawChangePct: 1.06,
       startTotalAssetValue: 94531798,
+      cashFlowDataAvailable: true,
+      netExternalFlow: 500000,
+      cashFlowAdjustedChangeAmount: 500000,
+      returnMetrics: {
+        dataAvailable: true,
+        twrPct: 0.53,
+        moneyWeightedAnnualizedPct: 6.7,
+        benchmarkReturnPct: -1.2,
+        excessReturnPct: 1.73,
+      },
       liveValuedPositions: 9,
       positionCount: 9,
       topPositions: [{ name: 'SK하이닉스', weightPct: 30.57, unrealizedPnlPct: -5.75 }],
@@ -240,6 +250,9 @@ test('monthly performance review leads with portfolio results and uses continuou
   });
 
   assert.match(message, /현재 총자산: 95,531,798원/);
+  assert.match(message, /TWR 0\.5%/);
+  assert.match(message, /MWR 연환산 6\.7%/);
+  assert.match(message, /KOSPI -1\.2%/);
   assert.match(message, /AI 추천 파이프라인/);
   assert.match(message, /이번 달 승인 추천: 0건/);
   assert.match(message, /종목 후보 2건/);

@@ -619,6 +619,39 @@ async function loadPersistedTradeExecutions() {
   return { rows: trades };
 }
 
+function portfolioCashFlowRow(flow) {
+  return {
+    id: flow.id,
+    date: flow.date,
+    occurred_at: flow.occurredAt || flow.occurred_at,
+    account_id: flow.accountId || flow.account_id || 'default:main',
+    type: flow.type,
+    amount: flow.amount,
+    external_amount: flow.externalAmount ?? flow.external_amount ?? 0,
+    is_external: flow.external === true,
+    currency: flow.currency || 'KRW',
+    notes: flow.notes || '',
+    payload: flow,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+async function persistPortfolioCashFlows(flows) {
+  const rows = (flows || [])
+    .filter(flow => flow?.id && flow?.date && flow?.occurredAt && flow?.type)
+    .map(portfolioCashFlowRow);
+  return upsert('portfolio_cash_flows', rows, 'id');
+}
+
+async function loadPersistedPortfolioCashFlows() {
+  const result = await selectRows('portfolio_cash_flows', {
+    select: 'payload',
+    order: 'occurred_at.asc',
+  });
+  if (!result.rows) return result;
+  return { rows: result.rows.map(row => row.payload).filter(Boolean) };
+}
+
 async function persistPortfolioSnapshot(snapshot) {
   if (!snapshot?.capturedAt) return { saved: 0 };
   const date = new Date(snapshot.capturedAt).toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
@@ -1027,6 +1060,8 @@ module.exports = {
   persistResearchCandidateEvaluations,
   persistTradeExecutions,
   loadPersistedTradeExecutions,
+  persistPortfolioCashFlows,
+  loadPersistedPortfolioCashFlows,
   persistPortfolioSnapshot,
   loadLatestPersistedPortfolioSnapshot,
   persistMarketSnapshots,

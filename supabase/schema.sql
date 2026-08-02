@@ -161,6 +161,21 @@ create table if not exists portfolio_snapshots (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists portfolio_cash_flows (
+  id text primary key,
+  date date not null,
+  occurred_at timestamptz not null,
+  account_id text not null default 'default:main',
+  type text not null,
+  amount numeric not null,
+  external_amount numeric not null default 0,
+  is_external boolean not null default false,
+  currency text not null default 'KRW',
+  notes text,
+  payload jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists market_snapshots (
   id text primary key,
   captured_at timestamptz not null,
@@ -406,6 +421,7 @@ create index if not exists research_candidates_model_idx on research_candidates(
 create index if not exists research_candidate_evaluations_candidate_idx on research_candidate_evaluations(candidate_id, day);
 create index if not exists trade_executions_date_idx on trade_executions(date);
 create index if not exists portfolio_snapshots_date_idx on portfolio_snapshots(date);
+create index if not exists portfolio_cash_flows_date_idx on portfolio_cash_flows(date, occurred_at);
 create index if not exists market_snapshots_captured_at_idx on market_snapshots(captured_at);
 create index if not exists price_snapshots_ticker_as_of_idx on price_snapshots(ticker, as_of desc);
 create index if not exists price_snapshots_source_type_idx on price_snapshots(source, price_type);

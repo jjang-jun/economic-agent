@@ -20,6 +20,7 @@
     "trade:plan": "node --env-file-if-exists=.env scripts/plan-trade.js",
     "trade:record": "node --env-file-if-exists=.env scripts/record-trade.js",
     "trade:performance": "node --env-file-if-exists=.env scripts/trade-performance.js",
+    "cashflow:record": "node --env-file-if-exists=.env scripts/record-portfolio-cash-flow.js",
     "action:report": "node --env-file-if-exists=.env scripts/action-report.js",
     "timing:alert": "node --env-file-if-exists=.env scripts/timing-alert.js",
     "pre-news:signal": "node --env-file-if-exists=.env scripts/pre-news-signal.js",

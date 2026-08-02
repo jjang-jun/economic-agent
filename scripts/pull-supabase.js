@@ -19,6 +19,7 @@ const TABLES = [
   'research_candidates',
   'research_candidate_evaluations',
   'trade_executions',
+  'portfolio_cash_flows',
   'portfolio_snapshots',
   'performance_reviews',
   'market_snapshots',

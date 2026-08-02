@@ -10,6 +10,7 @@ const {
   persistResearchCandidates,
   persistResearchCandidateEvaluations,
   persistTradeExecutions,
+  persistPortfolioCashFlows,
   persistPortfolioSnapshot,
   persistMarketSnapshots,
   persistDecisionContext,
@@ -147,6 +148,13 @@ async function importTradeExecutions() {
   return trades.length;
 }
 
+async function importPortfolioCashFlows() {
+  const file = path.join(DATA_DIR, 'portfolio-cash-flows', 'portfolio-cash-flows.json');
+  const flows = readJSON(file, []);
+  await persistOrThrow(persistPortfolioCashFlows(flows), 'portfolio cash flows');
+  return flows.length;
+}
+
 async function importPortfolioSnapshots() {
   let total = 0;
   const snapshotDir = path.join(DATA_DIR, 'portfolio-snapshots');
@@ -170,6 +178,7 @@ async function main() {
   const recommendationResult = await importRecommendations();
   const researchResult = await importResearchCandidates();
   const trades = await importTradeExecutions();
+  const cashFlows = await importPortfolioCashFlows();
   const portfolioSnapshots = await importPortfolioSnapshots();
 
   console.log(`[DB] imported articles: ${articles}`);
@@ -179,6 +188,7 @@ async function main() {
   console.log(`[DB] imported research candidates: ${researchResult.candidates}`);
   console.log(`[DB] imported research candidate evaluations: ${researchResult.evaluations}`);
   console.log(`[DB] imported trade executions: ${trades}`);
+  console.log(`[DB] imported portfolio cash flows: ${cashFlows}`);
   console.log(`[DB] imported portfolio snapshots: ${portfolioSnapshots}`);
 }
 

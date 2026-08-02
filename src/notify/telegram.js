@@ -1325,8 +1325,17 @@ function formatPerformanceReview(review) {
     `▸ 현재 총자산: ${fmtKRW(portfolio.currentTotalAssetValue)}`,
     `▸ 보유 평가손익: ${fmtKRW(portfolio.unrealizedPnl)} (${fmtPct(portfolio.unrealizedPnlPct)})`,
     portfolio.startTotalAssetValue !== null
-      ? `▸ 기간 순자산 변화: ${fmtKRW(portfolio.rawChangeAmount)} (${fmtPct(portfolio.rawChangePct)}) · 입출금 미조정`
+      ? `▸ 기간 순자산 변화: ${fmtKRW(portfolio.rawChangeAmount)} (${fmtPct(portfolio.rawChangePct)})`
       : '▸ 기간 순자산 변화: 비교 스냅샷 부족',
+    portfolio.cashFlowDataAvailable
+      ? `▸ 외부 현금흐름: ${fmtKRW(portfolio.netExternalFlow)} · 현금흐름 조정 손익 ${fmtKRW(portfolio.cashFlowAdjustedChangeAmount)}`
+      : '▸ 외부 현금흐름: 원장 조회 실패 · TWR/MWR 판단 보류',
+    portfolio.returnMetrics?.dataAvailable && portfolio.cashFlowDataAvailable
+      ? `▸ 운용 성과: TWR ${fmtPct(portfolio.returnMetrics.twrPct)} · MWR 연환산 ${fmtPct(portfolio.returnMetrics.moneyWeightedAnnualizedPct)}`
+      : '▸ 운용 성과: 비교 스냅샷 또는 현금흐름 부족',
+    portfolio.returnMetrics?.dataAvailable
+      ? `▸ KOSPI ${fmtPct(portfolio.returnMetrics.benchmarkReturnPct)} · 초과수익 ${fmtPct(portfolio.returnMetrics.excessReturnPct)}`
+      : '',
     `▸ 실시간 평가 적용: ${portfolio.liveValuedPositions ?? 0}/${portfolio.positionCount ?? 0}종목`,
     freedom.goal ? `▸ 경제적 자유: 목표 ${formatKRW(freedom.goal.targetNetWorth)}의 ${freedom.targetProgressPct ?? 'n/a'}%` : '',
     ...(portfolio.topPositions || []).map(item => `▸ 비중 상위: ${item.name} ${item.weightPct ?? 'n/a'}% · 평가 ${fmtPct(item.unrealizedPnlPct)}`),

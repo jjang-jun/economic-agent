@@ -129,3 +129,34 @@ test('portfolio performance reports raw asset change and live valuation coverage
   assert.equal(summary.liveValuationCoveragePct, 50);
   assert.equal(summary.unclassifiedAssetAmount, 1000000);
 });
+
+test('portfolio performance separates external cash flow from operating return', () => {
+  const summary = summarizePortfolioPerformance({
+    dataAvailable: true,
+    source: 'supabase_store',
+    portfolio: {
+      totalAssetValue: 12000000,
+      capturedAt: '2026-08-01T00:00:00Z',
+      positions: [],
+    },
+  }, [
+    { captured_at: '2026-07-01T00:00:00Z', total_asset_value: 10000000 },
+  ], {
+    cashFlowDataAvailable: true,
+    cashFlows: [{
+      type: 'deposit', amount: 1000000, externalAmount: 1000000, external: true,
+      occurredAt: '2026-07-15T00:00:00Z',
+    }],
+    benchmarkSnapshots: [
+      { as_of: '2026-07-01T00:00:00Z', price: 3000 },
+      { as_of: '2026-08-01T00:00:00Z', price: 3030 },
+    ],
+  });
+
+  assert.equal(summary.rawChangeAmount, 2000000);
+  assert.equal(summary.netExternalFlow, 1000000);
+  assert.equal(summary.cashFlowAdjustedChangeAmount, 1000000);
+  assert.equal(summary.returnMetrics.twrPct, 10);
+  assert.equal(summary.returnMetrics.benchmarkReturnPct, 1);
+  assert.equal(summary.returnMetrics.excessReturnPct, 9);
+});
