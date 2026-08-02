@@ -50,6 +50,17 @@ test('summarizePriceSourceQuality separates official EOD and fallback sources', 
   assert.equal(summary.providerDecision.action, 'ok');
 });
 
+test('price quality checks staleness only on the latest snapshot per ticker and price type', () => {
+  const summary = summarizePriceSourceQuality([
+    { ticker: '005930', source: 'naver-finance', price_type: 'current', as_of: '2026-05-01T10:00:00+09:00' },
+    { ticker: '005930', source: 'naver-finance', price_type: 'current', as_of: '2026-05-08T10:00:00+09:00' },
+    { ticker: '000660', source: 'naver-finance', price_type: 'current', as_of: '2026-05-01T10:00:00+09:00' },
+  ], { now: new Date('2026-05-08T12:00:00+09:00') });
+
+  assert.equal(summary.latestSnapshotCount, 2);
+  assert.equal(summary.staleSnapshots, 1);
+});
+
 test('buildPriceSourceQualityAnomalies flags provider failures and fallback overuse', () => {
   const anomalies = buildPriceSourceQualityAnomalies({
     totalSnapshots: 10,

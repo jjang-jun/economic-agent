@@ -15,6 +15,7 @@ test('weekly performance review workflow notifies private Telegram on failure', 
   assert.match(workflow, /if: failure\(\)/);
   assert.match(workflow, /npm run notify:workflow-failure -- "Performance Review Weekly \(주간 성과 리뷰\)" "Build and send weekly performance review"/);
   assert.match(workflow, /GITHUB_RUN_URL:/);
+  assert.doesNotMatch(workflow, /PORTFOLIO_JSON_BASE64:/);
 });
 
 test('monthly performance review workflow notifies private Telegram on failure', () => {
@@ -25,5 +26,5 @@ test('monthly performance review workflow notifies private Telegram on failure',
   assert.match(workflow, /if: failure\(\)/);
   assert.match(workflow, /npm run notify:workflow-failure -- "Performance Review Monthly \(월간 성과 리뷰\)" "Build and send monthly performance review"/);
   assert.match(workflow, /GITHUB_RUN_URL:/);
+  assert.match(workflow, /PORTFOLIO_JSON_BASE64:/);
 });
-

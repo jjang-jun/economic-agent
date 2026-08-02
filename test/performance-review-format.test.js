@@ -149,7 +149,7 @@ test('formatPerformanceReview explains recommendation and execution metrics in p
   assert.match(message, /가격 데이터 품질/);
   assert.match(message, /가격 조회: 30건 · 실패 2건 \(6.67%\) · 빈 응답 1건/);
   assert.match(message, /판단: 현재 가격 provider 구조 유지/);
-  assert.match(message, /KRX 3건 · 공공데이터 4건 · KIS 대체 사용 1건/);
+  assert.match(message, /최신 종목·가격유형 중 오래된 값: 0\/7건/);
   assert.match(message, /로컬 리서치/);
   assert.match(message, /삼성전자\(005930\): 2026-05-01~2026-05-08 기간 수익률 4.2%, 기간 중 최대 하락폭 -2.1%, 5거래일/);
   assert.match(message, /다음 개선 액션/);
@@ -157,10 +157,9 @@ test('formatPerformanceReview explains recommendation and execution metrics in p
   assert.match(message, /최소 손익비: 2.5:1/);
   assert.match(message, /매수 후보를 임의로 건너뛰지 말고/);
   assert.match(message, /추천 수익률은 실제 계좌 수익률이 아닙니다/);
-  assert.match(message, /다이제스트 처리: 전송완료 3건 · 대기 4건 · 실패 0건/);
+  assert.match(message, /알림 실패: 즉시 0건 · 다이제스트 0건 · catch-up 0건/);
+  assert.match(message, /기간 중 다이제스트 버퍼 유입: 0건 · 실제 pending 4건/);
   assert.match(message, /조치 필요 실패: 0건 · 정리된 과거 실패 1건/);
-  assert.match(message, /즉시 알림 실패: 최근 0건 · 과거 실패 1건/);
-  assert.match(message, /catch-up 처리: 전송완료 1건 · 대기 0건 · 실패 0건/);
 });
 
 test('formatPerformanceReview labels unavailable stores instead of reporting zero or stale data', () => {
@@ -192,4 +191,58 @@ test('formatPerformanceReview labels unavailable stores instead of reporting zer
   assert.match(message, /수집 이력 저장소 조회 실패/);
   assert.match(message, /실제 거래 데이터 조회 실패/);
   assert.doesNotMatch(message, /마지막 성공: 없음/);
+});
+
+test('monthly performance review leads with portfolio results and uses continuous section numbers', () => {
+  const message = formatPerformanceReview({
+    period: 'monthly',
+    startDate: '2026-07-02',
+    endDate: '2026-08-01',
+    portfolioSummary: {
+      dataAvailable: true,
+      currentTotalAssetValue: 95531798,
+      unrealizedPnl: -24139513,
+      unrealizedPnlPct: -23.4,
+      rawChangeAmount: 1000000,
+      rawChangePct: 1.06,
+      startTotalAssetValue: 94531798,
+      liveValuedPositions: 9,
+      positionCount: 9,
+      topPositions: [{ name: 'SK하이닉스', weightPct: 30.57, unrealizedPnlPct: -5.75 }],
+    },
+    recommendationSummary: { dataAvailable: true, total: 0, evaluated: 0 },
+    recommendationFunnel: { reportDays: 2, analyzedCandidates: 2, bullishCandidates: 1, watchOnlyCandidates: 2, approvedCandidates: 0 },
+    recommendationTracker: {
+      dataAvailable: true,
+      totalStored: 11,
+      evaluatedRecommendations: 8,
+      fullyEvaluatedRecommendations: 8,
+      verifiedCohort: 1,
+      verifiedCohort20d: 1,
+      missingPriceRecommendations: 3,
+      byHorizon: { 1: 8, 5: 8, 20: 8 },
+      latestRecommendationDate: '2026-05-08',
+      latestVerifiedDate: '2026-05-07',
+      latestEvaluationAt: '2026-06-08T08:30:00.000Z',
+      engineHasHistory: true,
+    },
+    tradeSummary: { dataAvailable: true, total: 0, linked: 0 },
+    performanceLab: {},
+    collectorOps: {},
+    priceSourceQuality: {},
+    notes: ['확인 필요'],
+  });
+
+  assert.match(message, /현재 총자산: 95,531,798원/);
+  assert.match(message, /AI 추천 파이프라인/);
+  assert.match(message, /이번 달 승인 추천: 0건/);
+  assert.match(message, /종목 후보 2건/);
+  assert.match(message, /누적 추적: 저장 신호 11건 · 평가 시작 8건 · 20일 완료 8건/);
+  assert.match(message, /검증 코호트: 리스크 승인·계약 충족 1건 · 20일 완료 1건/);
+  assert.match(message, /평가 제외: 기준 가격 없음 3건/);
+  assert.match(message, /평가기 상태: 동작 이력 있음 · 이번 달 신규 승인 입력 없음/);
+  assert.match(message, /성과 판단: 평가 표본 없음/);
+  assert.match(message, /다음 달 개선/);
+  assert.doesNotMatch(message, /모델별 성과/);
+  assert.doesNotMatch(message, /<b>7\./);
 });

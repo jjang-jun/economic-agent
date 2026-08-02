@@ -41,9 +41,11 @@ test('summarizeCollectorOps reports run health and pending alerts', () => {
   assert.equal(summary.alertEvents.sentDigest, 1);
   assert.equal(summary.alertEvents.actionableFailedImmediate, 1);
   assert.equal(summary.alertEvents.historicalFailedImmediate, 0);
-  assert.equal(summary.alertEvents.pendingDigest, 2);
+  assert.equal(summary.alertEvents.pendingDigest, 1);
+  assert.equal(summary.alertEvents.bufferedDigest, 1);
   assert.equal(summary.alertEvents.sentCatchUp, 1);
-  assert.equal(summary.alertEvents.pendingCatchUp, 1);
+  assert.equal(summary.alertEvents.pendingCatchUp, 0);
+  assert.equal(summary.alertEvents.bufferedCatchUp, 1);
   assert.equal(summary.lastSuccessAt, '2026-05-10T11:31:00.000Z');
   assert.equal(summary.minutesSinceLastSuccess, 29);
   assert.equal(summary.healthLabel, 'failed');

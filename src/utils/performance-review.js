@@ -4,9 +4,10 @@ const { loadRecommendationsWithStatus } = require('./recommendation-log');
 const { loadTradeExecutionsWithStatus } = require('./trade-log');
 const { getKSTDate } = require('./article-archive');
 const { loadPortfolio, enrichPortfolio, loadLatestPortfolioSnapshot } = require('./portfolio');
+const { loadStoredPortfolio } = require('./portfolio-store');
 const { buildFreedomStatus, saveFreedomStatus } = require('./freedom-engine');
-const { persistFinancialFreedomGoal } = require('./persistence');
-const { buildPerformanceLab } = require('./performance-lab');
+const { persistFinancialFreedomGoal, loadPersistedStockReports, selectRows } = require('./persistence');
+const { buildPerformanceLab, isEligibleRecommendation } = require('./performance-lab');
 const { buildBehaviorReview } = require('./behavior-reviewer');
 const { buildCollectorOpsSummary } = require('./collector-ops');
 const { buildPriceSourceQualitySummary } = require('./price-source-quality');
@@ -98,12 +99,163 @@ function filterByWindow(items, dateKey, startDate) {
   return items.filter(item => (item[dateKey] || '').slice(0, 10) >= startDate);
 }
 
-async function buildPerformanceReview(period = 'weekly') {
+function summarizeRecommendationFunnel(reports = [], options = {}) {
+  const stocks = reports.flatMap(report => report?.stocks || []);
+  const approved = stocks.filter(stock => (
+    stock.risk_review?.approved === true && stock.risk_review?.action === 'candidate'
+  ));
+  const blockerCounts = countBy(
+    stocks.flatMap(stock => [...new Set((stock.risk_review?.blockers || [])
+      .map(blocker => String(blocker).split(':')[0] || 'unknown'))]),
+    blocker => blocker,
+  );
+  return {
+    dataAvailable: options.dataAvailable !== false,
+    dataError: options.dataError || '',
+    reportDays: new Set(reports.map(report => report.date).filter(Boolean)).size,
+    analyzedCandidates: stocks.length,
+    bullishCandidates: stocks.filter(stock => stock.signal === 'bullish').length,
+    watchOnlyCandidates: stocks.filter(stock => stock.risk_review?.action === 'watch_only').length,
+    approvedCandidates: approved.length,
+    schemaBlockedCandidates: stocks.filter(stock => stock.schema_validation?.passed === false).length,
+    topBlockers: Object.entries(blockerCounts)
+      .map(([reason, count]) => ({ reason, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 4),
+  };
+}
+
+function summarizeRecommendationTracker(recommendations = [], options = {}) {
+  const verifiedCohort = recommendations.filter(isEligibleRecommendation);
+  const evaluationEntries = recommendations.flatMap(recommendation => (
+    Object.entries(recommendation.evaluations || {}).map(([day, evaluation]) => ({
+      day: Number(day),
+      evaluation,
+    }))
+  ));
+  const latestRecommendationDate = recommendations
+    .map(item => item.date || '')
+    .filter(Boolean)
+    .sort()
+    .at(-1) || null;
+  const latestVerifiedDate = verifiedCohort
+    .map(item => item.date || '')
+    .filter(Boolean)
+    .sort()
+    .at(-1) || null;
+  const latestEvaluationAt = evaluationEntries
+    .map(item => item.evaluation?.evaluatedAt || '')
+    .filter(Boolean)
+    .sort()
+    .at(-1) || null;
+  const byHorizon = Object.fromEntries([1, 5, 20].map(day => [
+    day,
+    recommendations.filter(item => item.evaluations?.[String(day)]).length,
+  ]));
+  const evaluatedRecommendations = recommendations.filter(item => (
+    Object.keys(item.evaluations || {}).length > 0
+  )).length;
+
+  return {
+    dataAvailable: options.dataAvailable !== false,
+    dataError: options.dataError || '',
+    totalStored: recommendations.length,
+    evaluatedRecommendations,
+    fullyEvaluatedRecommendations: byHorizon[20],
+    verifiedCohort: verifiedCohort.length,
+    verifiedCohort20d: verifiedCohort.filter(item => item.evaluations?.['20']).length,
+    pendingRecommendations: recommendations.filter(item => item.status === 'open').length,
+    missingPriceRecommendations: recommendations.filter(item => item.status === 'missing_price').length,
+    latestRecommendationDate,
+    latestVerifiedDate,
+    latestEvaluationAt,
+    byHorizon,
+    engineHasHistory: recommendations.length > 0 && evaluatedRecommendations > 0,
+  };
+}
+
+function summarizePortfolioPerformance(portfolioResult = {}, snapshots = []) {
+  const portfolio = portfolioResult.portfolio || null;
+  const validRows = snapshots
+    .map(row => ({
+      capturedAt: row.captured_at || row.payload?.capturedAt || '',
+      totalAssetValue: Number(row.total_asset_value ?? row.payload?.totalAssetValue),
+    }))
+    .filter(row => Number.isFinite(row.totalAssetValue) && row.totalAssetValue > 0)
+    .sort((a, b) => new Date(a.capturedAt || 0) - new Date(b.capturedAt || 0));
+  const currentTotal = Number(portfolio?.totalAssetValue);
+  const start = validRows[0] || null;
+  const rawChangeAmount = start && Number.isFinite(currentTotal) ? currentTotal - start.totalAssetValue : null;
+  const positions = portfolio?.positions || [];
+  const liveValuedPositions = positions.filter(position => position.priceSource === 'quote').length;
+  return {
+    dataAvailable: portfolioResult.dataAvailable === true,
+    source: portfolioResult.source || 'unavailable',
+    currentTotalAssetValue: Number.isFinite(currentTotal) && currentTotal > 0 ? currentTotal : null,
+    costBasis: typeof portfolio?.costBasis === 'number' ? portfolio.costBasis : null,
+    unrealizedPnl: typeof portfolio?.unrealizedPnl === 'number' ? portfolio.unrealizedPnl : null,
+    unrealizedPnlPct: typeof portfolio?.unrealizedPnlPct === 'number' ? portfolio.unrealizedPnlPct : null,
+    unclassifiedAssetAmount: typeof portfolio?.unclassifiedAssetAmount === 'number'
+      ? portfolio.unclassifiedAssetAmount
+      : 0,
+    positionCount: positions.length,
+    liveValuedPositions,
+    liveValuationCoveragePct: positions.length ? round((liveValuedPositions / positions.length) * 100) : null,
+    snapshotCount: validRows.length,
+    startTotalAssetValue: start?.totalAssetValue ?? null,
+    startCapturedAt: start?.capturedAt || null,
+    rawChangeAmount,
+    rawChangePct: start && rawChangeAmount !== null
+      ? round((rawChangeAmount / start.totalAssetValue) * 100)
+      : null,
+    changeIncludesCashFlows: true,
+    topPositions: positions
+      .filter(position => typeof position.marketValue === 'number')
+      .sort((a, b) => b.marketValue - a.marketValue)
+      .slice(0, 3)
+      .map(position => ({
+        name: position.name || position.ticker,
+        marketValue: position.marketValue,
+        weightPct: typeof position.weight === 'number' ? round(position.weight * 100) : null,
+        unrealizedPnlPct: position.unrealizedPnlPct ?? null,
+      })),
+  };
+}
+
+async function resolveReviewPortfolio() {
+  let source = 'supabase_store';
+  let raw = null;
+  try {
+    raw = await loadStoredPortfolio();
+  } catch (err) {
+    console.warn(`[성과리뷰] Supabase 포트폴리오 조회 실패: ${err.message}`);
+  }
+  if (!raw) {
+    source = 'env_or_local';
+    raw = loadPortfolio();
+  }
+  let portfolio = await enrichPortfolio(raw);
+  if (!(portfolio?.totalAssetValue > 0)) {
+    const snapshot = loadLatestPortfolioSnapshot();
+    if (snapshot?.totalAssetValue > 0) {
+      source = 'local_snapshot_fallback';
+      portfolio = snapshot;
+    }
+  }
+  return {
+    portfolio,
+    source,
+    dataAvailable: Boolean(portfolio?.totalAssetValue > 0),
+  };
+}
+
+async function buildPerformanceReview(period = 'weekly', options = {}) {
   const days = period === 'monthly' ? 30 : 7;
   const startDate = daysAgo(days);
-  const [recommendationResult, tradeResult] = await Promise.all([
+  const [recommendationResult, tradeResult, stockReportResult] = await Promise.all([
     loadRecommendationsWithStatus(),
     loadTradeExecutionsWithStatus(),
+    loadPersistedStockReports({ startDate, limit: 100 }),
   ]);
   const recommendations = recommendationResult.recommendations;
   const trades = tradeResult.trades;
@@ -120,6 +272,14 @@ async function buildPerformanceReview(period = 'weekly') {
     persistenceAvailable: tradeResult.persistenceAvailable,
     dataSource: tradeResult.source,
     dataError: tradeResult.error,
+  });
+  const recommendationFunnel = summarizeRecommendationFunnel(stockReportResult.rows || [], {
+    dataAvailable: !stockReportResult.error,
+    dataError: stockReportResult.error?.message || '',
+  });
+  const recommendationTracker = summarizeRecommendationTracker(recommendations, {
+    dataAvailable: recommendationResult.dataAvailable,
+    dataError: recommendationResult.error,
   });
   const performanceLab = buildPerformanceLab({
     recommendations: periodRecommendations,
@@ -141,21 +301,28 @@ async function buildPerformanceReview(period = 'weekly') {
         recommendations: periodRecommendations,
       })
     : null;
-  let freedomPortfolio = null;
+  let portfolioResult = { portfolio: null, source: 'not_requested', dataAvailable: false };
+  let portfolioSnapshots = [];
   if (period === 'monthly') {
-    const enriched = await enrichPortfolio(loadPortfolio());
-    const missingMarketValues = (enriched.positions || []).some(position => (
-      typeof position.quantity === 'number' && typeof position.marketValue !== 'number'
-    ));
-    freedomPortfolio = missingMarketValues && loadLatestPortfolioSnapshot()?.totalAssetValue
-      ? loadLatestPortfolioSnapshot()
-      : enriched;
+    portfolioResult = await resolveReviewPortfolio();
+    const snapshotResult = await selectRows('portfolio_snapshots', {
+      select: 'captured_at,total_asset_value,payload',
+      captured_at: `gte.${startDate}T00:00:00+09:00`,
+      order: 'captured_at.asc',
+      limit: '100',
+    });
+    portfolioSnapshots = snapshotResult.rows || [];
   }
-  const freedomStatus = period === 'monthly'
-    ? buildFreedomStatus({ portfolio: freedomPortfolio })
+  const portfolioSummary = period === 'monthly'
+    ? summarizePortfolioPerformance(portfolioResult, portfolioSnapshots)
     : null;
-  if (freedomStatus) saveFreedomStatus(freedomStatus);
-  if (freedomStatus) await persistFinancialFreedomGoal(freedomStatus);
+  const freedomStatus = period === 'monthly' && portfolioResult.dataAvailable
+    ? buildFreedomStatus({ portfolio: portfolioResult.portfolio })
+    : null;
+  if (freedomStatus && options.saveSideEffects !== false) saveFreedomStatus(freedomStatus);
+  if (freedomStatus && options.persistSideEffects !== false) {
+    await persistFinancialFreedomGoal(freedomStatus);
+  }
 
   const baseReview = {
     id: `${getKSTDate()}:${period}`,
@@ -164,7 +331,10 @@ async function buildPerformanceReview(period = 'weekly') {
     endDate: getKSTDate(),
     generatedAt: new Date().toISOString(),
     recommendationSummary,
+    recommendationFunnel,
+    recommendationTracker,
     tradeSummary,
+    portfolioSummary,
     performanceLab,
     behaviorReview,
     collectorOps,
@@ -180,6 +350,8 @@ async function buildPerformanceReview(period = 'weekly') {
     collectorOps,
     priceSourceQuality,
     backtestResearch,
+    recommendationFunnel,
+    portfolioSummary,
   );
   const improvementActions = buildImprovementActions({
     recommendationSummary,
@@ -189,6 +361,8 @@ async function buildPerformanceReview(period = 'weekly') {
     priceSourceQuality,
     performanceLearning,
     performanceLab,
+    recommendationFunnel,
+    portfolioSummary,
   });
 
   return {
@@ -207,6 +381,8 @@ function buildImprovementActions({
   priceSourceQuality = {},
   performanceLab = {},
   performanceLearning = {},
+  recommendationFunnel = {},
+  portfolioSummary = {},
 } = {}) {
   const actions = [];
   const missed = performanceLab.missedRecommendationQuality || {};
@@ -238,23 +414,41 @@ function buildImprovementActions({
   if (collectorOps.staleSuccess || (collectorOps.healthLabel === 'stale')) {
     actions.push('수집기 마지막 성공이 오래됐습니다. Cloud Run Scheduler와 GitHub 백업 수집 workflow를 먼저 확인합니다.');
   }
-  if (priceSourceQuality.healthLabel === 'warn') {
+  if (priceSourceQuality.healthLabel === 'warn' && !String(priceSourceQuality.providerDecision?.action || '').startsWith('monitor')) {
     const decision = priceSourceQuality.providerDecision?.label || '가격 provider 경고';
     actions.push(`${decision}: 국내 fallback, 공식 EOD 비중, provider 실패율 중 어느 항목이 경고인지 분리해서 조치합니다.`);
   }
   for (const action of performanceLearning.actions || []) {
     actions.push(`다음 추천 룰 반영: ${action}`);
   }
+  if ((recommendationSummary.total || 0) === 0 && (recommendationFunnel.analyzedCandidates || 0) > 0) {
+    actions.push(`분석 후보 ${recommendationFunnel.analyzedCandidates}건이 모두 승인 추천에서 제외됐습니다. 상위 차단 사유와 시장 레짐을 다음 추천 전에 재검토합니다.`);
+  }
+  if (portfolioSummary.dataAvailable === false) {
+    actions.unshift('포트폴리오 원본을 읽지 못했습니다. 경제적 자유 계산과 자산 성과 평가는 데이터 복구 전까지 중단합니다.');
+  }
 
   return [...new Set(actions)].slice(0, 6);
 }
 
-function buildNotes(recommendationSummary, tradeSummary, behaviorReview = {}, collectorOps = {}, priceSourceQuality = {}, backtestResearch = null) {
+function buildNotes(
+  recommendationSummary,
+  tradeSummary,
+  behaviorReview = {},
+  collectorOps = {},
+  priceSourceQuality = {},
+  backtestResearch = null,
+  recommendationFunnel = {},
+  portfolioSummary = {},
+) {
   const notes = [];
   if (recommendationSummary.dataAvailable === false) {
     notes.push('추천 데이터 저장소를 읽지 못했습니다. 추천 0건은 실제 성과가 아니라 조회 실패 상태입니다.');
   } else if (recommendationSummary.evaluated === 0) {
     notes.push('평가 완료된 추천이 아직 부족합니다.');
+  }
+  if ((recommendationSummary.total || 0) === 0 && (recommendationFunnel.analyzedCandidates || 0) > 0) {
+    notes.push(`추천 0건은 분석 중단이 아니라 리스크 승인 0건입니다. 분석 후보 ${recommendationFunnel.analyzedCandidates}건 중 관찰 후보 ${recommendationFunnel.watchOnlyCandidates || 0}건이었습니다.`);
   }
   if (tradeSummary.dataAvailable === false) {
     notes.push('실제 거래 저장소를 읽지 못했습니다. 거래 0건은 실제 미거래가 아니라 조회 실패 상태입니다.');
@@ -283,8 +477,13 @@ function buildNotes(recommendationSummary, tradeSummary, behaviorReview = {}, co
   if (priceSourceQuality.healthLabel === 'empty') {
     notes.push('최근 가격 스냅샷이 없어 가격 provider 동작 여부를 확인해야 합니다.');
   }
-  if (priceSourceQuality.healthLabel === 'warn') {
+  if (priceSourceQuality.healthLabel === 'warn' && !String(priceSourceQuality.providerDecision?.action || '').startsWith('monitor')) {
     notes.push('가격 source 품질이 주의 상태입니다. KRX/Data.go.kr/KIS와 fallback 사용 비율을 확인해야 합니다.');
+  }
+  if (portfolioSummary.dataAvailable === false) {
+    notes.push('포트폴리오 데이터가 없어 자산·경제적 자유 수치를 계산하지 않았습니다.');
+  } else if ((portfolioSummary.unclassifiedAssetAmount || 0) > 0) {
+    notes.push(`미분류 자산 ${Math.round(portfolioSummary.unclassifiedAssetAmount).toLocaleString('ko-KR')}원은 종목 성과와 현금 여력 계산에서 제외했습니다.`);
   }
   if (backtestResearch?.enabled && backtestResearch.failures?.length > 0 && backtestResearch.results?.length === 0) {
     notes.push('로컬 Python 리서치 worker가 켜져 있지만 OHLCV 결과를 만들지 못했습니다. pykrx/FinanceDataReader 설치와 provider 상태를 확인해야 합니다.');
@@ -305,5 +504,9 @@ module.exports = {
   savePerformanceReview,
   summarizeRecommendations,
   summarizeTrades,
+  summarizeRecommendationFunnel,
+  summarizeRecommendationTracker,
+  summarizePortfolioPerformance,
+  resolveReviewPortfolio,
   buildImprovementActions,
 };

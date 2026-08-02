@@ -60,6 +60,7 @@ function normalizePosition(position) {
     marketValue: position.marketValue ?? null,
     unrealizedPnl: position.unrealizedPnl ?? null,
     unrealizedPnlPct: position.unrealizedPnlPct ?? null,
+    valuationLocked: position.valuationLocked === true,
   };
 }
 
@@ -134,48 +135,46 @@ function valuePosition(position, quote, fxRates = {}) {
   const existingCostBasis = typeof position.costBasis === 'number' ? position.costBasis : null;
   const existingMarketValue = typeof position.marketValue === 'number' ? position.marketValue : null;
   const existingPnlPct = typeof position.unrealizedPnlPct === 'number' ? position.unrealizedPnlPct : null;
-  const currentPrice = typeof position.currentPrice === 'number'
-    ? position.currentPrice
-    : (manualCurrentPrice ?? quote?.price ?? null);
+  const hasQuotePrice = typeof quote?.price === 'number' && Number.isFinite(quote.price);
+  const valuationLocked = position.valuationLocked === true;
+  const useQuote = hasQuotePrice && !valuationLocked;
+  const currentPrice = useQuote
+    ? quote.price
+    : (typeof position.currentPrice === 'number' ? position.currentPrice : manualCurrentPrice);
   const currency = position.currency || quote?.currency || '';
   const fxRate = getFxRate(currency, fxRates, position.fxRate);
   const canValue = typeof fxRate === 'number' && Number.isFinite(fxRate);
-  const hasQuotePrice = typeof quote?.price === 'number' && Number.isFinite(quote.price);
-  const preserveManualValuation = existingMarketValue !== null && (
-    position.priceSource === 'manual'
-    || position.quoteSource === 'manual'
-    || typeof position.currentPrice === 'number'
-  );
-  const costBasis = existingCostBasis !== null && (!hasQuotePrice || preserveManualValuation)
+  const costBasis = existingCostBasis !== null
     ? existingCostBasis
-    : (canValue && quantity !== null && avgPrice !== null ? quantity * avgPrice * fxRate : existingCostBasis);
-  const marketValue = existingMarketValue !== null && (!hasQuotePrice || preserveManualValuation)
-    ? existingMarketValue
-    : (canValue && quantity !== null && typeof currentPrice === 'number' ? quantity * currentPrice * fxRate : existingMarketValue);
-  const unrealizedPnl = manualUnrealizedPnl !== null
-    ? manualUnrealizedPnl
-    : (marketValue !== null && costBasis !== null ? marketValue - costBasis : null);
-  const unrealizedPnlPct = manualPnlPct !== null
-    ? manualPnlPct
-    : (existingPnlPct !== null && (!hasQuotePrice || preserveManualValuation)
-    ? existingPnlPct
-    : (unrealizedPnl !== null && costBasis
-    ? round((unrealizedPnl / costBasis) * 100)
-    : existingPnlPct));
+    : (canValue && quantity !== null && avgPrice !== null ? quantity * avgPrice * fxRate : null);
+  const calculatedMarketValue = canValue && quantity !== null && typeof currentPrice === 'number'
+    ? quantity * currentPrice * fxRate
+    : null;
+  const marketValue = useQuote
+    ? calculatedMarketValue
+    : (existingMarketValue ?? calculatedMarketValue);
+  const calculatedPnl = marketValue !== null && costBasis !== null ? marketValue - costBasis : null;
+  const unrealizedPnl = useQuote
+    ? calculatedPnl
+    : (manualUnrealizedPnl ?? calculatedPnl);
+  const unrealizedPnlPct = useQuote
+    ? (unrealizedPnl !== null && costBasis ? round((unrealizedPnl / costBasis) * 100) : null)
+    : (manualPnlPct ?? existingPnlPct
+      ?? (unrealizedPnl !== null && costBasis ? round((unrealizedPnl / costBasis) * 100) : null));
 
   return {
     ...position,
     currentPrice,
     priceCurrency: quote?.currency || currency,
-    priceSource: typeof position.currentPrice === 'number' || manualPnlPct !== null ? 'manual' : (quote?.source ? 'quote' : position.priceSource),
-    quoteSource: typeof position.currentPrice === 'number' || manualPnlPct !== null ? 'manual' : (quote?.source || position.quoteSource || ''),
+    priceSource: useQuote ? 'quote' : (position.priceSource || (typeof currentPrice === 'number' ? 'manual' : '')),
+    quoteSource: useQuote ? (quote?.source || 'quote') : (position.quoteSource || ''),
     fxRate: fxRate ?? position.fxRate ?? null,
     previousClose: quote?.previousClose ?? position.previousClose ?? null,
     changePercent: quote?.changePercent ?? position.changePercent ?? null,
     return5dPct: quote?.return5dPct ?? position.return5dPct ?? null,
     return20dPct: quote?.return20dPct ?? position.return20dPct ?? null,
     currency,
-    marketTime: typeof position.currentPrice === 'number' ? position.marketTime ?? null : (quote?.marketTime || position.marketTime || null),
+    marketTime: useQuote ? (quote?.marketTime || position.marketTime || null) : (position.marketTime ?? null),
     costBasis,
     marketValue,
     unrealizedPnl,
@@ -204,9 +203,12 @@ async function enrichPortfolio(portfolio = loadPortfolio(), options = {}) {
     sum + (typeof position.costBasis === 'number' ? position.costBasis : 0)
   ), 0);
   const cashAmount = typeof portfolio.cashAmount === 'number' ? portfolio.cashAmount : 0;
+  const unclassifiedAssetAmount = typeof portfolio.unclassifiedAssetAmount === 'number'
+    ? portfolio.unclassifiedAssetAmount
+    : 0;
   const hasFreshValuation = valuedPositions.some(position => position.priceSource === 'quote');
   const totalAssetValue = hasFreshValuation || typeof portfolio.totalAssetValue !== 'number'
-    ? cashAmount + investedAmount
+    ? cashAmount + investedAmount + unclassifiedAssetAmount
     : portfolio.totalAssetValue;
   const unrealizedPnl = valuedPositions.reduce((sum, position) => (
     sum + (typeof position.unrealizedPnl === 'number' ? position.unrealizedPnl : 0)

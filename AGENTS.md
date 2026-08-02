@@ -114,7 +114,10 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - `market_profile.entryTiming` tracks 5d/20d moving-average alignment, 20d moving-average distance/slope, breakout/pullback status, and should block chase entries even when AI text is bullish.
 - Recommendations should include `risk_review` before persistence. Treat blockers as a reason to mark a stock watch-only even when AI text sounds bullish.
 - `src/utils/portfolio.js`: loads ignored local portfolio data and derives cash/position risk inputs
+- Manual portfolio prices are capture-time values and fresh quotes should replace them unless `valuationLocked=true`. `unclassifiedAssetAmount` contributes to net worth but never to cash/buying power.
 - Portfolio valuation snapshots are saved under ignored `data/portfolio-snapshots/` and persisted to Supabase `portfolio_snapshots` when configured.
+- Monthly reviews are portfolio-first and must distinguish the stock-report candidate funnel from approved recommendation logs. Missing portfolio data must not be rendered as zero net worth.
+- Monthly recommendation reporting must distinguish evaluator history, newly approved inputs, and the strict verified cohort. A successful evaluation workflow with no new approved recommendations is not an evaluator outage; persistence errors must fail the workflow.
 - `src/utils/persistence.js`: optional Supabase REST persistence for articles, summaries, reports, recommendations, snapshots, investor flows, decisions
 - `src/config/keywords.js`: compatibility facade merging purpose-specific keyword configs
 - `src/config/market-keywords.js`: macro/market-regime keywords

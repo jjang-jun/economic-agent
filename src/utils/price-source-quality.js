@@ -45,6 +45,18 @@ function uniqueCount(items, getKey) {
   return new Set((items || []).map(getKey).filter(Boolean)).size;
 }
 
+function latestSnapshotsByTicker(rows = []) {
+  const latest = new Map();
+  for (const row of rows) {
+    const key = `${row.ticker || row.symbol || 'unknown'}:${row.price_type || 'unknown'}`;
+    const current = latest.get(key);
+    const rowTime = new Date(row.as_of || row.collected_at || 0).getTime();
+    const currentTime = new Date(current?.as_of || current?.collected_at || 0).getTime();
+    if (!current || rowTime > currentTime) latest.set(key, row);
+  }
+  return [...latest.values()];
+}
+
 function isStaleSnapshot(row, now = new Date()) {
   const asOf = new Date(row.as_of || '').getTime();
   if (!Number.isFinite(asOf)) return true;
@@ -68,7 +80,8 @@ function summarizePriceSourceQuality(rows = [], options = {}) {
   const globalRows = rows.filter(row => !isDomesticSnapshot(row));
   const globalFallbackRows = globalRows.filter(row => GLOBAL_FALLBACK_SOURCES.includes(row.source));
   const globalCurrentFallbackRows = globalFallbackRows.filter(row => row.price_type === 'current');
-  const staleRows = rows.filter(row => isStaleSnapshot(row, now));
+  const latestRows = latestSnapshotsByTicker(rows);
+  const staleRows = latestRows.filter(row => isStaleSnapshot(row, now));
   const sourceRows = Object.entries(bySource)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 6)
@@ -93,7 +106,7 @@ function summarizePriceSourceQuality(rows = [], options = {}) {
     if (completedAttempts.length >= 5 && failedAttempts.length / completedAttempts.length > 0.3) return 'warn';
     if (domesticFallbackRatePct !== null && domesticFallbackRatePct > 50) return 'warn';
     if (eodRows.length > 0 && officialEodRatePct !== null && officialEodRatePct < 50) return 'warn';
-    if (staleRows.length > Math.max(3, rows.length * 0.2)) return 'warn';
+    if (staleRows.length > Math.max(3, latestRows.length * 0.2)) return 'warn';
     return 'ok';
   })();
 
@@ -123,6 +136,7 @@ function summarizePriceSourceQuality(rows = [], options = {}) {
       yahoo: bySource['yahoo-finance'] || 0,
     },
     staleSnapshots: staleRows.length,
+    latestSnapshotCount: latestRows.length,
     latestAsOf: latestIso(rows.map(row => row.as_of)),
     sourceRows,
     attempts: summarizeProviderAttempts(attempts),
@@ -302,4 +316,5 @@ module.exports = {
   buildPriceSourceQualitySummary,
   buildPriceSourceQualityAnomalies,
   buildPriceProviderDecision,
+  latestSnapshotsByTicker,
 };

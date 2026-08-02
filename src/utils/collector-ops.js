@@ -141,11 +141,11 @@ function summarizeCollectorOps(runs = [], alerts = [], options = {}) {
       sentDigest: alertByTypeStatus['digest:sent'] || 0,
       failedDigest: alertByTypeStatus['digest:failed'] || 0,
       bufferedDigest: alertByTypeStatus['digest:buffered'] || 0,
-      pendingDigest: (alertByTypeStatus['digest:pending'] || 0) + (alertByTypeStatus['digest:buffered'] || 0),
+      pendingDigest: alertByTypeStatus['digest:pending'] || 0,
       sentCatchUp: alertByTypeStatus['catch_up:sent'] || 0,
       failedCatchUp: alertByTypeStatus['catch_up:failed'] || 0,
       bufferedCatchUp: alertByTypeStatus['catch_up:buffered'] || 0,
-      pendingCatchUp: (alertByTypeStatus['catch_up:pending'] || 0) + (alertByTypeStatus['catch_up:buffered'] || 0),
+      pendingCatchUp: alertByTypeStatus['catch_up:pending'] || 0,
     },
     recentFailures: actionableFailures.slice(0, 3).map(run => ({
       startedAt: run.started_at,
@@ -233,7 +233,9 @@ function buildCollectorOpsAnomalies(summary = {}, options = {}) {
 
 async function buildCollectorOpsSummary({ days = 7 } = {}) {
   const since = startIso(days);
-  const expectedRuns = days > 1 || isCollectorExpectedNow();
+  // A long review window does not mean the collector should be running right now.
+  // Weekend/off-hours reviews must not turn an expected idle period into a stale alert.
+  const expectedRuns = isCollectorExpectedNow();
   const [runResult, alertResult] = await Promise.all([
     selectRows('collector_runs', {
       select: '*',

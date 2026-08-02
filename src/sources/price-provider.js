@@ -1,12 +1,12 @@
 const { PRICE_SOURCE_POLICY } = require('../config/price-source-policy');
-const { fetchKisCurrentPrice, fetchKisDailyOhlcv, normalizeKisTicker } = require('./kis-api');
+const { fetchKisCurrentPrice, fetchKisDailyOhlcv, normalizeKisTicker, isKisConfigured } = require('./kis-api');
 const { fetchNaverQuote } = require('./naver-finance');
-const { fetchKrxEodPrice, fetchKrxDailyOhlcv } = require('./krx-openapi');
-const { fetchDataGoKrEodPrice, fetchDataGoKrDailyOhlcv } = require('./data-go-kr-stocks');
-const { fetchAlpacaQuote } = require('./alpaca-api');
-const { fetchFmpQuote, fetchFmpDailyOhlcv } = require('./fmp-api');
-const { fetchAlphaVantageQuote } = require('./alpha-vantage-api');
-const { fetchTiingoQuote } = require('./tiingo-api');
+const { fetchKrxEodPrice, fetchKrxDailyOhlcv, isKrxConfigured } = require('./krx-openapi');
+const { fetchDataGoKrEodPrice, fetchDataGoKrDailyOhlcv, isDataGoKrConfigured } = require('./data-go-kr-stocks');
+const { fetchAlpacaQuote, isAlpacaConfigured } = require('./alpaca-api');
+const { fetchFmpQuote, fetchFmpDailyOhlcv, isFmpConfigured } = require('./fmp-api');
+const { fetchAlphaVantageQuote, isAlphaVantageConfigured } = require('./alpha-vantage-api');
+const { fetchTiingoQuote, isTiingoConfigured } = require('./tiingo-api');
 const {
   fetchQuote: fetchYahooQuote,
   fetchDailyOhlcv: fetchYahooDailyOhlcv,
@@ -50,9 +50,34 @@ async function persistQuoteSnapshot(quote, requestedSymbol) {
   await persistPriceSnapshots([snapshot]);
 }
 
+function isProviderConfigured(source) {
+  const checks = {
+    'kis-rest': isKisConfigured,
+    'krx-openapi': isKrxConfigured,
+    'data-go-kr': isDataGoKrConfigured,
+    'alpaca-market-data': isAlpacaConfigured,
+    fmp: isFmpConfigured,
+    'alpha-vantage': isAlphaVantageConfigured,
+    'tiingo-eod': isTiingoConfigured,
+  };
+  return checks[source] ? checks[source]() : true;
+}
+
 async function attemptProvider({ source, ticker, priceType, fetcher }) {
   const startedAt = Date.now();
   const attemptedAt = new Date().toISOString();
+  if (!isProviderConfigured(source)) {
+    await persistPriceProviderAttempt({
+      provider: source,
+      ticker,
+      priceType,
+      status: 'skipped',
+      attemptedAt,
+      latencyMs: 0,
+      payload: { reason: 'provider_not_configured' },
+    });
+    return null;
+  }
   try {
     const result = await fetcher();
     await persistPriceProviderAttempt({
@@ -288,5 +313,6 @@ module.exports = {
   fetchOfficialEodPrice,
   normalizeYahooSymbol,
   isDomesticTicker,
+  isProviderConfigured,
   toPriceSnapshot,
 };

@@ -1,6 +1,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { summarizeRecommendations, summarizeTrades } = require('../src/utils/performance-review');
+const {
+  summarizeRecommendations,
+  summarizeTrades,
+  summarizeRecommendationFunnel,
+  summarizeRecommendationTracker,
+  summarizePortfolioPerformance,
+} = require('../src/utils/performance-review');
 
 test('recommendation summary preserves unavailable data status', () => {
   const summary = summarizeRecommendations([], {
@@ -17,6 +23,33 @@ test('recommendation summary preserves unavailable data status', () => {
   assert.equal(summary.dataError, '503 schema cache unavailable');
 });
 
+test('recommendation tracker separates a working evaluator from missing new approvals', () => {
+  const summary = summarizeRecommendationTracker([
+    {
+      date: '2026-05-07',
+      status: 'evaluated',
+      evaluations: {
+        1: { evaluatedAt: '2026-05-08T08:30:00.000Z' },
+        5: { evaluatedAt: '2026-05-14T08:30:00.000Z' },
+        20: { evaluatedAt: '2026-06-05T08:30:00.000Z' },
+      },
+    },
+    { date: '2026-05-08', status: 'open', evaluations: {} },
+  ]);
+
+  assert.equal(summary.totalStored, 2);
+  assert.equal(summary.evaluatedRecommendations, 1);
+  assert.equal(summary.fullyEvaluatedRecommendations, 1);
+  assert.equal(summary.verifiedCohort, 0);
+  assert.equal(summary.verifiedCohort20d, 0);
+  assert.equal(summary.pendingRecommendations, 1);
+  assert.equal(summary.latestRecommendationDate, '2026-05-08');
+  assert.equal(summary.latestVerifiedDate, null);
+  assert.equal(summary.latestEvaluationAt, '2026-06-05T08:30:00.000Z');
+  assert.deepEqual(summary.byHorizon, { 1: 1, 5: 1, 20: 1 });
+  assert.equal(summary.engineHasHistory, true);
+});
+
 test('trade summary preserves unavailable data status', () => {
   const summary = summarizeTrades([], [], {
     dataAvailable: false,
@@ -28,4 +61,45 @@ test('trade summary preserves unavailable data status', () => {
   assert.equal(summary.total, 0);
   assert.equal(summary.dataAvailable, false);
   assert.equal(summary.dataError, '503 schema cache unavailable');
+});
+
+test('recommendation funnel distinguishes analysis from approved recommendations', () => {
+  const summary = summarizeRecommendationFunnel([{ date: '2026-07-31', stocks: [
+    { signal: 'bullish', risk_review: { approved: false, action: 'watch_only', blockers: ['market_regime: PANIC'] } },
+    { signal: 'neutral', risk_review: { approved: false, action: 'watch_only', blockers: ['liquidity: low'] } },
+    { signal: 'bullish', risk_review: { approved: true, action: 'candidate', blockers: [] } },
+  ] }]);
+
+  assert.equal(summary.reportDays, 1);
+  assert.equal(summary.analyzedCandidates, 3);
+  assert.equal(summary.bullishCandidates, 2);
+  assert.equal(summary.watchOnlyCandidates, 2);
+  assert.equal(summary.approvedCandidates, 1);
+  assert.deepEqual(summary.topBlockers, [
+    { reason: 'market_regime', count: 1 },
+    { reason: 'liquidity', count: 1 },
+  ]);
+});
+
+test('portfolio performance reports raw asset change and live valuation coverage', () => {
+  const summary = summarizePortfolioPerformance({
+    dataAvailable: true,
+    source: 'supabase_store',
+    portfolio: {
+      totalAssetValue: 11000000,
+      costBasis: 9000000,
+      unrealizedPnl: 1000000,
+      unrealizedPnlPct: 11.11,
+      unclassifiedAssetAmount: 1000000,
+      positions: [
+        { name: 'A', marketValue: 6000000, weight: 6 / 11, unrealizedPnlPct: 20, priceSource: 'quote' },
+        { name: 'B', marketValue: 4000000, weight: 4 / 11, unrealizedPnlPct: -5, priceSource: 'manual' },
+      ],
+    },
+  }, [{ captured_at: '2026-07-02T00:00:00Z', total_asset_value: 10000000 }]);
+
+  assert.equal(summary.rawChangeAmount, 1000000);
+  assert.equal(summary.rawChangePct, 10);
+  assert.equal(summary.liveValuationCoveragePct, 50);
+  assert.equal(summary.unclassifiedAssetAmount, 1000000);
 });

@@ -152,6 +152,7 @@ function explainRiskFactorKey(key) {
   const labels = {
     rr_ok: '손익비 기준 통과',
     rr_low: '손익비 기준 미달',
+    risk_reward: '손익비 기준',
     position_size: '매수 금액 기준',
     market_regime: '시장 상태 기준',
     stop_loss: '손절폭 기준',
@@ -1203,7 +1204,10 @@ async function sendFreedomStatus(status) {
 function formatPerformanceReview(review) {
   const title = review.period === 'monthly' ? '월간 성과 리뷰' : '주간 성과 리뷰';
   const rec = review.recommendationSummary || {};
+  const funnel = review.recommendationFunnel || {};
+  const tracker = review.recommendationTracker || {};
   const trade = review.tradeSummary || {};
+  const portfolio = review.portfolioSummary || {};
   const lab = review.performanceLab || {};
   const missed = lab.missedRecommendationQuality || {};
   const executed = lab.executedRecommendationQuality || {};
@@ -1214,8 +1218,6 @@ function formatPerformanceReview(review) {
   const collector = review.collectorOps || {};
   const alerts = collector.alertEvents || {};
   const priceQuality = review.priceSourceQuality || {};
-  const officialEod = priceQuality.officialEod || {};
-  const priceFallback = priceQuality.fallback || {};
   const priceAttempts = priceQuality.attempts || {};
   const priceDecision = priceQuality.providerDecision || {};
   const research = review.backtestResearch || {};
@@ -1226,6 +1228,7 @@ function formatPerformanceReview(review) {
   const notes = (review.notes || []).map(item => `▸ ${escapeHtml(item)}`);
 
   const fmtPct = value => formatPct(value);
+  const fmtKRW = value => (typeof value === 'number' && Number.isFinite(value) ? formatKRW(value) : '데이터 부족');
   const linkedRate = typeof trade.linkedRatePct === 'number' ? `${trade.linkedRatePct}%` : '데이터 부족';
   const winRate = typeof rec.winRatePct === 'number' ? `${rec.winRatePct}%` : '데이터 부족';
   const avgSignal = fmtPct(rec.avgSignalReturnPct);
@@ -1233,7 +1236,9 @@ function formatPerformanceReview(review) {
   const missedAvg = fmtPct(missed.avgSignalReturnPct);
   const executedAvg = fmtPct(executed.avgSignalReturnPct);
   const verdict = (() => {
+    if (review.period === 'monthly' && portfolio.dataAvailable === false) return '포트폴리오 원본을 읽지 못해 이번 달 자산 성과 판단을 보류합니다.';
     if (rec.dataAvailable === false) return '추천 성과 저장소를 읽지 못해 이번 주 성과를 판단할 수 없습니다.';
+    if (!rec.evaluated && funnel.analyzedCandidates > 0) return `분석 후보 ${funnel.analyzedCandidates}건이 있었지만 리스크 승인 추천은 ${funnel.approvedCandidates || 0}건입니다.`;
     if (!rec.evaluated) return '추천 성과를 판단하기에는 아직 평가 완료 데이터가 부족합니다.';
     if (typeof rec.avgAlphaPct === 'number' && rec.avgAlphaPct > 0 && typeof rec.winRatePct === 'number' && rec.winRatePct >= 50) {
       return '이번 기간의 추천은 시장 대비 양호했습니다.';
@@ -1248,7 +1253,9 @@ function formatPerformanceReview(review) {
     '▸ 상태: 추천 데이터 조회 실패 (0건으로 해석하면 안 됨)',
     `▸ 원인: ${rec.dataError || 'Supabase 또는 로컬 미러를 확인하세요'}`,
   ] : [
-    `▸ 추천 생성: ${rec.total ?? 0}건`,
+    `▸ 승인 추천: ${rec.total ?? 0}건`,
+    `▸ 분석 리포트: ${funnel.reportDays ?? 0}일 · 종목 후보 ${funnel.analyzedCandidates ?? 0}건`,
+    `▸ 강세 후보 ${funnel.bullishCandidates ?? 0}건 · 관찰/차단 ${funnel.watchOnlyCandidates ?? 0}건 · 승인 ${funnel.approvedCandidates ?? 0}건`,
     `▸ 평가 완료: ${rec.evaluated ?? 0}건`,
     `▸ 승률: ${winRate} - 평가 완료 추천 중 방향이 맞은 비율`,
     `▸ 평균 추천 수익률: ${avgSignal} - 추천 방향 기준 평균 성과`,
@@ -1301,23 +1308,28 @@ function formatPerformanceReview(review) {
     `▸ 원인: ${collector.dataError || 'Supabase 상태를 확인하세요'}`,
   ] : (collector.totalRuns ? [
     `▸ 수집 성공: ${collector.successfulRuns ?? 0}/${collector.completedRuns ?? collector.totalRuns}`,
-    `▸ 마지막 성공: ${collector.lastSuccessAt || '없음'}${typeof collector.minutesSinceLastSuccess === 'number' ? ` · ${collector.minutesSinceLastSuccess}분 전` : ''}`,
     `▸ 조치 필요 실패: ${collector.actionableFailedRuns ?? collector.failedRuns ?? 0}건${collector.resolvedFailureRuns ? ` · 정리된 과거 실패 ${collector.resolvedFailureRuns}건` : ''}`,
-    `▸ 즉시 알림: ${collector.totalImmediateAlerts ?? 0}건`,
-    `▸ 즉시 알림 실패: 최근 ${alerts.actionableFailedImmediate ?? alerts.failedImmediate ?? 0}건${alerts.historicalFailedImmediate ? ` · 과거 실패 ${alerts.historicalFailedImmediate}건` : ''}`,
-    `▸ 다이제스트 처리: 전송완료 ${alerts.sentDigest ?? 0}건 · 대기 ${alerts.pendingDigest ?? 0}건 · 실패 ${alerts.failedDigest ?? 0}건`,
-    `▸ catch-up 처리: 전송완료 ${alerts.sentCatchUp ?? 0}건 · 대기 ${alerts.pendingCatchUp ?? 0}건 · 실패 ${alerts.failedCatchUp ?? 0}건`,
+    `▸ 알림 실패: 즉시 ${alerts.actionableFailedImmediate ?? 0}건 · 다이제스트 ${alerts.failedDigest ?? 0}건 · catch-up ${alerts.failedCatchUp ?? 0}건`,
+    `▸ 기간 중 다이제스트 버퍼 유입: ${alerts.bufferedDigest ?? 0}건 · 실제 pending ${alerts.pendingDigest ?? 0}건`,
   ] : []);
   const priceLines = priceQuality.totalSnapshots ? [
     `▸ 가격 스냅샷: ${priceQuality.totalSnapshots ?? 0}건 / 종목 ${priceQuality.tickerCount ?? 0}개`,
     `▸ 가격 조회: ${priceAttempts.total ?? 0}건 · 실패 ${priceAttempts.failed ?? 0}건 (${priceAttempts.failureRatePct ?? 'n/a'}%) · 빈 응답 ${priceAttempts.empty ?? 0}건`,
-    `▸ 장마감 가격: ${priceQuality.eodSnapshots ?? 0}건, 공식 데이터 비중 ${officialEod.ratePct ?? 'n/a'}%`,
-    `▸ KRX ${officialEod.krx ?? 0}건 · 공공데이터 ${officialEod.dataGoKr ?? 0}건 · KIS 대체 사용 ${priceQuality.kisEodFallback ?? 0}건`,
-    `▸ 국내 대체 가격: ${priceFallback.domesticTotal ?? 0}건 (${priceFallback.domesticRatePct ?? 'n/a'}%)`,
-    `▸ 해외 Yahoo 현재가: ${priceFallback.globalCurrentTotal ?? 0}건 (${priceFallback.globalRatePct ?? 'n/a'}%)`,
-    `▸ 오래된 가격 의심: ${priceQuality.staleSnapshots ?? 0}건`,
+    `▸ 최신 종목·가격유형 중 오래된 값: ${priceQuality.staleSnapshots ?? 0}/${priceQuality.latestSnapshotCount ?? priceQuality.tickerCount ?? 0}건`,
     priceDecision.label ? `▸ 판단: ${priceDecision.label}` : '',
   ] : [];
+  const portfolioLines = portfolio.dataAvailable === false ? [
+    '▸ 상태: 포트폴리오 조회 실패 — 자산 성과와 경제적 자유 계산 보류',
+  ] : [
+    `▸ 현재 총자산: ${fmtKRW(portfolio.currentTotalAssetValue)}`,
+    `▸ 보유 평가손익: ${fmtKRW(portfolio.unrealizedPnl)} (${fmtPct(portfolio.unrealizedPnlPct)})`,
+    portfolio.startTotalAssetValue !== null
+      ? `▸ 기간 순자산 변화: ${fmtKRW(portfolio.rawChangeAmount)} (${fmtPct(portfolio.rawChangePct)}) · 입출금 미조정`
+      : '▸ 기간 순자산 변화: 비교 스냅샷 부족',
+    `▸ 실시간 평가 적용: ${portfolio.liveValuedPositions ?? 0}/${portfolio.positionCount ?? 0}종목`,
+    freedom.goal ? `▸ 경제적 자유: 목표 ${formatKRW(freedom.goal.targetNetWorth)}의 ${freedom.targetProgressPct ?? 'n/a'}%` : '',
+    ...(portfolio.topPositions || []).map(item => `▸ 비중 상위: ${item.name} ${item.weightPct ?? 'n/a'}% · 평가 ${fmtPct(item.unrealizedPnlPct)}`),
+  ];
   const researchLines = research.enabled ? [
     `▸ 대상: 국내 추천 후보 ${research.tickerCount ?? 0}개`,
     `▸ 가격 제공처: ${research.provider || 'auto'}`,
@@ -1335,27 +1347,74 @@ function formatPerformanceReview(review) {
     `▸ 진입 타이밍 승인 필수: ${learningRules.requireEntryTimingApproval ? '예' : '아니오'}`,
     ...learning.actions.slice(0, 4).map(action => `▸ ${action}`),
   ] : [];
+  const trackerLines = tracker.dataAvailable === false ? [
+    '▸ 성과 추적 저장소 조회 실패 — 평가 0건으로 해석하면 안 됨',
+  ] : [
+    `▸ 누적 추적: 저장 신호 ${tracker.totalStored ?? 0}건 · 평가 시작 ${tracker.evaluatedRecommendations ?? 0}건 · 20일 완료 ${tracker.fullyEvaluatedRecommendations ?? 0}건`,
+    `▸ 검증 코호트: 리스크 승인·계약 충족 ${tracker.verifiedCohort ?? 0}건 · 20일 완료 ${tracker.verifiedCohort20d ?? 0}건`,
+    `▸ 평가 구간: 1일 ${tracker.byHorizon?.[1] ?? 0}건 · 5일 ${tracker.byHorizon?.[5] ?? 0}건 · 20일 ${tracker.byHorizon?.[20] ?? 0}건`,
+    (tracker.missingPriceRecommendations ?? 0) > 0 ? `▸ 평가 제외: 기준 가격 없음 ${tracker.missingPriceRecommendations}건` : '',
+    `▸ 최근 저장 신호: ${tracker.latestRecommendationDate || '없음'} · 최근 검증 승인: ${tracker.latestVerifiedDate || '없음'}`,
+    `▸ 최근 평가 실행: ${tracker.latestEvaluationAt ? String(tracker.latestEvaluationAt).slice(0, 10) : '없음'}`,
+    tracker.engineHasHistory
+      ? `▸ 평가기 상태: 동작 이력 있음${(rec.total ?? 0) === 0 ? ' · 이번 달 신규 승인 입력 없음' : ''}`
+      : '▸ 평가기 상태: 평가 이력 없음 — 추천 저장과 가격 데이터를 점검해야 함',
+  ];
+
+  const sections = [];
+  const addSection = (heading, lines) => {
+    const visible = (lines || []).filter(Boolean);
+    if (visible.length > 0) sections.push(`<b>${sections.length + 1}. ${heading}</b>\n${visible.map(escapeHtml).join('\n')}`);
+  };
+  if (review.period === 'monthly') {
+    const funnelLines = funnel.dataAvailable === false ? [
+      '▸ 장마감 분석 저장소 조회 실패',
+    ] : [
+      `▸ 분석: 리포트 ${funnel.reportDays ?? 0}일 · 종목 후보 ${funnel.analyzedCandidates ?? 0}건`,
+      `▸ 판정: 강세 ${funnel.bullishCandidates ?? 0}건 · 관찰/차단 ${funnel.watchOnlyCandidates ?? 0}건 · 승인 ${funnel.approvedCandidates ?? 0}건`,
+      ...(funnel.topBlockers || []).slice(0, 3).map(item => `▸ 주요 차단: ${explainRiskFactorKey(item.reason)} ${item.count}건`),
+      ...trackerLines,
+    ];
+    const monthlyPerformanceLines = rec.dataAvailable === false ? recommendationLines : [
+      `▸ 이번 달 승인 추천: ${rec.total ?? 0}건 · 평가 완료 ${rec.evaluated ?? 0}건`,
+      rec.evaluated
+        ? `▸ 승률 ${winRate} · 평균 추천 수익률 ${avgSignal} · 시장 대비 ${avgAlpha}`
+        : '▸ 성과 판단: 평가 표본 없음 — 수익률·승률 계산 보류',
+      ...failureLines.slice(0, 2),
+    ];
+    addSection('내 자산 성과', portfolioLines);
+    addSection('AI 추천 파이프라인', funnelLines);
+    addSection('이번 달 AI 추천 성과', monthlyPerformanceLines);
+    addSection('내 매매 실행', executionLines);
+    addSection('운영 상태', [...collectorLines, ...priceLines]);
+    addSection('다음 달 개선', [
+      ...(review.improvementActions || []).slice(0, 4).map(item => `▸ ${item}`),
+      ...(review.notes || []).slice(0, 3).map(item => `▸ ${item}`),
+    ]);
+  } else {
+    addSection('AI 추천 성과', recommendationLines);
+    addSection('내 실행 품질', executionLines);
+    addSection('실패 원인', failureLines);
+    addSection('섹터별 성과', sectorLines);
+    addSection('리스크 요인별 성과', riskFactorLines);
+    addSection('모델별 성과', aiModelLines);
+    addSection('프롬프트 버전별 성과', promptVersionLines);
+    addSection('프롬프트+모델 설정별 성과', aiVersionLines);
+    addSection('수집/알림 운영', collectorLines);
+    addSection('가격 데이터 품질', priceLines);
+    addSection('로컬 리서치', researchLines);
+    addSection('다음 추천에 적용할 학습 룰', learningLines);
+    if (improvementActions.length > 0) sections.push(`<b>${sections.length + 1}. 다음 개선 액션</b>\n${improvementActions.join('\n')}`);
+    if (notes.length > 0) sections.push(`<b>${sections.length + 1}. 이번 주 점검할 것</b>\n${notes.join('\n')}`);
+  }
 
   return [
     `🧾 <b>${title}</b>`,
     `${escapeHtml(review.startDate)} ~ ${escapeHtml(review.endDate)}`,
     '',
     `<b>한줄 판단</b>\n${escapeHtml(verdict)}`,
-    freedom.goal ? `<b>경제적 자유</b>\n▸ 현재 ${formatKRW(freedom.currentNetWorth)} / 목표 ${formatKRW(freedom.goal.targetNetWorth)} (${freedom.targetProgressPct ?? 'n/a'}%)\n▸ 현재 속도 기준 예상 도달: ${escapeHtml(freedom.estimatedTargetDate || 'n/a')}` : '',
-    [`<b>1. AI 추천 성과</b>`, ...recommendationLines.map(escapeHtml)].join('\n'),
-    [`<b>2. 내 실행 품질</b>`, ...executionLines.map(escapeHtml)].join('\n'),
-    failureLines.length > 0 ? [`<b>3. 실패 원인</b>`, ...failureLines.map(escapeHtml)].join('\n') : '',
-    sectorLines.length > 0 ? [`<b>4. 섹터별 성과</b>`, ...sectorLines.map(escapeHtml)].join('\n') : '',
-    riskFactorLines.length > 0 ? [`<b>5. 리스크 요인별 성과</b>`, ...riskFactorLines.map(escapeHtml)].join('\n') : '',
-    aiModelLines.length > 0 ? [`<b>6. 모델별 성과</b>`, ...aiModelLines.map(escapeHtml)].join('\n') : '',
-    promptVersionLines.length > 0 ? [`<b>7. 프롬프트 버전별 성과</b>`, ...promptVersionLines.map(escapeHtml)].join('\n') : '',
-    aiVersionLines.length > 0 ? [`<b>8. 프롬프트+모델 설정별 성과</b>`, ...aiVersionLines.map(escapeHtml)].join('\n') : '',
-    collectorLines.length > 0 ? [`<b>9. 수집/알림 운영</b>`, ...collectorLines.map(escapeHtml)].join('\n') : '',
-    priceLines.length > 0 ? [`<b>10. 가격 데이터 품질</b>`, ...priceLines.map(escapeHtml)].join('\n') : '',
-    researchLines.length > 0 ? [`<b>11. 로컬 리서치</b>`, ...researchLines.map(escapeHtml)].join('\n') : '',
-    learningLines.length > 0 ? [`<b>12. 다음 추천에 적용할 학습 룰</b>`, ...learningLines.map(escapeHtml)].join('\n') : '',
-    improvementActions.length > 0 ? [`<b>13. 다음 개선 액션</b>`, ...improvementActions].join('\n') : '',
-    notes.length > 0 ? [`<b>14. 이번 주 점검할 것</b>`, ...notes].join('\n') : '',
+    freedom.goal && review.period !== 'monthly' ? `<b>경제적 자유</b>\n▸ 현재 ${formatKRW(freedom.currentNetWorth)} / 목표 ${formatKRW(freedom.goal.targetNetWorth)} (${freedom.targetProgressPct ?? 'n/a'}%)\n▸ 현재 속도 기준 예상 도달: ${escapeHtml(freedom.estimatedTargetDate || 'n/a')}` : '',
+    ...sections,
     '<i>추천 수익률은 실제 계좌 수익률이 아닙니다. 추천 성과와 내 매매 성과를 분리해서 봅니다.</i>',
   ].filter(Boolean).join('\n');
 }

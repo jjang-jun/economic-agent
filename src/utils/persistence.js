@@ -399,13 +399,14 @@ async function loadPersistedStockReports(options = {}) {
     limit: String(options.limit || 5),
   };
   if (options.date) params.date = `eq.${options.date}`;
+  else if (options.startDate) params.date = `gte.${options.startDate}`;
 
   const result = await selectRows('stock_reports', params);
   if (!result.rows) return result;
 
   return {
     rows: result.rows
-      .map(row => row.report || {
+      .map(row => row.report ? { ...row.report, date: row.report.date || row.date } : {
         date: row.date,
         market_summary: row.market_summary || '',
         decision: row.decision || null,

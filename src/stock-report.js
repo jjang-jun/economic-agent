@@ -118,7 +118,10 @@ async function main() {
   applyRecommendationRisk(report, report.decision);
   applyRiskReview(report, report.decision);
   applyRecommendationSchemaValidation(report);
-  await persistStockReport(report);
+  const stockReportPersistence = await persistStockReport(report);
+  if (stockReportPersistence.error) {
+    throw new Error(`종목 리포트 저장 실패: ${stockReportPersistence.error.message}`);
+  }
   await persistDecisionContext(report.decision);
 
   const sent = await sendStockReport(report);

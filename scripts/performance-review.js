@@ -44,12 +44,16 @@ async function main() {
     throw new Error('period must be weekly or monthly');
   }
 
-  const review = await buildPerformanceReview(period);
+  const review = await buildPerformanceReview(period, {
+    saveSideEffects: !noSave,
+    persistSideEffects: !noPersist,
+  });
   const file = noSave ? null : savePerformanceReview(review);
   if (noPersist) {
     console.log('[성과리뷰] Supabase 저장 생략');
   } else {
-    await persistPerformanceReview(review);
+    const persisted = await persistPerformanceReview(review);
+    if (persisted.error) throw new Error(`Supabase 성과 리뷰 저장 실패: ${persisted.error.message}`);
   }
   if (file) {
     console.log(`[성과리뷰] ${period} review saved: ${file}`);

@@ -298,7 +298,8 @@ async function logRecommendations(report, context = {}) {
   }
 
   saveRecommendations([...byId.values()]);
-  await persistRecommendations([...byId.values()]);
+  const persisted = await persistRecommendations([...byId.values()]);
+  if (persisted.error) throw new Error(`추천 저장 실패: ${persisted.error.message}`);
   return { added, skipped };
 }
 
@@ -454,8 +455,14 @@ async function evaluateRecommendations() {
   }
 
   saveRecommendations(recommendations);
-  await persistRecommendations(recommendations);
-  await persistRecommendationEvaluations(completed);
+  const recommendationResult = await persistRecommendations(recommendations);
+  if (recommendationResult.error) {
+    throw new Error(`추천 상태 저장 실패: ${recommendationResult.error.message}`);
+  }
+  const evaluationResult = await persistRecommendationEvaluations(completed);
+  if (evaluationResult.error) {
+    throw new Error(`추천 평가 저장 실패: ${evaluationResult.error.message}`);
+  }
   return { completed, total: recommendations.length };
 }
 

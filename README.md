@@ -243,7 +243,11 @@ npm run security:audit
 
 주간/월간 성과 리뷰는 단순 점검 메모와 별도로 `다음 개선 액션`을 생성합니다. 실제 매수한 추천보다 놓친 추천의 성과가 좋았는지, 손익비 부족 실패가 반복되는지, 손절 기준 없는 bullish 추천이 있었는지, 수집기 공백이나 가격 provider 경고가 있었는지를 행동 항목으로 분리해 Telegram에 표시합니다.
 
+월간 리뷰는 `자산 성과 → AI 추천 파이프라인 → 이번 달 AI 추천 성과 → 내 매매 실행 → 운영 상태 → 다음 달 개선`의 6개 섹션으로 구성합니다. 최신 포트폴리오의 현재 총자산, 평가손익, 기간 첫 스냅샷 대비 단순 자산 증감을 먼저 표시하며 단순 자산 증감은 입출금이 보정되지 않은 값입니다. 포트폴리오를 읽지 못하면 0원으로 계산하지 않고 데이터 오류로 표시하며 경제적 자유 계산도 생략합니다. 추천은 장마감 리포트 일수, 분석 후보, 강세 후보, 관찰/차단, 승인으로 이어지는 퍼널과 누적 1/5/20거래일 평가 상태를 함께 보여줍니다. `평가기 동작 이력 있음·이번 달 신규 승인 입력 없음`과 저장소/평가기 장애를 구분하고, 리스크 승인·추천 계약·기준가격을 모두 충족한 검증 코호트는 레거시 저장 신호와 별도로 표시합니다.
+
 성과 리뷰의 일부 개선 액션은 다음 장마감 종목 추천에 직접 환류됩니다. 단, 리스크 승인을 받은 후보의 20거래일 평가가 기본 30건 쌓이고 AI 메타데이터 커버리지가 80% 이상일 때만 규칙을 자동 조정합니다. 그 전에는 `low_risk_reward` 같은 소수 실패가 있어도 최소 손익비를 바꾸지 않고 표본 부족으로 표시합니다.
+
+추천 평가 workflow는 신규 승인 추천이 없으면 정상적으로 `신규 평가 0건`으로 끝납니다. 추천 또는 평가 결과의 Supabase 저장이 실패하면 더 이상 성공으로 처리하지 않고 workflow를 실패시켜 private Telegram 장애 알림으로 연결합니다.
 
 ETF 레이더의 `inflow_proxy`/`outflow_proxy`는 실제 ETF 순설정·순환매 금액이 아닙니다. 가격 5일·20일 상대강도와 20일 평균 대비 거래량으로 “어디가 강하고 약한지”를 추정하며, 실제 자금 유입은 발행주식수·AUM·creation/redemption 데이터가 확보된 경우에만 별도 수치로 해석해야 합니다.
 
@@ -601,7 +605,7 @@ module.exports = {
 
 추천 성과 평가와 백테스트용 일별 종가는 현재가와 분리합니다. 국내 EOD 가격은 KRX Open API 공식 일별매매정보(`krx-openapi`)를 우선 사용하고, 없으면 공공데이터포털 주식시세정보(`data-go-kr`), KIS 일봉 순서로 fallback합니다. 해외 EOD 가격은 FMP historical EOD를 우선 사용하고, Tiingo/Alpha/Yahoo fallback을 사용합니다. 추천 1일/5일/20일 평가는 가능한 경우 평가 대상일의 EOD 가격과 EOD high/low history로 수익률, MFE/MAE, 손절/목표 터치 여부를 계산합니다.
 
-해외 주식은 Alpaca Market Data, FMP, Alpha Vantage, Tiingo EOD, Yahoo fallback 순서로 조회합니다. 키가 없는 provider는 자동으로 건너뛰므로 초기에는 Yahoo fallback으로 계속 동작하고, `FMP_API_KEY`를 넣으면 미국 기업 재무/실적 분석까지 확장할 수 있습니다. 가격 provider 운영 점검은 국내 fallback과 해외 Yahoo 현재가 사용을 분리해 판단합니다. 해외 Yahoo 현재가 비중만 높은 경우는 장애가 아니라 `해외 실시간 가격 API는 필요 시 보강`으로 모니터링하며, 미국 장중 실시간 알림이 중요해지면 Alpaca WebSocket 또는 Massive를 별도 실시간 계층으로 추가합니다.
+해외 주식은 Alpaca Market Data, FMP, Alpha Vantage, Tiingo EOD, Yahoo fallback 순서로 조회합니다. 키가 없는 provider는 `skipped`로 기록하고 빈 응답률 계산에서는 제외하므로, 초기에는 Yahoo fallback으로 계속 동작합니다. `FMP_API_KEY`를 넣으면 미국 기업 재무/실적 분석까지 확장할 수 있습니다. 가격 provider 운영 점검은 국내 fallback과 해외 Yahoo 현재가 사용을 분리해 판단합니다. 해외 Yahoo 현재가 비중만 높은 경우는 장애가 아니라 `해외 실시간 가격 API는 필요 시 보강`으로 모니터링하며, 미국 장중 실시간 알림이 중요해지면 Alpaca WebSocket 또는 Massive를 별도 실시간 계층으로 추가합니다.
 
 FMP profile, 재무제표 요약, earnings calendar는 해외 종목 후보의 `fundamental_profile`로 저장합니다. 리스크 리뷰는 `isActivelyTrading=false` 종목을 차단하고, 고베타, ADR, 미국 소형주, ETF, 매출/순이익 역성장, 음수 FCF 마진, 높은 D/E, 실적발표 임박, 직전 EPS 쇼크를 경고로 표시합니다.
 
@@ -682,6 +686,8 @@ npm run portfolio:sync-secret
 ```
 
 `cashAmount`와 `totalAssetValue`를 넣으면 현금 비중이 자동 계산됩니다. 종목별 `weight`를 넣으면 장 마감 리포트의 행동 가드레일에서 종목/섹터 쏠림을 점검합니다.
+
+스크린샷에서 옮긴 `currentPrice`와 `marketValue`는 다음 평가 때 최신 시세가 있으면 갱신됩니다. 특정 평가액을 의도적으로 고정해야 하는 포지션만 `valuationLocked: true`를 사용합니다. 상세 구성이 아직 확인되지 않은 자산은 `unclassifiedAssetAmount`에 둘 수 있으며 총자산에는 포함되지만 현금·매수 가능 금액으로 취급하지 않습니다.
 
 ### 경제적 자유 목표
 

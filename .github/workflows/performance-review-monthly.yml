@@ -38,6 +38,8 @@ jobs:
           SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PORTFOLIO_JSON_BASE64: ${{ secrets.PORTFOLIO_JSON_BASE64 }}
+          PORTFOLIO_JSON: ${{ secrets.PORTFOLIO_JSON }}
       - name: Notify private chat on failure
         if: failure()
         run: npm run notify:workflow-failure -- "Performance Review Monthly (월간 성과 리뷰)" "Build and send monthly performance review"

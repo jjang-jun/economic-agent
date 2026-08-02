@@ -48,7 +48,7 @@ test('normalizePortfolio preserves valuation fields for stored portfolios', () =
   assert.equal(position.fxRate, 1390);
 });
 
-test('enrichPortfolio preserves manual unrealized PnL amount overrides', async () => {
+test('enrichPortfolio refreshes manual capture values when quotes are available', async () => {
   const portfolio = await enrichPortfolio({
     cashAmount: 1000000,
     positions: [
@@ -81,9 +81,10 @@ test('enrichPortfolio preserves manual unrealized PnL amount overrides', async (
   });
 
   assert.equal(portfolio.positions[0].currentPrice, 87.33);
-  assert.equal(portfolio.positions[0].unrealizedPnl, -156702);
-  assert.equal(portfolio.positions[1].unrealizedPnl, 2239016);
-  assert.equal(portfolio.unrealizedPnl, 2082314);
+  assert.equal(portfolio.positions[0].unrealizedPnl, -109032);
+  assert.equal(portfolio.positions[1].unrealizedPnl, 1601600);
+  assert.equal(portfolio.unrealizedPnl, 1492568);
+  assert.equal(portfolio.positions[0].priceSource, 'quote');
 });
 
 test('enrichPortfolio preserves USD valuation fields when FX and quote fetches fail', async () => {
@@ -124,7 +125,7 @@ test('enrichPortfolio preserves USD valuation fields when FX and quote fetches f
   assert.equal(portfolio.unrealizedPnlPct, 7.75);
 });
 
-test('enrichPortfolio preserves manual USD valuation even when FX refresh succeeds', async () => {
+test('enrichPortfolio preserves explicitly locked manual USD valuation even when FX refresh succeeds', async () => {
   const portfolio = await enrichPortfolio({
     cashAmount: 15000000,
     investedAmount: 42377347,
@@ -142,6 +143,7 @@ test('enrichPortfolio preserves manual USD valuation even when FX refresh succee
         currentPrice: 52.79,
         priceSource: 'manual',
         quoteSource: 'manual',
+        valuationLocked: true,
         fxRate: 1394,
         costBasis: 13252868,
         marketValue: 15491884,
@@ -161,4 +163,29 @@ test('enrichPortfolio preserves manual USD valuation even when FX refresh succee
   assert.equal(portfolio.positions[0].unrealizedPnl, 2239016);
   assert.equal(portfolio.positions[0].unrealizedPnlPct, 17.3);
   assert.equal(portfolio.totalAssetValue, 57377347);
+});
+
+test('enrichPortfolio includes unclassified non-cash assets without treating them as buying power', async () => {
+  const portfolio = await enrichPortfolio({
+    cashAmount: 0,
+    unclassifiedAssetAmount: 500000,
+    positions: [{
+      name: '삼성전자',
+      ticker: '005930',
+      symbol: '005930.KS',
+      currency: 'KRW',
+      quantity: 10,
+      avgPrice: 70000,
+      costBasis: 700000,
+    }],
+  }, {
+    fetcher: async symbol => (symbol === '005930.KS'
+      ? { price: 80000, currency: 'KRW', source: 'test' }
+      : null),
+  });
+
+  assert.equal(portfolio.investedAmount, 800000);
+  assert.equal(portfolio.totalAssetValue, 1300000);
+  assert.equal(portfolio.cashAmount, 0);
+  assert.equal(portfolio.positions[0].weight, 800000 / 1300000);
 });
