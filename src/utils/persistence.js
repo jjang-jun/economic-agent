@@ -195,6 +195,26 @@ async function upsert(table, rows, onConflict) {
   }
 }
 
+async function insertRowsIgnoreDuplicates(table, rows, onConflict) {
+  if (!isPersistenceEnabled() || !rows || rows.length === 0) return { saved: 0 };
+  const circuitError = getSupabaseCircuitError();
+  if (circuitError) return { saved: 0, error: circuitError, skipped: true };
+  const url = new URL(`/rest/v1/${table}`, SUPABASE_URL);
+  if (onConflict) url.searchParams.set('on_conflict', onConflict);
+  try {
+    await fetchSupabaseWithRetry(url, {
+      method: 'POST',
+      headers: getHeaders('resolution=ignore-duplicates'),
+      body: JSON.stringify(rows),
+    });
+    return { saved: rows.length };
+  } catch (err) {
+    console.warn(`[DB] ${table} 저장 실패: ${err.message}`);
+    recordSupabaseFailure(err);
+    return { saved: 0, error: err };
+  }
+}
+
 async function deleteRows(table, filterParams = {}) {
   if (!isPersistenceEnabled()) return { deleted: 0, disabled: true };
   const circuitError = getSupabaseCircuitError();
@@ -571,6 +591,59 @@ async function persistResearchCandidateEvaluations(completed) {
     .filter(item => item?.recommendation?.id && item?.evaluation)
     .map(researchEvaluationRow);
   return upsert('research_candidate_evaluations', rows, 'id');
+}
+
+async function persistMarketAnomalySignals(signals = []) {
+  const rows = (signals || []).filter(signal => signal?.id && signal?.detectedAt).map(signal => ({
+    id: signal.id,
+    date: signal.date || getKSTDate(new Date(signal.detectedAt)),
+    symbol: signal.symbol || '',
+    ticker: signal.ticker || '',
+    name: signal.name || '',
+    direction: signal.direction || 'unknown',
+    score: signal.score ?? null,
+    detected_at: signal.detectedAt,
+    evidence_status: signal.evidence?.status || 'unverified',
+    related_article_ids: (signal.evidence?.relatedArticles || []).map(article => article.id).filter(Boolean),
+    payload: signal,
+    updated_at: new Date().toISOString(),
+  }));
+  return insertRowsIgnoreDuplicates('market_anomaly_signals', rows, 'id');
+}
+
+async function loadMarketAnomalySignals(options = {}) {
+  const result = await selectRows('market_anomaly_signals', {
+    select: 'payload,detected_at,evidence_status',
+    detected_at: options.since ? `gte.${options.since}` : undefined,
+    evidence_status: options.evidenceStatuses ? postgrestIn(options.evidenceStatuses) : undefined,
+    order: 'detected_at.asc',
+    limit: String(options.limit || 200),
+  });
+  if (!result.rows) return result;
+  return {
+    rows: result.rows.map(row => ({
+      ...(row.payload || {}),
+      detectedAt: row.payload?.detectedAt || row.detected_at,
+    })).filter(row => row.id),
+  };
+}
+
+async function updateMarketAnomalySignals(signals = []) {
+  const rows = (signals || []).filter(signal => signal?.id && signal?.detectedAt).map(signal => ({
+    id: signal.id,
+    date: signal.date || getKSTDate(new Date(signal.detectedAt)),
+    symbol: signal.symbol || '',
+    ticker: signal.ticker || '',
+    name: signal.name || '',
+    direction: signal.direction || 'unknown',
+    score: signal.score ?? null,
+    detected_at: signal.detectedAt,
+    evidence_status: signal.evidence?.status || 'unverified',
+    related_article_ids: (signal.evidence?.relatedArticles || []).map(article => article.id).filter(Boolean),
+    payload: signal,
+    updated_at: new Date().toISOString(),
+  }));
+  return upsert('market_anomaly_signals', rows, 'id');
 }
 
 function tradeExecutionRow(trade) {
@@ -1058,6 +1131,9 @@ module.exports = {
   persistResearchCandidates,
   loadPersistedResearchCandidates,
   persistResearchCandidateEvaluations,
+  persistMarketAnomalySignals,
+  loadMarketAnomalySignals,
+  updateMarketAnomalySignals,
   persistTradeExecutions,
   loadPersistedTradeExecutions,
   persistPortfolioCashFlows,

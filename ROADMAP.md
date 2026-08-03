@@ -168,6 +168,7 @@ Codex 작업 위임 원칙:
 - [x] 강세장 세부 태그: `OVERHEATED`, `CONCENTRATED_LEADERSHIP`, `SEMICONDUCTOR_LEADERSHIP`, `MOMENTUM_ALLOWED`
 - [x] 포트폴리오 설정 초안
 - [x] 종목 리포트에 행동 가드레일 추가
+- [x] 가격·거래량 이상징후의 감지시각과 기사·DART 선후관계 저장. 저장소 장애·날짜 단위 공시는 판단 보류하고 추천으로 자동 승격하지 않음
 
 ## Phase 2: 히스토리 저장소
 - [x] Supabase/Postgres 도입
@@ -177,6 +178,7 @@ Codex 작업 위임 원칙:
 - [x] 추천/성과 평가를 DB 기준으로 변경
 - [x] 가격 사용 이력 `price_snapshots` 저장
 - [x] 브리핑/리포트 입력 데이터도 DB에서 조회 가능하게 변경
+- [x] `market_anomaly_signals`에 감지 당시 근거 상태와 후속 첫 관련 기사 시각 저장
 
 ## Phase 2.5: 가격 데이터 엔진
 - [x] 한국 주식 Yahoo 의존 축소

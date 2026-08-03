@@ -6,6 +6,9 @@ const {
   filterAlreadyAlertedPreNews,
   markPreNewsSignalsSent,
   scorePreNewsSignal,
+  articleMatchesSignal,
+  classifySignalEvidence,
+  evaluateSignalFollowUp,
 } = require('../src/utils/pre-news-signal');
 const { formatPreNewsSignalReport } = require('../src/notify/telegram');
 
@@ -80,6 +83,113 @@ test('scorePreNewsSignal keeps technical-only watchlist strength as watch', () =
   assert.equal(signal.originalName, '삼성전자');
   assert.ok(signal.score >= 5);
   assert.ok(signal.reasons.some(item => item.includes('20일 고점 돌파')));
+});
+
+test('article evidence matches a stock deterministically and only uses pre-detection timestamps', () => {
+  const signal = { ticker: '005930', name: '삼성전자' };
+  const prior = {
+    id: 'prior',
+    title: '삼성전자 HBM 공급 확대',
+    source: 'DART',
+    pubDate: '2026-05-11T00:30:00.000Z',
+    pubDatePrecision: 'datetime',
+  };
+  const future = {
+    id: 'future',
+    title: '삼성전자 주가 급등',
+    pubDate: '2026-05-11T01:30:00.000Z',
+    pubDatePrecision: 'datetime',
+  };
+
+  assert.equal(articleMatchesSignal(prior, signal), true);
+  const evidence = classifySignalEvidence(signal, [prior, future], {
+    detectedAt: '2026-05-11T01:00:00.000Z',
+    lookbackHours: 12,
+    dataAvailable: true,
+  });
+  assert.equal(evidence.status, 'related_information_found');
+  assert.deepEqual(evidence.relatedArticles.map(item => item.id), ['prior']);
+  assert.equal(evidence.relatedArticles[0].leadMinutes, 30);
+});
+
+test('article evidence distinguishes unknown publication time and unavailable storage', () => {
+  const signal = { ticker: '005930', name: '삼성전자' };
+  const dateOnly = classifySignalEvidence(signal, [{
+    id: 'dart-date',
+    title: '삼성전자 공시',
+    pubDate: '2026-05-11',
+    pubDatePrecision: 'date',
+  }], {
+    detectedAt: '2026-05-11T01:00:00.000Z',
+    dataAvailable: true,
+  });
+  assert.equal(dateOnly.status, 'same_day_time_unverified');
+
+  const unavailable = classifySignalEvidence(signal, [], {
+    detectedAt: '2026-05-11T01:00:00.000Z',
+    dataAvailable: false,
+  });
+  assert.equal(unavailable.status, 'evidence_unavailable');
+});
+
+test('article evidence does not match a global stock on a generic company-name token', () => {
+  const signal = { ticker: 'MU', name: 'Micron Technology Inc' };
+  assert.equal(articleMatchesSignal({
+    title: '한국 첨단 technology 산업 지원 확대',
+  }, signal), false);
+  assert.equal(articleMatchesSignal({
+    title: 'Micron, 차세대 HBM 공급 계획 공개',
+  }, signal), true);
+});
+
+test('signal follow-up records the first related article published after detection', () => {
+  const updated = evaluateSignalFollowUp({
+    id: 'signal-1',
+    ticker: '005930',
+    name: '삼성전자',
+    detectedAt: '2026-05-11T01:00:00.000Z',
+    evidence: { status: 'unexplained_at_detection', relatedArticles: [] },
+  }, [{
+    id: 'after',
+    title: '삼성전자 신규 공급 계약',
+    pubDate: '2026-05-11T02:15:00.000Z',
+    pubDatePrecision: 'datetime',
+    source: 'DART',
+  }], {
+    checkedAt: '2026-05-11T03:00:00.000Z',
+    dataAvailable: true,
+  });
+
+  assert.equal(updated.evidence.status, 'related_information_after_signal');
+  assert.equal(updated.evidence.firstFollowingArticle.id, 'after');
+  assert.equal(updated.evidence.firstFollowingArticle.lagMinutes, 75);
+});
+
+test('signal follow-up rechecks evidence after article storage recovers', () => {
+  const updated = evaluateSignalFollowUp({
+    id: 'signal-retry',
+    ticker: '005930',
+    name: '삼성전자',
+    detectedAt: '2026-05-11T01:00:00.000Z',
+    evidence: {
+      status: 'evidence_unavailable',
+      lookbackHours: 12,
+      relatedArticles: [],
+    },
+  }, [{
+    id: 'before-recovered',
+    title: '삼성전자 공급 계약 공시',
+    pubDate: '2026-05-11T00:20:00.000Z',
+    pubDatePrecision: 'datetime',
+    source: 'DART',
+  }], {
+    checkedAt: '2026-05-11T02:00:00.000Z',
+    dataAvailable: true,
+  });
+
+  assert.equal(updated.evidence.status, 'related_information_found');
+  assert.equal(updated.evidence.relatedArticles[0].id, 'before-recovered');
+  assert.equal(updated.evidence.relatedArticles[0].leadMinutes, 40);
 });
 
 test('scorePreNewsSignal promotes a strong personally relevant compound signal', () => {

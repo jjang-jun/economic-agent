@@ -878,12 +878,32 @@ function formatPreNewsSignal(signal) {
   const nameNote = signal.originalName && signal.originalName !== signal.name
     ? `공식명 기준, 추천명 ${signal.originalName}`
     : '';
+  const evidence = signal.evidence || {};
+  const evidenceLine = evidence.status === 'evidence_unavailable'
+    ? '기사·공시 대조: 저장소 조회 불가 · 선행성 판단 보류'
+    : (evidence.status === 'related_information_found'
+    ? `기사·공시 대조: 신호 전 관련 자료 ${evidence.relatedArticles?.length || 0}건`
+    : (evidence.status === 'related_information_after_signal'
+      ? `기사·공시 대조: 신호 후 ${evidence.firstFollowingArticle?.lagMinutes ?? '?'}분 뒤 첫 관련 자료`
+    : (evidence.status === 'same_day_time_unverified'
+      ? '기사·공시 대조: 당일 관련 자료는 있으나 선후 시각 확인 불가'
+      : `기사·공시 대조: 직전 ${evidence.lookbackHours || 12}시간 종목 일치 자료 없음 · 원인 미확정`)));
+  const evidenceTitles = (evidence.relatedArticles || []).slice(0, 2)
+    .map(item => {
+      const timing = typeof item.leadMinutes === 'number'
+        ? `${item.leadMinutes}분 전`
+        : (typeof item.lagMinutes === 'number' ? `${item.lagMinutes}분 후` : '시각 비교 불가');
+      return `  - ${escapeHtml(item.title || item.source || item.id)} (${timing})`;
+    })
+    .join('\n');
 
   return [
     `<b>${escapeHtml(signal.name || signal.ticker)}</b> ${escapeHtml(signal.ticker || '')} [${label} · ${escapeHtml(signal.sourceLabel || '')}]`,
     `└ 점수 ${signal.score} · ${escapeHtml([price, ma, volume, rs].filter(Boolean).join(' · '))}`,
     nameNote ? `└ ${escapeHtml(nameNote)}` : '',
     signal.thesis ? `└ 기존 근거: ${escapeHtml(signal.thesis)}` : '',
+    `└ ${evidenceLine}`,
+    evidenceTitles,
     reasons ? `감지 근거:\n${reasons}` : '',
     warnings,
   ].filter(Boolean).join('\n');
@@ -896,7 +916,7 @@ function formatPreNewsSignalReport(report = {}) {
     '📡 <b>가격·거래량 선행 이상징후</b>',
     `기준일: ${escapeHtml(report.date || '')}`,
     '의미: 가격·거래량이 평소보다 먼저 크게 변해 원인 확인이 필요한 종목입니다.',
-    `감시 대상: ${report.universeCount || 0}개 · 원인 확인 ${candidates.length}개 · 낮은 강도 관찰 ${watch.length}개`,
+    `감시 대상: ${report.universeCount || 0}개 · 확인 필요 ${candidates.length}개 · 낮은 강도 관찰 ${watch.length}개`,
     '',
     candidates.length > 0
       ? candidates.map(formatPreNewsSignal).join('\n\n')

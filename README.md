@@ -196,7 +196,7 @@ Telegram 채팅창에서 명령어를 실제로 쓰기 위한 배포와 webhook 
 - `data/portfolio-snapshots/YYYY-MM-DD.json`: 보유 종목 현재가/평가손익 스냅샷
 - `data/action-reports/YYYY-MM-DD.json`: 신규 매수/관찰/보유/축소/매도 후보 일일 행동 리포트
 - `data/freedom/freedom-status.json`: 경제적 자유 목표와 현재 달성률
-- Supabase tables: `articles`, `daily_summaries`, `stock_reports`, `recommendations`, `recommendation_evaluations`, `research_candidates`, `research_candidate_evaluations`, `trade_executions`, `portfolio_cash_flows`, `portfolio_snapshots`, `market_snapshots`, `price_snapshots`, `investor_flows`, `decision_contexts`
+- Supabase tables: `articles`, `daily_summaries`, `stock_reports`, `recommendations`, `recommendation_evaluations`, `research_candidates`, `research_candidate_evaluations`, `market_anomaly_signals`, `trade_executions`, `portfolio_cash_flows`, `portfolio_snapshots`, `market_snapshots`, `price_snapshots`, `investor_flows`, `decision_contexts`
 - Agent/Supabase tables: `financial_freedom_goals`, `portfolio_accounts`, `positions`, `risk_policy`, `conversation_messages`, `pending_actions`
 - `data/supabase/*.json`: Supabase 데이터를 내려받은 로컬 JSON 미러
 - `data/economic-agent.db`: Supabase 데이터를 내려받은 로컬 SQLite 미러
@@ -474,6 +474,8 @@ SUPABASE_DB_PASSWORD=...
 # MARKET_STRESS_WARNING_PCT=-3
 # MARKET_STRESS_SEVERE_PCT=-5
 # MARKET_STRESS_CIRCUIT_BREAKER_PCT=-8
+# PRE_NEWS_EVIDENCE_LOOKBACK_HOURS=12
+# PRE_NEWS_FOLLOW_UP_HOURS=24
 # STRATEGY_MIN_EVALUATED=30
 # STRATEGY_MIN_LINKED_TRADES=10
 ```
@@ -554,6 +556,7 @@ AI 비용을 줄이기 위해 전체 히스토리를 매번 프롬프트에 넣�
 | `portfolio-snapshot.yml` | 평일 16:10 KST | 보유 포트폴리오 평가손익 스냅샷 |
 | `freedom-report.yml` | 금요일 16:20 KST | 경제적 자유 목표 달성률과 목표 속도 점검 |
 | `action-report.yml` | 평일 16:25 KST | 신규 매수/관찰/보유/축소/매도 후보 분리 |
+| `pre-news-signal.yml` | 평일 09:05~15:20 KST, 15분 간격 | 가격·거래량 이상징후 감지와 기사·공시 선후관계 기록 |
 | `evaluate-recommendations.yml` | 평일 17:30 KST | 추천 성과 평가 |
 | `trade-performance.yml` | 금요일 17:40 KST | 실제 거래 성과 평가 |
 | `performance-review-weekly.yml` | 금요일 18:10 KST | 주간 성과 리뷰 |
@@ -567,7 +570,7 @@ AI 비용을 줄이기 위해 전체 히스토리를 매번 프롬프트에 넣�
 
 메인 5분 수집은 Cloud Run Agent Server의 `POST /jobs/news-collector`를 Scheduler가 호출합니다. `news-alert.yml`에는 workflow concurrency를 설정해 15분 백업 수집 작업이 겹치더라도 같은 버퍼/캐시 상태를 동시에 건드릴 가능성을 줄입니다. 기사는 deterministic article id, 정규화 URL, 정규화 제목 기준으로 중복을 제거하고, 낮은 점수로 다이제스트에 들어가지 않는 원문도 Supabase `articles`에 저장해 Cloud Run의 휘발 로컬 캐시 때문에 같은 기사가 반복 신규 처리되지 않게 합니다.
 
-가격·거래량 선행 이상징후는 보유·최근 추천 종목의 강한 복합 신호 또는 관심 종목의 ±10%급 극단 움직임만 전송합니다. 이 알림은 기사 발생을 예측하거나 관련 뉴스의 부재를 확인하는 기능이 아니며, 공시·뉴스·수급·지속성을 추가로 확인할 원인 조사 대상을 알립니다.
+가격·거래량 선행 이상징후는 보유·최근 추천 종목의 강한 복합 신호 또는 관심 종목의 ±10%급 극단 움직임만 전송합니다. 감지 시점과 직전 기본 12시간의 저장 기사·DART 공시를 대조해 `관련 정보 확인`, `당일 시각 미확인`, `감지 당시 원인 미확인`, `저장소 조회 불가`를 구분하고, 이후 기본 24시간 안에 처음 확인된 관련 기사 시각도 `market_anomaly_signals`에 남깁니다. 날짜만 제공하는 DART 공시는 선후관계를 확정하지 않으며, 저장소 장애는 “뉴스 없음”이 아니라 판단 보류입니다. 이 기록은 선행성 연구용이며 추천이나 자동 매매로 승격되지 않습니다.
 
 GitHub 저장소의 **Settings > Secrets and variables > Actions**에 환경 변수를 등록하세요. DART 공시 수집을 쓰려면 `DART_API_KEY`도 Secret에 추가합니다.
 

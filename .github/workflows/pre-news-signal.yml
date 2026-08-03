@@ -1,4 +1,4 @@
-name: Pre-news Signal (기사 전 선행 신호)
+name: Market Data Anomaly (가격·거래량 선행 이상징후)
 
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
 
       - run: npm ci
 
-      - name: Detect and send pre-news signals
+      - name: Detect and send market data anomalies
         run: npm run pre-news:signal
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -48,7 +48,7 @@ jobs:
 
       - name: Notify private chat on failure
         if: failure()
-        run: npm run notify:workflow-failure -- "Pre-news Signal (기사 전 선행 신호)" "Detect and send pre-news signals"
+        run: npm run notify:workflow-failure -- "Market Data Anomaly (가격·거래량 선행 이상징후)" "Detect and send market data anomalies"
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_SECRET_CHAT_ID: ${{ secrets.TELEGRAM_SECRET_CHAT_ID }}

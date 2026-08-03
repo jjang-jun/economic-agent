@@ -1,12 +1,20 @@
 const { loadRecommendations } = require('../src/utils/recommendation-log');
 const { loadPortfolio, enrichPortfolio } = require('../src/utils/portfolio');
 const { loadStoredPortfolio } = require('../src/utils/portfolio-store');
+const { loadScoredArticles, getKSTDate } = require('../src/utils/article-archive');
+const {
+  loadPersistedArticles,
+  persistMarketAnomalySignals,
+  loadMarketAnomalySignals,
+  updateMarketAnomalySignals,
+} = require('../src/utils/persistence');
 const {
   buildPreNewsSignalReport,
   filterAlreadyAlertedPreNews,
   loadPreNewsSignalState,
   markPreNewsSignalsSent,
   savePreNewsSignalState,
+  evaluateSignalFollowUp,
 } = require('../src/utils/pre-news-signal');
 const { sendPreNewsSignalReport, formatPreNewsSignalReport } = require('../src/notify/telegram');
 
@@ -20,16 +28,53 @@ function parseArgs(argv = process.argv.slice(2)) {
 
 async function main() {
   const options = parseArgs();
-  const [recommendations, storedPortfolio] = await Promise.all([
+  const now = new Date();
+  const evidenceLookbackHours = Math.max(1, Number(process.env.PRE_NEWS_EVIDENCE_LOOKBACK_HOURS || 12));
+  const followUpHours = Math.max(evidenceLookbackHours, Number(process.env.PRE_NEWS_FOLLOW_UP_HOURS || 24));
+  const signalSince = new Date(now.getTime() - followUpHours * 60 * 60 * 1000).toISOString();
+  const articleSince = new Date(now.getTime() - (followUpHours + evidenceLookbackHours) * 60 * 60 * 1000).toISOString();
+  const [recommendations, storedPortfolio, persistedArticles, unresolvedSignals] = await Promise.all([
     loadRecommendations(),
     loadStoredPortfolio(),
+    loadPersistedArticles({ since: articleSince, limit: 500 }),
+    loadMarketAnomalySignals({
+      since: signalSince,
+      evidenceStatuses: ['evidence_unavailable', 'unexplained_at_detection', 'same_day_time_unverified'],
+      limit: 200,
+    }),
   ]);
   const portfolio = await enrichPortfolio(storedPortfolio || loadPortfolio());
-  const report = await buildPreNewsSignalReport({ recommendations, portfolio });
+  const localArticles = loadScoredArticles(getKSTDate(now));
+  const byId = new Map(localArticles.filter(article => article?.id).map(article => [article.id, article]));
+  for (const article of persistedArticles.rows || []) {
+    if (article?.id) byId.set(article.id, article);
+  }
+  const report = await buildPreNewsSignalReport({
+    recommendations,
+    portfolio,
+    now,
+    articles: [...byId.values()],
+    articleDataAvailable: Array.isArray(persistedArticles.rows) || localArticles.length > 0,
+    evidenceLookbackHours,
+  });
+  const persistenceResult = await persistMarketAnomalySignals(report.signals);
+  if (persistenceResult.error) {
+    throw new Error(`이상징후 저장 실패: ${persistenceResult.error.message}`);
+  }
+  const followUps = (unresolvedSignals.rows || [])
+    .map(signal => evaluateSignalFollowUp(signal, [...byId.values()], {
+      checkedAt: now.toISOString(),
+      dataAvailable: report.articleDataAvailable,
+    }))
+    .filter((signal, index) => signal.evidence?.status !== unresolvedSignals.rows[index]?.evidence?.status);
+  if (followUps.length > 0) {
+    const followUpResult = await updateMarketAnomalySignals(followUps);
+    if (followUpResult.error) throw new Error(`이상징후 후속 검증 저장 실패: ${followUpResult.error.message}`);
+  }
   const state = loadPreNewsSignalState();
   const filtered = options.noState ? report : filterAlreadyAlertedPreNews(report, state);
 
-  console.log(`[데이터 이상징후] 감시 ${report.universeCount}개, 원인 확인 ${filtered.candidates.length}개, 낮은 강도 관찰 ${report.watch.length}개`);
+  console.log(`[데이터 이상징후] 감시 ${report.universeCount}개, 확인 필요 ${filtered.candidates.length}개, 낮은 강도 관찰 ${report.watch.length}개`);
 
   if (options.noTelegram) {
     console.log(formatPreNewsSignalReport(filtered));
@@ -37,7 +82,7 @@ async function main() {
   }
 
   if (filtered.candidates.length === 0 && !options.includeEmpty) {
-    console.log('[데이터 이상징후] 신규 원인 확인 후보 없음');
+    console.log('[데이터 이상징후] 신규 확인 필요 후보 없음');
     return;
   }
 

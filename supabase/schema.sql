@@ -128,6 +128,21 @@ create table if not exists research_candidate_evaluations (
   payload jsonb not null default '{}'::jsonb
 );
 
+create table if not exists market_anomaly_signals (
+  id text primary key,
+  date date not null,
+  symbol text not null,
+  ticker text,
+  name text,
+  direction text not null default 'unknown',
+  score numeric,
+  detected_at timestamptz not null,
+  evidence_status text not null default 'unverified',
+  related_article_ids jsonb not null default '[]'::jsonb,
+  payload jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists trade_executions (
   id text primary key,
   date date not null,
@@ -419,6 +434,8 @@ create index if not exists research_candidates_date_idx on research_candidates(d
 create index if not exists research_candidates_cohort_idx on research_candidates(cohort, decision_status);
 create index if not exists research_candidates_model_idx on research_candidates(ai_provider, ai_model, prompt_version);
 create index if not exists research_candidate_evaluations_candidate_idx on research_candidate_evaluations(candidate_id, day);
+create index if not exists market_anomaly_signals_detected_idx on market_anomaly_signals(detected_at desc);
+create index if not exists market_anomaly_signals_evidence_idx on market_anomaly_signals(evidence_status, detected_at desc);
 create index if not exists trade_executions_date_idx on trade_executions(date);
 create index if not exists portfolio_snapshots_date_idx on portfolio_snapshots(date);
 create index if not exists portfolio_cash_flows_date_idx on portfolio_cash_flows(date, occurred_at);

@@ -18,6 +18,7 @@ const TABLES = [
   'recommendation_evaluations',
   'research_candidates',
   'research_candidate_evaluations',
+  'market_anomaly_signals',
   'trade_executions',
   'portfolio_cash_flows',
   'portfolio_snapshots',

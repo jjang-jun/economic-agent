@@ -7,6 +7,7 @@ const { fetchBenchmarkQuote, isDomesticTicker, normalizeYahooSymbol } = require(
 
 const PRE_NEWS_SIGNAL_DIR = path.join(__dirname, '..', '..', 'data', 'pre-news-signals');
 const PRE_NEWS_SIGNAL_STATE_FILE = path.join(PRE_NEWS_SIGNAL_DIR, 'state.json');
+const DEFAULT_EVIDENCE_LOOKBACK_HOURS = 12;
 
 function toTime(value) {
   const time = new Date(value || 0).getTime();
@@ -104,6 +105,159 @@ function sourceLabel(sources = []) {
     watchlist: '관심',
   };
   return sources.map(source => labels[source] || source).join('/');
+}
+
+function normalizeEvidenceText(value = '') {
+  return String(value || '')
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[^0-9a-z가-힣]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function articleEvidenceText(article = {}) {
+  const disclosure = article.disclosure || {};
+  return normalizeEvidenceText([
+    article.title,
+    article.titleKo,
+    article.summary,
+    article.reason,
+    disclosure.corpName,
+    disclosure.corp_name,
+    disclosure.stockCode,
+    disclosure.stock_code,
+  ].filter(Boolean).join(' '));
+}
+
+function signalEvidenceTerms(signal = {}) {
+  const terms = new Set();
+  const genericNameTokens = new Set([
+    'company', 'corporation', 'corp', 'group', 'holdings', 'holding', 'inc',
+    'limited', 'ltd', 'technology', 'technologies',
+  ]);
+  const ticker = String(signal.ticker || '').replace(/\.(KS|KQ)$/i, '');
+  if (/^\d{6}$/.test(ticker)) terms.add(ticker);
+  const name = normalizeEvidenceText(signal.name || signal.originalName || '');
+  if (name.length >= 2) terms.add(name);
+  for (const token of name.split(' ')) {
+    if ((/^[a-z0-9]{4,}$/.test(token) && !genericNameTokens.has(token)) || /^[가-힣]{2,}$/.test(token)) {
+      terms.add(token);
+    }
+  }
+  return [...terms];
+}
+
+function articleMatchesSignal(article, signal) {
+  const text = articleEvidenceText(article);
+  if (!text) return false;
+  return signalEvidenceTerms(signal).some(term => text.includes(term));
+}
+
+function classifySignalEvidence(signal, articles = [], options = {}) {
+  const detectedAt = options.detectedAt || new Date().toISOString();
+  if (options.dataAvailable !== true) {
+    return {
+      status: 'evidence_unavailable',
+      detectedAt,
+      lookbackHours: Number(options.lookbackHours || DEFAULT_EVIDENCE_LOOKBACK_HOURS),
+      relatedArticles: [],
+      sameDayUnknownTimeCount: 0,
+    };
+  }
+  const detectedTime = toTime(detectedAt);
+  const lookbackHours = Number(options.lookbackHours || DEFAULT_EVIDENCE_LOOKBACK_HOURS);
+  const windowStartTime = detectedTime - lookbackHours * 60 * 60 * 1000;
+  const matches = [];
+  let sameDayUnknownTimeCount = 0;
+
+  for (const article of articles) {
+    if (!articleMatchesSignal(article, signal)) continue;
+    const precision = article.pubDatePrecision || 'datetime';
+    const publishedTime = toTime(article.pubDate);
+    if (precision === 'date' || !publishedTime) {
+      if (String(article.pubDate || '').slice(0, 10) === getKSTDate(new Date(detectedAt))) {
+        sameDayUnknownTimeCount++;
+      }
+      continue;
+    }
+    if (publishedTime < windowStartTime || publishedTime > detectedTime) continue;
+    matches.push({
+      id: article.id || '',
+      title: article.titleKo || article.title || '',
+      source: article.source || '',
+      pubDate: article.pubDate,
+      link: article.link || '',
+      leadMinutes: Math.round((detectedTime - publishedTime) / 60000),
+    });
+  }
+
+  matches.sort((a, b) => toTime(b.pubDate) - toTime(a.pubDate));
+  return {
+    status: matches.length > 0
+      ? 'related_information_found'
+      : (sameDayUnknownTimeCount > 0 ? 'same_day_time_unverified' : 'unexplained_at_detection'),
+    detectedAt,
+    lookbackHours,
+    relatedArticles: matches.slice(0, 3),
+    sameDayUnknownTimeCount,
+  };
+}
+
+function attachSignalEvidence(signals = [], articles = [], options = {}) {
+  return signals.map(signal => ({
+    ...signal,
+    evidence: classifySignalEvidence(signal, articles, options),
+  }));
+}
+
+function evaluateSignalFollowUp(signal, articles = [], options = {}) {
+  const detectedTime = toTime(signal.detectedAt || signal.evidence?.detectedAt);
+  const checkedAt = options.checkedAt || new Date().toISOString();
+  const checkedTime = toTime(checkedAt);
+  if (!detectedTime || !checkedTime || options.dataAvailable !== true) return signal;
+  const detectionEvidence = classifySignalEvidence(signal, articles, {
+    detectedAt: signal.detectedAt || signal.evidence?.detectedAt,
+    lookbackHours: signal.evidence?.lookbackHours || DEFAULT_EVIDENCE_LOOKBACK_HOURS,
+    dataAvailable: true,
+  });
+  const matches = articles
+    .filter(article => articleMatchesSignal(article, signal))
+    .filter(article => (article.pubDatePrecision || 'datetime') !== 'date')
+    .map(article => ({ article, publishedTime: toTime(article.pubDate) }))
+    .filter(item => item.publishedTime > detectedTime && item.publishedTime <= checkedTime)
+    .sort((a, b) => a.publishedTime - b.publishedTime);
+  if (matches.length === 0) {
+    return {
+      ...signal,
+      evidence: {
+        ...detectionEvidence,
+        checkedAt,
+      },
+    };
+  }
+  const first = matches[0].article;
+  const followingArticle = {
+    id: first.id || '',
+    title: first.titleKo || first.title || '',
+    source: first.source || '',
+    pubDate: first.pubDate,
+    link: first.link || '',
+    lagMinutes: Math.round((toTime(first.pubDate) - detectedTime) / 60000),
+  };
+  return {
+    ...signal,
+    evidence: {
+      ...detectionEvidence,
+      status: 'related_information_after_signal',
+      checkedAt,
+      firstFollowingArticle: followingArticle,
+      relatedArticles: [
+        ...(signal.evidence?.relatedArticles || []),
+        followingArticle,
+      ].slice(0, 3),
+    },
+  };
 }
 
 function scorePreNewsSignal(item, marketProfile = {}) {
@@ -213,6 +367,9 @@ async function buildPreNewsSignalReport({
   now = new Date(),
   fetcher = fetchRecommendationQuote,
   benchmarkFetcher = fetchBenchmarkQuote,
+  articles = [],
+  articleDataAvailable = false,
+  evidenceLookbackHours = DEFAULT_EVIDENCE_LOOKBACK_HOURS,
 } = {}) {
   const universe = buildPreNewsUniverse({ recommendations, portfolio, watchlist, now });
   const benchmark = await benchmarkFetcher();
@@ -226,15 +383,32 @@ async function buildPreNewsSignalReport({
     if (signal.action !== 'ignore') signals.push(signal);
   }
 
-  signals.sort((a, b) => b.score - a.score);
+  const verifiedSignals = attachSignalEvidence(signals, articles, {
+    detectedAt: now.toISOString(),
+    lookbackHours: evidenceLookbackHours,
+    dataAvailable: articleDataAvailable,
+  }).map(signal => {
+    const change = signal.marketProfile?.changePercent;
+    const direction = typeof change !== 'number' ? 'unknown' : (change < 0 ? 'down' : 'up');
+    return {
+      ...signal,
+      id: `${getKSTDate(now)}:${signal.symbol}:${direction}:${signal.action}`,
+      date: getKSTDate(now),
+      detectedAt: now.toISOString(),
+      direction,
+    };
+  });
+  verifiedSignals.sort((a, b) => b.score - a.score);
   return {
     id: `${getKSTDate(now)}:pre-news-signal`,
     date: getKSTDate(now),
     createdAt: now.toISOString(),
     universeCount: universe.length,
-    signals,
-    candidates: signals.filter(item => item.action === 'pre_news_candidate'),
-    watch: signals.filter(item => item.action === 'watch'),
+    evidenceLookbackHours,
+    articleDataAvailable,
+    signals: verifiedSignals,
+    candidates: verifiedSignals.filter(item => item.action === 'pre_news_candidate'),
+    watch: verifiedSignals.filter(item => item.action === 'watch'),
   };
 }
 
@@ -288,4 +462,9 @@ module.exports = {
   loadPreNewsSignalState,
   savePreNewsSignalState,
   preNewsAlertKey,
+  normalizeEvidenceText,
+  articleMatchesSignal,
+  classifySignalEvidence,
+  attachSignalEvidence,
+  evaluateSignalFollowUp,
 };
