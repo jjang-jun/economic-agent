@@ -874,7 +874,7 @@ function formatPreNewsSignal(signal) {
   const ma = typeof market.distanceFromMa20Pct === 'number' ? `20일선 대비 ${market.distanceFromMa20Pct}%` : '';
   const reasons = (signal.reasons || []).slice(0, 4).map(item => `  - ${escapeHtml(item)}`).join('\n');
   const warnings = (signal.warnings || []).slice(0, 2).map(item => `주의: ${escapeHtml(item)}`).join('\n');
-  const label = signal.action === 'pre_news_candidate' ? '선행 후보' : '관찰';
+  const label = signal.action === 'pre_news_candidate' ? '원인 확인 후보' : '낮은 강도 관찰';
   const nameNote = signal.originalName && signal.originalName !== signal.name
     ? `공식명 기준, 추천명 ${signal.originalName}`
     : '';
@@ -884,7 +884,7 @@ function formatPreNewsSignal(signal) {
     `└ 점수 ${signal.score} · ${escapeHtml([price, ma, volume, rs].filter(Boolean).join(' · '))}`,
     nameNote ? `└ ${escapeHtml(nameNote)}` : '',
     signal.thesis ? `└ 기존 근거: ${escapeHtml(signal.thesis)}` : '',
-    reasons ? `선행 신호:\n${reasons}` : '',
+    reasons ? `감지 근거:\n${reasons}` : '',
     warnings,
   ].filter(Boolean).join('\n');
 }
@@ -893,18 +893,21 @@ function formatPreNewsSignalReport(report = {}) {
   const candidates = report.candidates || [];
   const watch = report.watch || [];
   return [
-    '📡 <b>기사 전 선행 신호</b>',
+    '📡 <b>가격·거래량 선행 이상징후</b>',
     `기준일: ${escapeHtml(report.date || '')}`,
-    `감시 대상: ${report.universeCount || 0}개 · 선행 후보 ${candidates.length}개 · 관찰 ${watch.length}개`,
+    '의미: 가격·거래량이 평소보다 먼저 크게 변해 원인 확인이 필요한 종목입니다.',
+    `감시 대상: ${report.universeCount || 0}개 · 원인 확인 ${candidates.length}개 · 낮은 강도 관찰 ${watch.length}개`,
     '',
     candidates.length > 0
       ? candidates.map(formatPreNewsSignal).join('\n\n')
-      : '현재 선행 후보는 없습니다.',
+      : '현재 원인 확인이 필요한 강한 이상징후는 없습니다.',
     watch.length > 0
-      ? `\n<b>관찰</b>\n${watch.slice(0, 3).map(formatPreNewsSignal).join('\n\n')}`
+      ? `\n<b>낮은 강도 관찰</b>\n${watch.slice(0, 3).map(formatPreNewsSignal).join('\n\n')}`
       : '',
     '',
-    '원칙: 기사보다 먼저 움직이는 공개 가격/거래량 신호입니다. 공시·뉴스 확인 전 전액 진입 금지, 조건 충족 시 1차만 분할 진입.',
+    '확인 순서: DART·기업 공시 → 관련 뉴스·해외 동종주 → 외국인/기관 수급 → 다음 세션 지속성',
+    '주의: 기사 발생 예측이나 “현재 관련 뉴스가 없다”는 판정이 아닙니다. 단독 매수 신호로 사용하지 마세요.',
+    '대응: 원인 확인 전 추격·전액 진입 금지. 보유 종목은 추가매수보다 변동성·이익보호를 먼저 점검합니다.',
   ].filter(line => line !== '').join('\n');
 }
 

@@ -193,7 +193,7 @@ test('buildPreNewsSignalReport filters duplicates after alert state', async () =
   assert.equal(filtered.candidates.length, 0);
 });
 
-test('formatPreNewsSignalReport explains candidates in Korean', async () => {
+test('formatPreNewsSignalReport explains data-first anomalies without claiming news prediction', async () => {
   const report = await buildPreNewsSignalReport({
     now,
     portfolio: { positions: [] },
@@ -226,10 +226,13 @@ test('formatPreNewsSignalReport explains candidates in Korean', async () => {
   });
   const message = formatPreNewsSignalReport(report);
 
-  assert.match(message, /기사 전 선행 신호/);
+  assert.match(message, /가격·거래량 선행 이상징후/);
   assert.match(message, /삼성전자/);
   assert.match(message, /거래량 1.6배/);
-  assert.match(message, /공시·뉴스 확인 전 전액 진입 금지/);
+  assert.match(message, /기사 발생 예측.*판정이 아닙니다/);
+  assert.match(message, /DART·기업 공시/);
+  assert.match(message, /원인 확인 전 추격·전액 진입 금지/);
+  assert.doesNotMatch(message, /기사 전 선행 신호/);
 });
 
 test('formatPreNewsSignalReport formats global candidate prices in USD', () => {

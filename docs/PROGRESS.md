@@ -108,7 +108,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 추천 종목별 진입 타이밍 프로필 추가. 5일선/20일선 정렬, 20일선 대비 이격, 20일선 기울기, 거래량 확인, 20일 고점 돌파/눌림목 여부를 계산하고 추격매수 또는 20일선 하회 후보는 `entry_timing` 차단 사유로 매수 보류 처리.
 - 장전/장중 매매 타이밍 알림을 추가했다. 최근 국내주식 추천을 기준으로 08:45 KST 장전 후보표를 보내고, 장중에는 돌파/눌림목 조건이 충족된 후보만 중복 없이 Telegram private 채널로 알린다.
 - 타이밍 알림 실행 시각 가드를 추가했다. GitHub Actions schedule이 1시간 이상 지연돼도 `premarket` 스텝이 10:25 KST처럼 장중에 도착하면 제목을 장전으로 보내지 않고 실제 KST 시각 기준으로 장중 모드로 자동 전환한다. 장 종료 뒤 실행되면 전송을 건너뛴다.
-- 무료/저비용 `pre-news:signal` 엔진을 추가했다. 보유 종목, 최근 국내 추천, 워치리스트 대표주만 15분 간격으로 감시해 거래량 증가, 20일 고점 돌파/근접, 5일선·20일선 정렬, KOSPI 대비 상대강도 개선을 점수화하고 기사 전 선행 후보가 생겼을 때만 Telegram private 채널로 보낸다.
+- 무료/저비용 `pre-news:signal` 엔진을 추가했다. 보유 종목, 최근 국내 추천, 워치리스트 대표주만 15분 간격으로 감시해 거래량 증가, 20일 고점 돌파/근접, 5일선·20일선 정렬, KOSPI 대비 상대강도 개선을 점수화하고 강한 가격·거래량 이상징후가 생겼을 때만 Telegram private 채널로 보낸다.
 - `npm run trade:performance`와 `trade-performance.yml` 추가. 실제 매매 기록의 현재가 기준 평가손익, 추천 연결 여부, 거래 수를 별도 리포트로 계산.
 - `keywords.js`를 시장/종목/공시 목적별 설정으로 분리하고, 기존 import 호환을 위해 통합 facade로 유지. 개인 관심사성 키워드는 투자 필터에서 제거하고 `interests.js` relevance 용도로 분리.
 - 한국어/공시 감성 분석을 `sentiment-dictionary.js`로 분리. 단순 개수 비교 대신 강한 투자 신호(`자사주 소각`, `주주환원`, `유상증자`, `전환사채`, `거래정지` 등)에 가중치를 부여하고 sentiment reason을 저장.
@@ -214,7 +214,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 종목 분석 `related_news` 인덱스가 전체 기사 배열의 다른 기사 ID로 저장될 수 있던 문제를 수정했다. AI에 실제 제공한 선택 기사 배열에서 즉시 `related_article_ids`를 확정하고 추천 로그는 이 ID를 우선 사용한다.
 - 속보 정책을 실제 발송 이력 기준으로 강화했다. 로컬 미러의 과거 즉시 전송 164건은 모두 관련성 없는 DART 공시였고 새 정책을 재적용하면 164건 모두 다이제스트 대상이다. 앞으로 보유·명시적 critical 종목의 치명 공시와 시장 전체 긴급 사건만 즉시 허용하며 실행당 기본 상한은 1건, 일일 상한은 2건이다. 같은 금리 결정·서킷브레이커·동일 기업의 같은 치명 공시 후속 기사는 24시간 동안 한 사건으로 묶고 나머지는 정기 다이제스트로 이월한다.
 - Telegram 중요 알림 모드는 정기 다이제스트 5회와 하루 단위 리포트는 유지하고 실시간성 알림만 축소한다. 장전/장중 타이밍 알림은 리스크와 진입 타이밍을 모두 통과한 신규 후보만 하루 한 번 보낸다.
-- 기사 전 선행 신호는 보유·최근 추천의 점수 7 이상 복합 신호 또는 관심 종목의 당일 ±10% 이상 극단 움직임으로 제한해 단순 기술적 강세 관찰은 보내지 않는다.
+- 가격·거래량 선행 이상징후는 보유·최근 추천의 점수 7 이상 복합 신호 또는 관심 종목의 당일 ±10% 이상 극단 움직임으로 제한한다. 이 탐지기는 기사 발생을 예측하거나 관련 뉴스가 없음을 확인하지 않으며 원인 조사 대상만 알린다.
 - Telegram 승인 흐름 smoke 실패 알림을 추가했다. `telegram-smoke-actions.yml`에서 smoke 단계가 실패하면 `notify:workflow-failure`가 private Telegram으로 워크플로우명, 작업명, 브랜치, 커밋, GitHub Actions 로그 링크를 보낸다.
 - 가격 provider 운영 알림을 추가했다. `price-provider:ops-report`는 최근 provider 호출 실패율, 빈 응답률, fallback 비중, 오래된 가격 스냅샷을 점검하고 기준 초과 시 private Telegram으로 보낸다. GitHub Actions `price-provider-ops-report.yml`은 평일 23:55 KST에 실행된다. fallback 탐색 과정의 빈 응답은 정상적으로 발생할 수 있어 경보 기준을 90%로 둔다.
 - 가격 provider 운영 알림에 야간 전송 가드를 추가했다. GitHub Actions가 크게 지연돼 02:14 KST처럼 새벽에 실행되면 운영 점검 메시지는 Telegram 전송을 건너뛰고 로그만 남긴다. 필요하면 `PRICE_PROVIDER_ALLOW_OFF_HOURS=1`로 강제 전송할 수 있다.

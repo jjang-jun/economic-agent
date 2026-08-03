@@ -29,7 +29,7 @@ async function main() {
   const state = loadPreNewsSignalState();
   const filtered = options.noState ? report : filterAlreadyAlertedPreNews(report, state);
 
-  console.log(`[선행신호] 감시 ${report.universeCount}개, 신규 후보 ${filtered.candidates.length}개, 관찰 ${report.watch.length}개`);
+  console.log(`[데이터 이상징후] 감시 ${report.universeCount}개, 원인 확인 ${filtered.candidates.length}개, 낮은 강도 관찰 ${report.watch.length}개`);
 
   if (options.noTelegram) {
     console.log(formatPreNewsSignalReport(filtered));
@@ -37,12 +37,12 @@ async function main() {
   }
 
   if (filtered.candidates.length === 0 && !options.includeEmpty) {
-    console.log('[선행신호] 신규 선행 후보 없음');
+    console.log('[데이터 이상징후] 신규 원인 확인 후보 없음');
     return;
   }
 
   const sent = await sendPreNewsSignalReport(filtered);
-  if (!sent) throw new Error('선행 신호 리포트 전송 실패');
+  if (!sent) throw new Error('가격·거래량 이상징후 리포트 전송 실패');
   if (!options.noState) {
     savePreNewsSignalState(markPreNewsSignalsSent(filtered, state));
   }
@@ -50,7 +50,7 @@ async function main() {
 
 if (require.main === module) {
   main().catch(err => {
-    console.error('[선행신호] 실패:', err.message);
+    console.error('[데이터 이상징후] 실패:', err.message);
     process.exit(1);
   });
 }

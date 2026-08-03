@@ -567,7 +567,7 @@ AI 비용을 줄이기 위해 전체 히스토리를 매번 프롬프트에 넣�
 
 메인 5분 수집은 Cloud Run Agent Server의 `POST /jobs/news-collector`를 Scheduler가 호출합니다. `news-alert.yml`에는 workflow concurrency를 설정해 15분 백업 수집 작업이 겹치더라도 같은 버퍼/캐시 상태를 동시에 건드릴 가능성을 줄입니다. 기사는 deterministic article id, 정규화 URL, 정규화 제목 기준으로 중복을 제거하고, 낮은 점수로 다이제스트에 들어가지 않는 원문도 Supabase `articles`에 저장해 Cloud Run의 휘발 로컬 캐시 때문에 같은 기사가 반복 신규 처리되지 않게 합니다.
 
-기사 전 선행 신호는 보유·최근 추천 종목의 강한 복합 신호 또는 관심 종목의 ±10%급 극단 움직임만 전송합니다.
+가격·거래량 선행 이상징후는 보유·최근 추천 종목의 강한 복합 신호 또는 관심 종목의 ±10%급 극단 움직임만 전송합니다. 이 알림은 기사 발생을 예측하거나 관련 뉴스의 부재를 확인하는 기능이 아니며, 공시·뉴스·수급·지속성을 추가로 확인할 원인 조사 대상을 알립니다.
 
 GitHub 저장소의 **Settings > Secrets and variables > Actions**에 환경 변수를 등록하세요. DART 공시 수집을 쓰려면 `DART_API_KEY`도 Secret에 추가합니다.
 
