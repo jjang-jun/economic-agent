@@ -195,6 +195,64 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;');
 }
 
+function formatFlowAmount(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '확인 불가';
+  if (value === 0) return '0억 보합';
+  return `${Math.abs(Math.round(value)).toLocaleString('ko-KR')}억 ${value > 0 ? '순매수' : '순매도'}`;
+}
+
+function combineFlows(flow = {}) {
+  if (typeof flow.foreign !== 'number' || typeof flow.institution !== 'number') return null;
+  return flow.foreign + flow.institution;
+}
+
+function formatCapitalFlowSection(snapshot = {}) {
+  const investor = snapshot.investorFlow;
+  const proxy = snapshot.etfProxy;
+  const lines = ['💰 <b>자금 흐름</b>'];
+
+  if (investor?.latest) {
+    const latestCombined = combineFlows(investor.latest);
+    const fiveDayCombined = combineFlows(investor.sums5d);
+    const sourceLabel = investor.source === 'naver-finance' ? 'Naver Finance' : (investor.source || '출처 미상');
+    lines.push(
+      `▸ ${escapeHtml(investor.market || 'KOSPI')} 투자자 순매수 (${escapeHtml(investor.date || '기준일 미상')}, ${escapeHtml(investor.unit || '억원')} · ${escapeHtml(sourceLabel)})`,
+      `  당일: 외국인 ${formatFlowAmount(investor.latest.foreign)} · 기관 ${formatFlowAmount(investor.latest.institution)}${latestCombined === null ? '' : ` · 합계 ${formatFlowAmount(latestCombined)}`}`,
+    );
+    if (investor.sums5d && (typeof investor.sums5d.foreign === 'number' || typeof investor.sums5d.institution === 'number')) {
+      lines.push(
+        `  5일: 외국인 ${formatFlowAmount(investor.sums5d.foreign)} · 기관 ${formatFlowAmount(investor.sums5d.institution)}${fiveDayCombined === null ? '' : ` · 합계 ${formatFlowAmount(fiveDayCombined)}`}`,
+      );
+    }
+  } else {
+    lines.push('▸ KOSPI 투자자 순매수: 조회 불가');
+  }
+
+  if (proxy) {
+    const regimeLabel = {
+      risk_on: '위험선호 우세',
+      risk_off: '위험회피 우세',
+      mixed: '혼조',
+    }[proxy.regime?.hint] || '판단 보류';
+    const formatProxyItem = item => {
+      const change = typeof item.return5dPct === 'number'
+        ? `, 5일 ${item.return5dPct >= 0 ? '+' : ''}${item.return5dPct}%`
+        : '';
+      return `${item.name}(${item.symbol}${change})`;
+    };
+    const leaders = (proxy.leaders || []).slice(0, 3).map(formatProxyItem).join(', ');
+    const laggards = (proxy.laggards || []).slice(0, 3).map(formatProxyItem).join(', ');
+    lines.push(
+      `▸ 글로벌 ETF 가격·거래량 프록시: ${regimeLabel} · ${proxy.coverage?.available ?? 0}/${proxy.coverage?.expected ?? 0}개`,
+      leaders ? `  강세: ${escapeHtml(leaders)}` : '',
+      laggards ? `  약세: ${escapeHtml(laggards)}` : '',
+      '<i>ETF 항목은 실제 설정·환매 순유입액이 아니라 상대강도 추정입니다.</i>',
+    );
+  }
+
+  return lines.filter(Boolean).join('\n');
+}
+
 function formatMessage(article) {
   const s = getSentimentDisplay(article);
   const relevanceTags = (article.relevanceTags || [])
@@ -490,6 +548,8 @@ function formatStockReport(report) {
       portfolioLines.join('\n'),
       positionLines.length > 0 ? `<b>보유 평가</b>\n${positionLines.join('\n')}` : '',
     ].join('\n'),
+
+    formatCapitalFlowSection(report.capitalFlow),
 
     [
       `<b>3. 섹터 동향</b>`,
@@ -1005,6 +1065,8 @@ function formatDigest(digest) {
 
     formatDigestMarketSignal(digest),
 
+    formatCapitalFlowSection(digest.capitalFlow),
+
     sectionLines.join('\n\n'),
 
     numberLines.length > 0
@@ -1471,5 +1533,5 @@ async function sendPerformanceReview(review) {
 
 module.exports = {
   notifyArticles, sendStockReport, sendDigest, sendPerformanceReport, sendTradePerformanceReport, sendPerformanceReview, sendActionReport, sendTimingAlertReport, sendPreNewsSignalReport, sendFreedomStatus, sendTelegramMessage, answerTelegramCallbackQuery, getTelegramChatId,
-  formatMessage, formatStockReport, formatDigest, formatDigestMarketSignal, formatPerformanceReport, formatTradePerformanceReport, formatPerformanceReview, formatActionReport, formatTimingAlertReport, formatPreNewsSignalReport, formatFreedomStatus,
+  formatMessage, formatStockReport, formatDigest, formatDigestMarketSignal, formatCapitalFlowSection, formatPerformanceReport, formatTradePerformanceReport, formatPerformanceReview, formatActionReport, formatTimingAlertReport, formatPreNewsSignalReport, formatFreedomStatus,
 };

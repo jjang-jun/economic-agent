@@ -213,7 +213,16 @@ test('digest prompt exposes freshness and final mood is reconciled before Telegr
   let capturedPrompt = '';
   const digest = await generateDigest(
     [{ id: 'article-1', title: '반도체 급반등', score: 5, sentiment: 'bullish' }],
-    { marketSnapshot: marketSnapshot() },
+    {
+      marketSnapshot: marketSnapshot(),
+      investorFlow: {
+        source: 'naver-finance',
+        market: 'KOSPI',
+        unit: '억원',
+        latest: { date: '2026-08-03', foreign: 3200, institution: -1200, individual: -1900 },
+        sums5d: { foreign: 8100, institution: 2400, individual: -10400 },
+      },
+    },
     'midday',
     {
       now: NOW,
@@ -248,6 +257,8 @@ test('digest prompt exposes freshness and final mood is reconciled before Telegr
   assert.match(telegram, /단기 호재 · 중기 하락 추세 경계/);
   assert.match(telegram, /오래된 시세 2개 제외/);
   assert.match(telegram, /AI 초안 악재→호재 보정/);
+  assert.match(telegram, /자금 흐름/);
+  assert.match(telegram, /외국인 3,200억 순매수 · 기관 1,200억 순매도/);
 });
 
 test('daily summary audit preserves final and original AI mood by session', () => {
@@ -262,6 +273,7 @@ test('daily summary audit preserves final and original AI mood by session', () =
       overridden: true,
     },
     marketSignal: { mood: 'bullish', strength: 'strong' },
+    capitalFlow: { investorFlow: { date: '2026-08-03' } },
     aiMetadata: { generatedAt: NOW.toISOString() },
   });
   const merged = mergeDigestAudits(current, [
@@ -271,6 +283,7 @@ test('daily summary audit preserves final and original AI mood by session', () =
 
   assert.equal(current.aiMarketMood, 'bearish');
   assert.equal(current.marketMood, 'bullish');
+  assert.equal(current.capitalFlow.investorFlow.date, '2026-08-03');
   assert.equal(merged.length, 2);
   assert.equal(merged[0].marketMood, 'bullish');
 });

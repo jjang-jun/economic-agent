@@ -24,6 +24,22 @@ test('formatStockReport explains regime, VIX, USD/KRW, and risk reward blockers'
     }],
     action_items: [],
     risk_flags: [],
+    capitalFlow: {
+      investorFlow: {
+        market: 'KOSPI',
+        source: 'naver-finance',
+        unit: '억원',
+        date: '2026-08-03',
+        latest: { foreign: 3200, institution: -1200 },
+        sums5d: { foreign: 8100, institution: 2400 },
+      },
+      etfProxy: {
+        coverage: { available: 18, expected: 19 },
+        regime: { hint: 'risk_on' },
+        leaders: [{ symbol: 'QQQ', name: '나스닥100' }],
+        laggards: [{ symbol: 'TLT', name: '미국 장기국채' }],
+      },
+    },
     decision: {
       market: {
         regime: 'NEUTRAL',
@@ -57,4 +73,7 @@ test('formatStockReport explains regime, VIX, USD/KRW, and risk reward blockers'
   assert.match(message, /제안 매수 원안 3,000,000원 → 1,000,000원 \(1회 상한 적용\) \(총자산 1.7%, 현금 6.7%\)/);
   assert.match(message, /손익비 부족: 기대수익이 예상손실의 1.14배/);
   assert.match(message, /매수 보류/);
+  assert.match(message, /KOSPI 투자자 순매수/);
+  assert.match(message, /글로벌 ETF 가격·거래량 프록시: 위험선호 우세/);
+  assert.match(message, /실제 설정·환매 순유입액이 아니라/);
 });

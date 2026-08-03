@@ -17,6 +17,7 @@ function buildDigestAudit(digest) {
     aiMarketMood: digest.marketMoodReview?.aiMood || digest.market_mood || 'neutral',
     marketMoodReview: digest.marketMoodReview || null,
     marketSignal: digest.marketSignal || null,
+    capitalFlow: digest.capitalFlow || null,
     sections: digest.sections || [],
     keyNumbers: digest.key_numbers || [],
     watchList: digest.watch_list || [],

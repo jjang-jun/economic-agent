@@ -95,6 +95,7 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - `src/utils/urgent-alert-state.js`: local fallback for 24-hour event deduplication and KST daily immediate-alert caps when shared persistence is unavailable
 - `src/utils/market-stress-monitor.js`: KST regular-session KOSPI/KOSDAQ -3/-5/-8% staged alerts, deduplicated locally and in Supabase
 - `src/utils/capital-flow-radar.js`: daily 19-ETF price/volume relative-strength proxy; never describe it as actual ETF creations/redemptions
+- `src/utils/capital-flow-report.js`: deterministic Telegram snapshot that separates KOSPI investor net-buy data from the global ETF price/volume proxy and preserves unavailable data as unavailable
 - `src/utils/article-archive.js`: daily scored article archive used by stock reports and later performance review
 - `src/utils/article-identity.js`: normalized article identity keys for duplicate suppression across RSS/DART, URLs, and titles
 - `src/utils/recommendation-log.js`: stores stock signals and evaluates returns against KOSPI benchmark when available

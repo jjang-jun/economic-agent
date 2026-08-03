@@ -11,6 +11,7 @@ const {
   formatMarketSignalForPrompt,
   reconcileDigestMood,
 } = require('../utils/digest-market');
+const { buildCapitalFlowSnapshot } = require('../utils/capital-flow-report');
 
 const DIGEST_PROMPT_VERSION = 'digest-v1.2';
 const DIGEST_RESPONSE_SCHEMA = {
@@ -197,6 +198,7 @@ Rules:
     result.market_mood = marketMoodReview.finalMood;
     result.marketSignal = marketSignal;
     result.marketMoodReview = marketMoodReview;
+    result.capitalFlow = buildCapitalFlowSnapshot(indicators);
     result.session = session;
     result.sessionName = sessionName;
     result.articleCount = articles.length;

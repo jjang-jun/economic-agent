@@ -7,6 +7,7 @@ const {
   formatMarketSnapshot,
 } = require('../utils/ai-budget');
 const { formatCapitalFlowRadar } = require('../utils/capital-flow-radar');
+const { buildCapitalFlowSnapshot } = require('../utils/capital-flow-report');
 const { buildReportContext } = require('../utils/report-context');
 
 const STOCK_ANALYSIS_PROMPT_VERSION = 'stock-analysis-v2.3';
@@ -248,6 +249,7 @@ Rules:
       extractJSON(aiResponse.text, 'object'),
       selectedArticles
     );
+    report.capitalFlow = buildCapitalFlowSnapshot(indicators);
     report.aiMetadata = {
       ...aiResponse.metadata,
       task: 'stock_analysis',
