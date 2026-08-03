@@ -985,6 +985,9 @@ function formatPreNewsSignalReport(report = {}) {
       ? `\n<b>낮은 강도 관찰</b>\n${watch.slice(0, 3).map(formatPreNewsSignal).join('\n\n')}`
       : '',
     '',
+    formatCapitalFlowSection(report.capitalFlow),
+    '<i>위 수급은 KOSPI 시장 전체 배경이며 개별 종목의 매매 주체나 급등락 원인을 뜻하지 않습니다.</i>',
+    '',
     '확인 순서: DART·기업 공시 → 관련 뉴스·해외 동종주 → 외국인/기관 수급 → 다음 세션 지속성',
     '주의: 기사 발생 예측이나 “현재 관련 뉴스가 없다”는 판정이 아닙니다. 단독 매수 신호로 사용하지 마세요.',
     '대응: 원인 확인 전 추격·전액 진입 금지. 보유 종목은 추가매수보다 변동성·이익보호를 먼저 점검합니다.',

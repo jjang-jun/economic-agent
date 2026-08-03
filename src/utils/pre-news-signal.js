@@ -4,6 +4,7 @@ const WATCHLIST = require('../config/watchlist');
 const { getKSTDate } = require('./article-archive');
 const { buildMarketProfile, fetchRecommendationQuote } = require('./recommendation-market');
 const { fetchBenchmarkQuote, isDomesticTicker, normalizeYahooSymbol } = require('../sources/price-provider');
+const { buildCapitalFlowSnapshot } = require('./capital-flow-report');
 
 const PRE_NEWS_SIGNAL_DIR = path.join(__dirname, '..', '..', 'data', 'pre-news-signals');
 const PRE_NEWS_SIGNAL_STATE_FILE = path.join(PRE_NEWS_SIGNAL_DIR, 'state.json');
@@ -211,6 +212,148 @@ function attachSignalEvidence(signals = [], articles = [], options = {}) {
   }));
 }
 
+function addFlowValues(left, right) {
+  if (typeof left !== 'number' || typeof right !== 'number') return null;
+  return left + right;
+}
+
+function marketFlowObservation(capitalFlow = {}, observedAt = new Date().toISOString()) {
+  const flow = capitalFlow.investorFlow;
+  if (!flow?.latest || !flow.date) return null;
+  return {
+    observedAt,
+    date: flow.date,
+    market: flow.market || 'KOSPI',
+    source: flow.source || '',
+    unit: flow.unit || '억원',
+    latest: {
+      foreign: flow.latest.foreign,
+      institution: flow.latest.institution,
+      combined: addFlowValues(flow.latest.foreign, flow.latest.institution),
+    },
+    sums5d: {
+      foreign: flow.sums5d?.foreign ?? null,
+      institution: flow.sums5d?.institution ?? null,
+      combined: addFlowValues(flow.sums5d?.foreign, flow.sums5d?.institution),
+    },
+  };
+}
+
+function flowObservationKey(observation) {
+  if (!observation) return '';
+  return JSON.stringify([
+    observation.date || '',
+    observation.latest?.foreign ?? null,
+    observation.latest?.institution ?? null,
+    observation.latest?.combined ?? null,
+    observation.sums5d?.foreign ?? null,
+    observation.sums5d?.institution ?? null,
+    observation.sums5d?.combined ?? null,
+  ]);
+}
+
+function marketFlowContextKey(context = {}) {
+  return JSON.stringify({
+    status: context.status || '',
+    atDetection: flowObservationKey(context.atDetection),
+    firstAvailableAfterDetection: flowObservationKey(context.firstAvailableAfterDetection),
+    lastObserved: flowObservationKey(context.lastObserved),
+    alignmentAtDetection: context.alignmentAtDetection || '',
+    alignmentAtLastObserved: context.alignmentAtLastObserved || '',
+    sameMarketDateDelta: context.sameMarketDateDelta || null,
+  });
+}
+
+function classifyMarketFlowAlignment(signal, observation) {
+  const domestic = isDomesticTicker(signal.ticker || signal.symbol || '');
+  if (!domestic) return 'market_context_only';
+  const signalDate = signal.date || (signal.detectedAt ? getKSTDate(new Date(signal.detectedAt)) : '');
+  if (!observation?.date || !signalDate) return 'neutral_or_unavailable';
+  if (observation.date < signalDate) return 'prior_market_date_context';
+  if (observation.date > signalDate) return 'later_market_date_context';
+  const combined = observation?.latest?.combined;
+  if (typeof combined !== 'number' || combined === 0 || signal.direction === 'unknown') return 'neutral_or_unavailable';
+  const aligned = (signal.direction === 'up' && combined > 0)
+    || (signal.direction === 'down' && combined < 0);
+  return aligned ? 'market_aligned' : 'market_diverged';
+}
+
+function attachSignalMarketFlow(signal, capitalFlow = {}, observedAt = new Date().toISOString()) {
+  const observation = marketFlowObservation(capitalFlow, observedAt);
+  return {
+    ...signal,
+    marketFlowContext: observation ? {
+      scope: 'kospi_market_context_not_stock_specific',
+      status: 'detection_snapshot',
+      atDetection: observation,
+      lastObserved: observation,
+      alignmentAtDetection: classifyMarketFlowAlignment(signal, observation),
+      alignmentAtLastObserved: classifyMarketFlowAlignment(signal, observation),
+      sameMarketDateDelta: null,
+    } : {
+      scope: 'kospi_market_context_not_stock_specific',
+      status: 'unavailable_at_detection',
+      atDetection: null,
+      lastObserved: null,
+      alignmentAtDetection: 'neutral_or_unavailable',
+      alignmentAtLastObserved: 'neutral_or_unavailable',
+      sameMarketDateDelta: null,
+    },
+  };
+}
+
+function updateSignalMarketFlow(signal, capitalFlow = {}, observedAt = new Date().toISOString()) {
+  const observation = marketFlowObservation(capitalFlow, observedAt);
+  if (!observation) return signal;
+  const context = signal.marketFlowContext || {};
+  const sameObservation = flowObservationKey(context.lastObserved) === flowObservationKey(observation);
+  if (sameObservation) {
+    const firstAvailableIsLatest = !context.atDetection
+      && flowObservationKey(context.firstAvailableAfterDetection) === flowObservationKey(observation);
+    const normalizedStatus = firstAvailableIsLatest ? 'first_available_after_detection' : context.status;
+    const alignmentAtLastObserved = context.alignmentAtLastObserved
+      || classifyMarketFlowAlignment(signal, observation);
+    if (
+      normalizedStatus === context.status
+      && alignmentAtLastObserved === context.alignmentAtLastObserved
+    ) return signal;
+    return {
+      ...signal,
+      marketFlowContext: {
+        ...context,
+        status: normalizedStatus,
+        alignmentAtLastObserved,
+      },
+    };
+  }
+  const atDetection = context.atDetection || null;
+  const firstAvailableAfterDetection = context.firstAvailableAfterDetection || (!atDetection ? observation : null);
+  const baseline = atDetection || firstAvailableAfterDetection;
+  const sameDate = baseline?.date === observation.date;
+  const delta = sameDate ? {
+    foreign: addFlowValues(observation.latest.foreign, typeof baseline.latest?.foreign === 'number' ? -baseline.latest.foreign : null),
+    institution: addFlowValues(observation.latest.institution, typeof baseline.latest?.institution === 'number' ? -baseline.latest.institution : null),
+    combined: addFlowValues(observation.latest.combined, typeof baseline.latest?.combined === 'number' ? -baseline.latest.combined : null),
+  } : null;
+  return {
+    ...signal,
+    marketFlowContext: {
+      scope: 'kospi_market_context_not_stock_specific',
+      status: atDetection
+        ? (sameDate ? 'same_market_date_follow_up' : 'later_market_date_follow_up')
+        : (context.firstAvailableAfterDetection
+            ? (sameDate ? 'same_market_date_follow_up_after_detection' : 'later_market_date_follow_up_after_detection')
+            : 'first_available_after_detection'),
+      atDetection,
+      firstAvailableAfterDetection,
+      lastObserved: observation,
+      alignmentAtDetection: context.alignmentAtDetection || 'neutral_or_unavailable',
+      alignmentAtLastObserved: classifyMarketFlowAlignment(signal, observation),
+      sameMarketDateDelta: delta,
+    },
+  };
+}
+
 function evaluateSignalFollowUp(signal, articles = [], options = {}) {
   const detectedTime = toTime(signal.detectedAt || signal.evidence?.detectedAt);
   const checkedAt = options.checkedAt || new Date().toISOString();
@@ -370,6 +513,7 @@ async function buildPreNewsSignalReport({
   articles = [],
   articleDataAvailable = false,
   evidenceLookbackHours = DEFAULT_EVIDENCE_LOOKBACK_HOURS,
+  investorFlow = null,
 } = {}) {
   const universe = buildPreNewsUniverse({ recommendations, portfolio, watchlist, now });
   const benchmark = await benchmarkFetcher();
@@ -383,6 +527,7 @@ async function buildPreNewsSignalReport({
     if (signal.action !== 'ignore') signals.push(signal);
   }
 
+  const capitalFlow = buildCapitalFlowSnapshot({ investorFlow });
   const verifiedSignals = attachSignalEvidence(signals, articles, {
     detectedAt: now.toISOString(),
     lookbackHours: evidenceLookbackHours,
@@ -390,13 +535,13 @@ async function buildPreNewsSignalReport({
   }).map(signal => {
     const change = signal.marketProfile?.changePercent;
     const direction = typeof change !== 'number' ? 'unknown' : (change < 0 ? 'down' : 'up');
-    return {
+    return attachSignalMarketFlow({
       ...signal,
       id: `${getKSTDate(now)}:${signal.symbol}:${direction}:${signal.action}`,
       date: getKSTDate(now),
       detectedAt: now.toISOString(),
       direction,
-    };
+    }, capitalFlow, now.toISOString());
   });
   verifiedSignals.sort((a, b) => b.score - a.score);
   return {
@@ -406,6 +551,7 @@ async function buildPreNewsSignalReport({
     universeCount: universe.length,
     evidenceLookbackHours,
     articleDataAvailable,
+    capitalFlow,
     signals: verifiedSignals,
     candidates: verifiedSignals.filter(item => item.action === 'pre_news_candidate'),
     watch: verifiedSignals.filter(item => item.action === 'watch'),
@@ -467,4 +613,10 @@ module.exports = {
   classifySignalEvidence,
   attachSignalEvidence,
   evaluateSignalFollowUp,
+  marketFlowObservation,
+  classifyMarketFlowAlignment,
+  attachSignalMarketFlow,
+  updateSignalMarketFlow,
+  flowObservationKey,
+  marketFlowContextKey,
 };

@@ -2,6 +2,7 @@ const { loadRecommendations } = require('../src/utils/recommendation-log');
 const { loadPortfolio, enrichPortfolio } = require('../src/utils/portfolio');
 const { loadStoredPortfolio } = require('../src/utils/portfolio-store');
 const { loadScoredArticles, getKSTDate } = require('../src/utils/article-archive');
+const { fetchInvestorFlow } = require('../src/sources/naver-investor');
 const {
   loadPersistedArticles,
   persistMarketAnomalySignals,
@@ -15,6 +16,8 @@ const {
   markPreNewsSignalsSent,
   savePreNewsSignalState,
   evaluateSignalFollowUp,
+  updateSignalMarketFlow,
+  marketFlowContextKey,
 } = require('../src/utils/pre-news-signal');
 const { sendPreNewsSignalReport, formatPreNewsSignalReport } = require('../src/notify/telegram');
 
@@ -33,15 +36,15 @@ async function main() {
   const followUpHours = Math.max(evidenceLookbackHours, Number(process.env.PRE_NEWS_FOLLOW_UP_HOURS || 24));
   const signalSince = new Date(now.getTime() - followUpHours * 60 * 60 * 1000).toISOString();
   const articleSince = new Date(now.getTime() - (followUpHours + evidenceLookbackHours) * 60 * 60 * 1000).toISOString();
-  const [recommendations, storedPortfolio, persistedArticles, unresolvedSignals] = await Promise.all([
+  const [recommendations, storedPortfolio, persistedArticles, recentSignals, investorFlow] = await Promise.all([
     loadRecommendations(),
     loadStoredPortfolio(),
     loadPersistedArticles({ since: articleSince, limit: 500 }),
     loadMarketAnomalySignals({
       since: signalSince,
-      evidenceStatuses: ['evidence_unavailable', 'unexplained_at_detection', 'same_day_time_unverified'],
       limit: 200,
     }),
+    fetchInvestorFlow(),
   ]);
   const portfolio = await enrichPortfolio(storedPortfolio || loadPortfolio());
   const localArticles = loadScoredArticles(getKSTDate(now));
@@ -56,17 +59,29 @@ async function main() {
     articles: [...byId.values()],
     articleDataAvailable: Array.isArray(persistedArticles.rows) || localArticles.length > 0,
     evidenceLookbackHours,
+    investorFlow,
   });
   const persistenceResult = await persistMarketAnomalySignals(report.signals);
   if (persistenceResult.error) {
     throw new Error(`이상징후 저장 실패: ${persistenceResult.error.message}`);
   }
-  const followUps = (unresolvedSignals.rows || [])
-    .map(signal => evaluateSignalFollowUp(signal, [...byId.values()], {
-      checkedAt: now.toISOString(),
-      dataAvailable: report.articleDataAvailable,
-    }))
-    .filter((signal, index) => signal.evidence?.status !== unresolvedSignals.rows[index]?.evidence?.status);
+  const unresolvedEvidence = new Set(['evidence_unavailable', 'unexplained_at_detection', 'same_day_time_unverified']);
+  const followUps = (recentSignals.rows || [])
+    .map(signal => {
+      const evidenceUpdated = unresolvedEvidence.has(signal.evidence?.status)
+        ? evaluateSignalFollowUp(signal, [...byId.values()], {
+            checkedAt: now.toISOString(),
+            dataAvailable: report.articleDataAvailable,
+          })
+        : signal;
+      return updateSignalMarketFlow(evidenceUpdated, report.capitalFlow, now.toISOString());
+    })
+    .filter((signal, index) => {
+      const previous = recentSignals.rows[index];
+      return signal.evidence?.status !== previous.evidence?.status
+        || marketFlowContextKey(signal.marketFlowContext)
+          !== marketFlowContextKey(previous.marketFlowContext);
+    });
   if (followUps.length > 0) {
     const followUpResult = await updateMarketAnomalySignals(followUps);
     if (followUpResult.error) throw new Error(`이상징후 후속 검증 저장 실패: ${followUpResult.error.message}`);

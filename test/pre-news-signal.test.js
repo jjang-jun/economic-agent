@@ -9,6 +9,9 @@ const {
   articleMatchesSignal,
   classifySignalEvidence,
   evaluateSignalFollowUp,
+  attachSignalMarketFlow,
+  updateSignalMarketFlow,
+  flowObservationKey,
 } = require('../src/utils/pre-news-signal');
 const { formatPreNewsSignalReport } = require('../src/notify/telegram');
 
@@ -192,6 +195,133 @@ test('signal follow-up rechecks evidence after article storage recovers', () => 
   assert.equal(updated.evidence.relatedArticles[0].leadMinutes, 40);
 });
 
+test('market flow context records detection alignment and same-date follow-up deltas', () => {
+  const detected = attachSignalMarketFlow({
+    ticker: '005930',
+    direction: 'up',
+    date: '2026-05-11',
+  }, {
+    investorFlow: {
+      source: 'naver-finance',
+      market: 'KOSPI',
+      unit: '억원',
+      date: '2026-05-11',
+      latest: { foreign: 1000, institution: -200 },
+      sums5d: { foreign: 4000, institution: 500 },
+    },
+  }, '2026-05-11T01:00:00.000Z');
+
+  assert.equal(detected.marketFlowContext.alignmentAtDetection, 'market_aligned');
+  assert.equal(detected.marketFlowContext.atDetection.latest.combined, 800);
+
+  const updated = updateSignalMarketFlow(detected, {
+    investorFlow: {
+      source: 'naver-finance',
+      market: 'KOSPI',
+      unit: '억원',
+      date: '2026-05-11',
+      latest: { foreign: 1600, institution: -100 },
+      sums5d: { foreign: 4600, institution: 600 },
+    },
+  }, '2026-05-11T03:00:00.000Z');
+
+  assert.equal(updated.marketFlowContext.status, 'same_market_date_follow_up');
+  assert.equal(updated.marketFlowContext.alignmentAtLastObserved, 'market_aligned');
+  assert.deepEqual(updated.marketFlowContext.sameMarketDateDelta, {
+    foreign: 600,
+    institution: 100,
+    combined: 700,
+  });
+});
+
+test('market flow context does not present KOSPI flow as stock-specific or global-stock alignment', () => {
+  const detected = attachSignalMarketFlow({ ticker: 'GOOGL', direction: 'up' }, {
+    investorFlow: {
+      source: 'naver-finance',
+      market: 'KOSPI',
+      unit: '억원',
+      date: '2026-05-11',
+      latest: { foreign: 1000, institution: 200 },
+      sums5d: { foreign: 4000, institution: 500 },
+    },
+  });
+
+  assert.equal(detected.marketFlowContext.scope, 'kospi_market_context_not_stock_specific');
+  assert.equal(detected.marketFlowContext.alignmentAtDetection, 'market_context_only');
+});
+
+test('market flow alignment does not treat a prior trading date as same-session confirmation', () => {
+  const detected = attachSignalMarketFlow({
+    ticker: '005930',
+    direction: 'up',
+    date: '2026-05-11',
+  }, {
+    investorFlow: {
+      source: 'naver-finance',
+      market: 'KOSPI',
+      unit: '억원',
+      date: '2026-05-08',
+      latest: { foreign: 1000, institution: 200 },
+      sums5d: { foreign: 4000, institution: 500 },
+    },
+  });
+
+  assert.equal(detected.marketFlowContext.alignmentAtDetection, 'prior_market_date_context');
+});
+
+test('unchanged first-available flow does not become a false follow-up change', () => {
+  const signal = {
+    ticker: '005930',
+    direction: 'up',
+    date: '2026-05-11',
+    marketFlowContext: {
+      scope: 'kospi_market_context_not_stock_specific',
+      status: 'same_market_date_follow_up_after_detection',
+      atDetection: null,
+      firstAvailableAfterDetection: {
+        observedAt: '2026-05-11T01:00:00.000Z',
+        date: '2026-05-09',
+        latest: { foreign: 1000, institution: 200, combined: 1200 },
+        sums5d: { foreign: 4000, institution: 500, combined: 4500 },
+      },
+      lastObserved: {
+        observedAt: '2026-05-11T01:00:00.000Z',
+        date: '2026-05-09',
+        latest: { foreign: 1000, institution: 200, combined: 1200 },
+        sums5d: { foreign: 4000, institution: 500, combined: 4500 },
+      },
+      alignmentAtDetection: 'neutral_or_unavailable',
+    },
+  };
+  const updated = updateSignalMarketFlow(signal, {
+    investorFlow: {
+      source: 'naver-finance',
+      market: 'KOSPI',
+      unit: '억원',
+      date: '2026-05-09',
+      latest: { foreign: 1000, institution: 200 },
+      sums5d: { foreign: 4000, institution: 500 },
+    },
+  });
+
+  assert.equal(updated.marketFlowContext.status, 'first_available_after_detection');
+  assert.equal(updated.marketFlowContext.alignmentAtLastObserved, 'prior_market_date_context');
+});
+
+test('flow observation identity is stable across database JSON property order', () => {
+  const left = {
+    date: '2026-05-11',
+    latest: { foreign: 1000, institution: 200, combined: 1200 },
+    sums5d: { foreign: 4000, institution: 500, combined: 4500 },
+  };
+  const right = {
+    date: '2026-05-11',
+    latest: { combined: 1200, institution: 200, foreign: 1000 },
+    sums5d: { institution: 500, combined: 4500, foreign: 4000 },
+  };
+  assert.equal(flowObservationKey(left), flowObservationKey(right));
+});
+
 test('scorePreNewsSignal promotes a strong personally relevant compound signal', () => {
   const signal = scorePreNewsSignal({
     symbol: '005930.KS',
@@ -295,6 +425,13 @@ test('buildPreNewsSignalReport filters duplicates after alert state', async () =
       ma20Slope5dPct: 0.6,
     }),
     benchmarkFetcher: async () => ({ symbol: '^KS11', return20dPct: 3 }),
+    investorFlow: {
+      source: 'naver-finance',
+      market: 'KOSPI',
+      unit: '억원',
+      latest: { date: '2026-05-11', foreign: 1200, institution: -300 },
+      sums5d: { foreign: 4200, institution: 800 },
+    },
   });
 
   assert.equal(report.candidates.length, 1);
@@ -333,6 +470,13 @@ test('formatPreNewsSignalReport explains data-first anomalies without claiming n
       ma20Slope5dPct: 0.6,
     }),
     benchmarkFetcher: async () => ({ symbol: '^KS11', return20dPct: 3 }),
+    investorFlow: {
+      source: 'naver-finance',
+      market: 'KOSPI',
+      unit: '억원',
+      latest: { date: '2026-05-11', foreign: 1200, institution: -300 },
+      sums5d: { foreign: 4200, institution: 800 },
+    },
   });
   const message = formatPreNewsSignalReport(report);
 
@@ -342,6 +486,9 @@ test('formatPreNewsSignalReport explains data-first anomalies without claiming n
   assert.match(message, /기사 발생 예측.*판정이 아닙니다/);
   assert.match(message, /DART·기업 공시/);
   assert.match(message, /원인 확인 전 추격·전액 진입 금지/);
+  assert.match(message, /KOSPI 투자자 순매수/);
+  assert.match(message, /외국인 1,200억 순매수 · 기관 300억 순매도 · 합계 900억 순매수/);
+  assert.match(message, /시장 전체 배경이며 개별 종목의 매매 주체나 급등락 원인을 뜻하지 않습니다/);
   assert.doesNotMatch(message, /기사 전 선행 신호/);
 });
 
