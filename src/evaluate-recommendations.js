@@ -1,5 +1,6 @@
 const { evaluateRecommendations } = require('./utils/recommendation-log');
 const { evaluateResearchCandidates } = require('./utils/research-candidate-log');
+const { evaluateMarketAnomalySignals } = require('./utils/anomaly-performance');
 const { sendPerformanceReport } = require('./notify/telegram');
 
 async function main() {
@@ -15,6 +16,9 @@ async function main() {
     const sent = await sendPerformanceReport(result.completed);
     if (!sent) throw new Error('추천 성과 리포트 전송 실패');
   }
+
+  const anomalyResult = await evaluateMarketAnomalySignals();
+  console.log(`[이상징후 평가] 전체 ${anomalyResult.total}건, 신규 평가 ${anomalyResult.completed.length}건`);
 
   console.log(`[${new Date().toISOString()}] 추천 성과 평가 완료`);
 }

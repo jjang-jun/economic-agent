@@ -94,6 +94,25 @@ test('formatPerformanceReview explains recommendation and execution metrics in p
       },
       staleSnapshots: 0,
     },
+    anomalyPerformance: {
+      dataAvailable: true,
+      total: 8,
+      strong: 3,
+      watch: 5,
+      evidenceTiming: {
+        articleBeforeSignal: 2,
+        avgLeadMinutes: 40,
+        signalBeforeArticle: 1,
+        avgLagMinutes: 55,
+      },
+      horizons: {
+        1: { evaluated: 6, hitRatePct: 50, avgSignalReturnPct: 0.8 },
+        5: { evaluated: 4, hitRatePct: 75, avgSignalReturnPct: 3.1 },
+      },
+      nonPersistentWithoutFollowUp: 1,
+      factorCombinations: [{ key: 'price_move+volume', evaluated: 3, hitRatePct: 66.67, avgSignalReturnPct: 2.4 }],
+      readiness: { evaluated5d: 4, required5d: 30, ready: false },
+    },
     backtestResearch: {
       enabled: true,
       provider: 'auto',
@@ -150,6 +169,12 @@ test('formatPerformanceReview explains recommendation and execution metrics in p
   assert.match(message, /가격 조회: 30건 · 실패 2건 \(6.67%\) · 빈 응답 1건/);
   assert.match(message, /판단: 현재 가격 provider 구조 유지/);
   assert.match(message, /최신 종목·가격유형 중 오래된 값: 0\/7건/);
+  assert.match(message, /가격·거래량 이상징후 연구/);
+  assert.match(message, /신호→후속 기사: 1건 · 평균 55분 뒤 확인/);
+  assert.match(message, /5거래일: 평가 4건 · 방향 적중 75% · 평균 3.1%/);
+  assert.match(message, /1일 비지속·후속기사 미확인: 1건 \(확정 오탐 아님\)/);
+  assert.match(message, /규칙 반영 보류/);
+  assert.match(message, /추천\/자동매매 신호가 아님/);
   assert.match(message, /로컬 리서치/);
   assert.match(message, /삼성전자\(005930\): 2026-05-01~2026-05-08 기간 수익률 4.2%, 기간 중 최대 하락폭 -2.1%, 5거래일/);
   assert.match(message, /다음 개선 액션/);

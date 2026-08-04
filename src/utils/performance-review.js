@@ -8,7 +8,13 @@ const { getKSTDate } = require('./article-archive');
 const { loadPortfolio, enrichPortfolio, loadLatestPortfolioSnapshot } = require('./portfolio');
 const { loadStoredPortfolio } = require('./portfolio-store');
 const { buildFreedomStatus, saveFreedomStatus } = require('./freedom-engine');
-const { persistFinancialFreedomGoal, loadPersistedStockReports, selectRows } = require('./persistence');
+const {
+  persistFinancialFreedomGoal,
+  loadPersistedStockReports,
+  loadMarketAnomalySignals,
+  selectRows,
+} = require('./persistence');
+const { buildAnomalyPerformanceSummary } = require('./anomaly-performance');
 const { buildPerformanceLab, isEligibleRecommendation } = require('./performance-lab');
 const { buildBehaviorReview } = require('./behavior-reviewer');
 const { buildCollectorOpsSummary } = require('./collector-ops');
@@ -303,12 +309,16 @@ async function resolveReviewPortfolio() {
 async function buildPerformanceReview(period = 'weekly', options = {}) {
   const days = period === 'monthly' ? 30 : 7;
   const startDate = daysAgo(days);
-  const [recommendationResult, researchResult, tradeResult, cashFlowResult, stockReportResult] = await Promise.all([
+  const [recommendationResult, researchResult, tradeResult, cashFlowResult, stockReportResult, anomalyResult] = await Promise.all([
     loadRecommendationsWithStatus(),
     loadResearchCandidatesWithStatus(),
     loadTradeExecutionsWithStatus(),
     loadPortfolioCashFlowsWithStatus(),
     loadPersistedStockReports({ startDate, limit: 100 }),
+    loadMarketAnomalySignals({
+      since: `${startDate}T00:00:00+09:00`,
+      limit: 1000,
+    }),
   ]);
   const recommendations = recommendationResult.recommendations;
   const researchCandidates = researchResult.candidates;
@@ -340,6 +350,10 @@ async function buildPerformanceReview(period = 'weekly', options = {}) {
   const researchCandidateSummary = summarizeResearchCandidates(periodResearchCandidates, {
     dataAvailable: researchResult.dataAvailable,
     dataError: researchResult.error,
+  });
+  const anomalyPerformance = buildAnomalyPerformanceSummary(anomalyResult.rows || [], {
+    dataAvailable: Array.isArray(anomalyResult.rows),
+    dataError: anomalyResult.error?.message || (anomalyResult.disabled ? 'Supabase 설정 없음' : ''),
   });
   const performanceLab = buildPerformanceLab({
     recommendations: periodRecommendations,
@@ -410,6 +424,7 @@ async function buildPerformanceReview(period = 'weekly', options = {}) {
     recommendationFunnel,
     recommendationTracker,
     researchCandidateSummary,
+    anomalyPerformance,
     tradeSummary,
     portfolioSummary,
     performanceLab,

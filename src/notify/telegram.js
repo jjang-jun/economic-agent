@@ -1335,6 +1335,7 @@ function formatPerformanceReview(review) {
   const funnel = review.recommendationFunnel || {};
   const tracker = review.recommendationTracker || {};
   const researchCandidates = review.researchCandidateSummary || {};
+  const anomaly = review.anomalyPerformance || {};
   const trade = review.tradeSummary || {};
   const portfolio = review.portfolioSummary || {};
   const lab = review.performanceLab || {};
@@ -1498,6 +1499,36 @@ function formatPerformanceReview(review) {
       ? `▸ 평가기 상태: 동작 이력 있음${(rec.total ?? 0) === 0 ? ' · 이번 달 신규 승인 입력 없음' : ''}`
       : '▸ 평가기 상태: 평가 이력 없음 — 추천 저장과 가격 데이터를 점검해야 함',
   ];
+  const anomalyFactors = {
+    price_move: '가격 움직임',
+    volume: '거래량 확인',
+    high_proximity: '20일 고점 근접/돌파',
+    ma_trend: '이동평균 추세',
+    relative_strength: '상대강도',
+    market_flow_aligned: '당일 시장 수급 방향 일치',
+  };
+  const anomalyFactorLabel = key => String(key || '')
+    .split('+')
+    .map(item => anomalyFactors[item] || item)
+    .join(' + ');
+  const anomalyLines = anomaly.dataAvailable === false ? [
+    '▸ 상태: 이상징후 저장소 조회 실패 — 신호가 없었다고 해석하면 안 됨',
+    `▸ 원인: ${anomaly.dataError || 'Supabase 상태를 확인하세요'}`,
+  ] : [
+    `▸ 감지: ${anomaly.total ?? 0}건 · 강한 확인 후보 ${anomaly.strong ?? 0}건 · 낮은 강도 관찰 ${anomaly.watch ?? 0}건`,
+    `▸ 기사→신호: ${anomaly.evidenceTiming?.articleBeforeSignal ?? 0}건${typeof anomaly.evidenceTiming?.avgLeadMinutes === 'number' ? ` · 평균 ${anomaly.evidenceTiming.avgLeadMinutes}분 먼저 확인` : ''}`,
+    `▸ 신호→후속 기사: ${anomaly.evidenceTiming?.signalBeforeArticle ?? 0}건${typeof anomaly.evidenceTiming?.avgLagMinutes === 'number' ? ` · 평균 ${anomaly.evidenceTiming.avgLagMinutes}분 뒤 확인` : ''}`,
+    `▸ 1거래일: 평가 ${anomaly.horizons?.[1]?.evaluated ?? 0}건 · 방향 적중 ${fmtPct(anomaly.horizons?.[1]?.hitRatePct)} · 평균 ${fmtPct(anomaly.horizons?.[1]?.avgSignalReturnPct)}`,
+    `▸ 5거래일: 평가 ${anomaly.horizons?.[5]?.evaluated ?? 0}건 · 방향 적중 ${fmtPct(anomaly.horizons?.[5]?.hitRatePct)} · 평균 ${fmtPct(anomaly.horizons?.[5]?.avgSignalReturnPct)}`,
+    `▸ 1일 비지속·후속기사 미확인: ${anomaly.nonPersistentWithoutFollowUp ?? 0}건 (확정 오탐 아님)`,
+    ...(anomaly.factorCombinations || []).slice(0, 3).map(item => (
+      `▸ 조합 ${anomalyFactorLabel(item.key)}: 5일 평가 ${item.evaluated}건 · 적중 ${fmtPct(item.hitRatePct)} · 평균 ${fmtPct(item.avgSignalReturnPct)}`
+    )),
+    anomaly.readiness?.ready
+      ? `▸ 연구 표본: 5일 평가 ${anomaly.readiness.evaluated5d}/${anomaly.readiness.required5d}건 · 해석 가능`
+      : `▸ 연구 표본: 5일 평가 ${anomaly.readiness?.evaluated5d ?? 0}/${anomaly.readiness?.required5d ?? 30}건 · 규칙 반영 보류`,
+    '▸ 용도: 기사 선행성 연구 전용 · 추천/자동매매 신호가 아님',
+  ];
 
   const sections = [];
   const addSection = (heading, lines) => {
@@ -1529,6 +1560,7 @@ function formatPerformanceReview(review) {
     addSection('AI 추천 파이프라인', funnelLines);
     addSection('이번 달 AI 추천 성과', monthlyPerformanceLines);
     addSection('내 매매 실행', executionLines);
+    addSection('가격·거래량 이상징후 연구', anomalyLines);
     addSection('운영 상태', [...collectorLines, ...priceLines]);
     addSection('다음 달 개선', [
       ...(review.improvementActions || []).slice(0, 4).map(item => `▸ ${item}`),
@@ -1545,6 +1577,7 @@ function formatPerformanceReview(review) {
     addSection('프롬프트+모델 설정별 성과', aiVersionLines);
     addSection('수집/알림 운영', collectorLines);
     addSection('가격 데이터 품질', priceLines);
+    addSection('가격·거래량 이상징후 연구', anomalyLines);
     addSection('로컬 리서치', researchLines);
     addSection('다음 추천에 적용할 학습 룰', learningLines);
     if (improvementActions.length > 0) sections.push(`<b>${sections.length + 1}. 다음 개선 액션</b>\n${improvementActions.join('\n')}`);

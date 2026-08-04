@@ -34,6 +34,7 @@ RSS feeds
 - Review actual trade performance: `npm run trade:performance`
 - Send premarket/intraday timing alerts: `npm run timing:alert -- premarket`, `npm run timing:alert -- intraday`
 - Detect low-cost pre-news signals: `npm run pre-news:signal`
+- Evaluate stored market anomalies after 1/5 trading sessions: `npm run anomaly:evaluate`
 - Build weekly/monthly performance reviews: `npm run review:weekly`, `npm run review:monthly`
 - Check model/prompt performance sample readiness: `npm run model:performance` after `npm run db:pull`
 - Backfill research-only shadow candidates from pulled historical stock reports: `npm run research:backfill`
@@ -105,6 +106,7 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - `src/utils/valuation-profile.js`: PER/PSR/FCF yield plus growth/quality valuation overlay used by risk review
 - `src/utils/timing-alert.js`: builds KOSPI/KOSDAQ premarket watchlists and intraday entry alerts from recent recommendations and moving-average timing data
 - `src/utils/pre-news-signal.js`: low-cost price/volume anomaly detector for holdings, recent recommendations, and domestic/global watchlist leaders; classifies point-in-time article/DART evidence and KOSPI-wide investor-flow context without treating market flow as stock-specific or promoting anomalies to recommendations
+- `src/utils/anomaly-performance.js`: research-only 1/5-trading-session evaluator and article-timing/factor-combination summary for stored market anomalies; never feeds live recommendation rules before readiness
 - `src/utils/performance-review.js`: summarizes recommendation and trade performance over weekly/monthly windows
 - `src/utils/local-research-worker.js`: optional monthly review sidecar for local Python OHLCV research; disabled unless `LOCAL_RESEARCH_WORKER_ENABLED=true`
 - `src/utils/trade-log.js`: stores actual manual trade executions in ignored local data and Supabase
