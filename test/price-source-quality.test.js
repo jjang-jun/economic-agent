@@ -157,7 +157,10 @@ test('price provider ops summary includes provider decision and anomalies', () =
     tickerCount: 3,
     officialEod: { ratePct: 40 },
     fallback: { ratePct: 63, domesticRatePct: 10, globalRatePct: 100 },
-    providerDecision: { label: '해외 실시간 가격 API는 필요 시 보강' },
+    providerDecision: {
+      action: 'monitor_global_fallback',
+      label: '해외 실시간 가격 API는 필요 시 보강',
+    },
     attempts: {
       total: 5,
       success: 3,
@@ -166,16 +169,19 @@ test('price provider ops summary includes provider decision and anomalies', () =
       failureRatePct: 0,
       emptyRatePct: 40,
       byProvider: [
-        { provider: 'yahoo-finance', count: 3, failed: 0, empty: 0, failureRatePct: 0, emptyRatePct: 0 },
+        { provider: 'yahoo-finance', count: 3, success: 3, failed: 0, empty: 0, failureRatePct: 0, emptyRatePct: 0 },
       ],
     },
-  }, ['Naver/Yahoo fallback 비중 63%']);
+  }, ['해외 Yahoo fallback 비중 100%']);
 
-  assert.match(message, /가격 Provider 점검/);
-  assert.match(message, /판단: 해외 실시간 가격 API는 필요 시 보강/);
-  assert.match(message, /국내 fallback: 10%/);
-  assert.match(message, /해외 Yahoo: 100%/);
-  assert.match(message, /빈 응답 0회 \(0%\)/);
+  assert.match(message, /가격 데이터 경로 점검/);
+  assert.match(message, /한줄 판단.*해외 실시간 가격 API는 필요 시 보강/s);
+  assert.match(message, /즉시 장애는 아닙니다/);
+  assert.match(message, /국내 대체 가격 10%/);
+  assert.match(message, /해외 Yahoo 대체 가격 100%/);
+  assert.match(message, /빈 응답은 해당 제공처에 값이 없어 다음 경로를 조회한 경우/);
+  assert.match(message, /Yahoo 최종 대체: 3회 중 성공 3 · 빈 응답 0 · 오류 0/);
+  assert.match(message, /해외 가격의 Yahoo 대체 경로 비중 100%/);
 });
 
 test('price provider ops skips delayed scheduled sends outside quiet-hours window', () => {

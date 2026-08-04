@@ -598,6 +598,7 @@ async function sendStockReport(report) {
 
 function formatActionReport(report) {
   const portfolio = report.portfolio || {};
+  const valuation = portfolio.valuation || {};
   const counts = {
     buy: (report.newBuyCandidates || []).length,
     watch: (report.watchOnlyCandidates || []).length,
@@ -607,23 +608,55 @@ function formatActionReport(report) {
     reduce: (report.reduceCandidates || []).length,
     sell: (report.sellCandidates || []).length,
   };
+  const formatKstTimestamp = value => {
+    const time = new Date(value || '').getTime();
+    if (!Number.isFinite(time)) return '시각 확인 불가';
+    return new Intl.DateTimeFormat('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(new Date(time));
+  };
+  const priceSourceLabels = {
+    'kis-rest': 'KIS',
+    'naver-finance': 'Naver',
+    'alpaca-iex': 'Alpaca',
+    'fmp': 'FMP',
+    'alpha-vantage': 'Alpha Vantage',
+    'tiingo': 'Tiingo',
+    'yahoo-finance': 'Yahoo',
+    manual: '저장 가격',
+    unavailable: '가격 없음',
+  };
+  const sourceText = Object.entries(valuation.sourceCounts || {})
+    .map(([source, count]) => `${priceSourceLabels[source] || source} ${count}개`)
+    .join(' · ');
+  const valuationChange = typeof valuation.changeAmount === 'number'
+    && typeof valuation.previousTotalAssetValue === 'number'
+    && Math.abs(valuation.changeAmount) >= 1
+    ? `가격 갱신 전 저장 평가 ${formatKRW(valuation.previousTotalAssetValue)} → 현재 ${formatKRW(portfolio.totalAssetValue)} (${valuation.changeAmount >= 0 ? '+' : ''}${formatKRW(valuation.changeAmount)}${typeof valuation.changePct === 'number' ? `, ${valuation.changePct >= 0 ? '+' : ''}${valuation.changePct}%` : ''})`
+    : '';
   const portfolioLines = [
     portfolio.totalAssetValue ? `총자산 ${formatKRW(portfolio.totalAssetValue)}` : '',
     typeof portfolio.cashAmount === 'number' ? `현금 ${formatKRW(portfolio.cashAmount)} (${Math.round((portfolio.cashRatio || 0) * 100)}%)` : '',
+    typeof portfolio.investedAmount === 'number' ? `주식 평가액 ${formatKRW(portfolio.investedAmount)}` : '',
     typeof portfolio.unrealizedPnl === 'number' ? `평가손익 ${formatKRW(portfolio.unrealizedPnl)} (${portfolio.unrealizedPnlPct ?? 0}%)` : '',
     `보유 ${portfolio.positionCount || 0}개`,
+    valuation.capturedAt
+      ? `평가 기준 ${formatKstTimestamp(valuation.capturedAt)} KST · 가격 갱신 ${valuation.quotePositionCount ?? 0}/${valuation.positionCount ?? portfolio.positionCount ?? 0}개`
+      : '',
+    sourceText ? `가격 출처 ${sourceText}` : '',
+    valuationChange,
+    valuation.synchronized ? '현재 평가액을 포트폴리오 원본에 동기화함' : '',
   ].filter(Boolean).map(item => `▸ ${escapeHtml(item)}`);
 
-  const summaryTable = [
-    '구분       건수',
-    `매수후보   ${String(counts.buy).padStart(2, ' ')}`,
-    `관찰       ${String(counts.watch).padStart(2, ' ')}`,
-    `모멘텀     ${String(counts.momentum).padStart(2, ' ')}`,
-    `추가점검   ${String(counts.add).padStart(2, ' ')}`,
-    `보유       ${String(counts.hold).padStart(2, ' ')}`,
-    `축소       ${String(counts.reduce).padStart(2, ' ')}`,
-    `매도       ${String(counts.sell).padStart(2, ' ')}`,
-  ].join('\n');
+  const summaryLines = [
+    `▸ 신규 판단: 매수 ${counts.buy} · 보류 ${counts.watch} · 모멘텀 관찰 ${counts.momentum}`,
+    `▸ 보유 행동: 추가점검 ${counts.add} · 유지 ${counts.hold} · 일부축소 ${counts.reduce} · 전량매도 ${counts.sell}`,
+  ];
 
   const formatRecommendation = (item, mode = 'candidate') => {
     const risk = item.riskProfile || item.risk_profile || {};
@@ -789,7 +822,7 @@ function formatActionReport(report) {
     ].join('\n'),
     [
       '<b>한눈에 보기</b>',
-      `<pre>${escapeHtml(summaryTable)}</pre>`,
+      ...summaryLines.map(escapeHtml),
     ].join('\n'),
     [
       '<b>읽는 법</b>',
@@ -798,43 +831,50 @@ function formatActionReport(report) {
       '▸ 손절은 손실 제한을 위해 다시 점검할 가격입니다.',
     ].join('\n'),
     [
-      '<b>1. 포트폴리오</b>',
+      '<b>포트폴리오 평가</b>',
       portfolioLines.join('\n') || '▸ 기록 없음',
     ].join('\n'),
-    [
-      '<b>2. 지금 살 수 있는 후보</b>',
-      (report.newBuyCandidates || []).map(item => formatRecommendation(item, 'candidate')).join('\n\n') || '▸ 없음',
-    ].join('\n'),
-    [
-      '<b>3. 관심은 있지만 보류</b>',
-      (report.watchOnlyCandidates || []).map(item => formatRecommendation(item, 'watch')).join('\n\n') || '▸ 없음',
-    ].join('\n'),
-    [
-      '<b>4. 가격 모멘텀 관찰</b>',
-      (report.momentumWatchCandidates || []).map(formatMomentumCandidate).join('\n\n') || '▸ 없음',
-    ].join('\n'),
-    [
-      '<b>5. 추가매수/수익보호 점검</b>',
-      (report.addCandidates || []).map(item => formatPosition(item, 'add')).join('\n\n') || '▸ 없음',
-    ].join('\n'),
-    [
-      '<b>6. 그대로 보유</b>',
-      (report.holdCandidates || []).slice(0, 5).map(item => formatPosition(item, 'hold')).join('\n\n') || '▸ 없음',
-    ].join('\n'),
-    [
-      '<b>7. 일부 줄일 후보</b>',
-      (report.reduceCandidates || []).map(item => formatPosition(item, 'reduce')).join('\n\n') || '▸ 없음',
-    ].join('\n'),
-    [
-      '<b>8. 전량 매도 후보</b>',
-      (report.sellCandidates || []).map(item => formatPosition(item, 'sell')).join('\n\n') || '▸ 없음',
-    ].join('\n'),
-    [
-      '<b>9. 예정 매매 확인</b>',
-      (report.plannedTrades || []).map(formatPlannedTrade).join('\n') || '▸ 없음',
-    ].join('\n'),
-    '<i>자동 주문이 아닙니다. 실제 매매 전 손절선, 유동성, 당일 수급을 다시 확인하세요.</i>',
   ];
+
+  const appendSection = (title, content) => {
+    if (content) sections.push(`<b>${title}</b>\n${content}`);
+  };
+  appendSection(
+    '지금 살 수 있는 후보',
+    (report.newBuyCandidates || []).map(item => formatRecommendation(item, 'candidate')).join('\n\n'),
+  );
+  appendSection(
+    '관심은 있지만 보류',
+    (report.watchOnlyCandidates || []).map(item => formatRecommendation(item, 'watch')).join('\n\n'),
+  );
+  appendSection(
+    '가격 모멘텀 관찰',
+    (report.momentumWatchCandidates || []).map(formatMomentumCandidate).join('\n\n'),
+  );
+  if (counts.buy + counts.watch + counts.momentum === 0) {
+    sections.push('<b>신규 후보</b>\n▸ 오늘 새로 매수하거나 관찰할 후보 없음');
+  }
+  appendSection(
+    '추가매수/수익보호 점검',
+    (report.addCandidates || []).map(item => formatPosition(item, 'add')).join('\n\n'),
+  );
+  appendSection(
+    '그대로 보유',
+    (report.holdCandidates || []).slice(0, 5).map(item => formatPosition(item, 'hold')).join('\n\n'),
+  );
+  appendSection(
+    '일부 줄일 후보',
+    (report.reduceCandidates || []).map(item => formatPosition(item, 'reduce')).join('\n\n'),
+  );
+  appendSection(
+    '전량 매도 후보',
+    (report.sellCandidates || []).map(item => formatPosition(item, 'sell')).join('\n\n'),
+  );
+  appendSection(
+    '예정 매매 확인',
+    (report.plannedTrades || []).map(formatPlannedTrade).join('\n'),
+  );
+  sections.push('<i>자동 주문이 아닙니다. 실제 매매 전 손절선, 유동성, 당일 수급을 다시 확인하세요.</i>');
 
   return sections.join('\n\n');
 

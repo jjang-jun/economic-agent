@@ -548,7 +548,50 @@ function buildPositionActions(portfolio) {
   return groups;
 }
 
-function buildActionReport({ recommendations, portfolio, plannedTrades = [], momentumCandidates = [] }) {
+function buildPortfolioValuationContext(previousPortfolio = {}, portfolio = {}, options = {}) {
+  const positions = portfolio.positions || [];
+  const sourceCounts = positions.reduce((counts, position) => {
+    const source = position.quoteSource || position.priceSource || 'unavailable';
+    counts[source] = (counts[source] || 0) + 1;
+    return counts;
+  }, {});
+  const quotePositionCount = positions.filter(position => position.priceSource === 'quote').length;
+  const previousTotalAssetValue = typeof previousPortfolio.totalAssetValue === 'number'
+    ? previousPortfolio.totalAssetValue
+    : null;
+  const currentTotalAssetValue = typeof portfolio.totalAssetValue === 'number'
+    ? portfolio.totalAssetValue
+    : null;
+  const changeAmount = previousTotalAssetValue !== null && currentTotalAssetValue !== null
+    ? Math.round(currentTotalAssetValue - previousTotalAssetValue)
+    : null;
+  const changePct = changeAmount !== null && previousTotalAssetValue
+    ? round((changeAmount / previousTotalAssetValue) * 100)
+    : null;
+
+  return {
+    capturedAt: portfolio.capturedAt || new Date().toISOString(),
+    previousCapturedAt: previousPortfolio.capturedAt || null,
+    previousTotalAssetValue,
+    currentTotalAssetValue,
+    changeAmount,
+    changePct,
+    positionCount: positions.length,
+    quotePositionCount,
+    manualPositionCount: Math.max(0, positions.length - quotePositionCount),
+    sourceCounts,
+    synchronized: options.synchronized === true,
+    source: options.source || 'portfolio_input',
+  };
+}
+
+function buildActionReport({
+  recommendations,
+  portfolio,
+  plannedTrades = [],
+  momentumCandidates = [],
+  portfolioValuation = null,
+}) {
   const positionActions = buildPositionActions(portfolio);
   const newBuyCandidates = buildNewBuyCandidates(recommendations, portfolio);
   const watchOnlyCandidates = buildWatchOnlyCandidates(recommendations, portfolio);
@@ -570,6 +613,7 @@ function buildActionReport({ recommendations, portfolio, plannedTrades = [], mom
       maxNewBuyAmount: portfolio.maxNewBuyAmount,
       maxNewBuyRatio: portfolio.maxNewBuyRatio,
       maxPositionRatio: portfolio.maxPositionRatio,
+      valuation: portfolioValuation,
     },
     newBuyCandidates,
     watchOnlyCandidates,
@@ -599,6 +643,7 @@ module.exports = {
   buildPortfolioLimitContext,
   enrichRecommendationsWithLatestPrices,
   classifyPosition,
+  buildPortfolioValuationContext,
   latestPriceChangePct,
   recommendationLatestPrice,
   saveActionReport,

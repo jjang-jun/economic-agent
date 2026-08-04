@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const { formatActionReport } = require('../src/notify/telegram');
 const {
   buildActionReport,
+  buildPortfolioValuationContext,
   buildMarketMomentumCandidates,
   enrichRecommendationsWithLatestPrices,
 } = require('../src/utils/action-report');
@@ -42,13 +43,56 @@ test('formatActionReport renders Korean buy candidates as whole shares with entr
 
   assert.match(message, /읽는 법/);
   assert.match(message, /한눈에 보기/);
-  assert.match(message, /<pre>구분       건수/);
-  assert.match(message, /매수후보\s+1/);
-  assert.match(message, /모멘텀\s+0/);
+  assert.doesNotMatch(message, /<pre>/);
+  assert.match(message, /신규 판단: 매수 1 · 보류 0 · 모멘텀 관찰 0/);
   assert.match(message, /추천 171,000원/);
   assert.match(message, /현재 168,000원 \(-1.7%\)/);
   assert.match(message, /손절 159,030원/);
   assert.match(message, /제안: 5주 \/ 855,000원 \(원안 2,966,738원, 1회 상한\)/);
+});
+
+test('action report explains live valuation differences and quote coverage', () => {
+  const previous = {
+    capturedAt: '2026-07-31T09:52:04.036Z',
+    totalAssetValue: 71973660,
+  };
+  const portfolio = {
+    capturedAt: '2026-08-04T00:18:11.746Z',
+    totalAssetValue: 59223249,
+    investedAmount: 48132366,
+    cashAmount: 11090883,
+    cashRatio: 0.187,
+    positionCount: 2,
+    positions: [
+      { ticker: '005930', priceSource: 'quote', quoteSource: 'kis-rest' },
+      { ticker: 'MU', priceSource: 'quote', quoteSource: 'alpaca-iex' },
+    ],
+  };
+  const valuation = buildPortfolioValuationContext(previous, portfolio, {
+    synchronized: true,
+    source: 'supabase_portfolio',
+  });
+  const message = formatActionReport({
+    date: '2026-08-04',
+    portfolio: { ...portfolio, valuation },
+    newBuyCandidates: [],
+    watchOnlyCandidates: [],
+    momentumWatchCandidates: [],
+    addCandidates: [],
+    holdCandidates: [],
+    reduceCandidates: [],
+    sellCandidates: [],
+    plannedTrades: [],
+  });
+
+  assert.equal(valuation.changeAmount, -12750411);
+  assert.match(message, /평가 기준 .* KST · 가격 갱신 2\/2개/);
+  assert.match(message, /가격 출처 KIS 1개 · Alpaca 1개/);
+  assert.match(message, /가격 갱신 전 저장 평가 71,973,660원 → 현재 59,223,249원/);
+  assert.match(message, /현재 평가액을 포트폴리오 원본에 동기화함/);
+  assert.match(message, /오늘 새로 매수하거나 관찰할 후보 없음/);
+  assert.doesNotMatch(message, /지금 살 수 있는 후보/);
+  assert.doesNotMatch(message, /그대로 보유/);
 });
 
 test('formatActionReport renders momentum watch candidates separately', () => {

@@ -2,7 +2,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { isPlanRelevantToPortfolio, shouldSkipTelegram } = require('../scripts/action-report');
+const {
+  assertCompletePortfolioValuation,
+  isPlanRelevantToPortfolio,
+  shouldSkipTelegram,
+} = require('../scripts/action-report');
 
 test('action report workflow notifies private Telegram on failure', () => {
   const workflow = fs.readFileSync(path.join(__dirname, '..', '.github', 'workflows', 'action-report.yml'), 'utf8');
@@ -33,4 +37,15 @@ test('action report hides stale sell plans for positions no longer held', () => 
     { side: 'buy', ticker: 'DRAM', symbol: 'DRAM' },
     { positions: [] },
   ), true);
+});
+
+test('action report refuses to synchronize an incomplete portfolio valuation', () => {
+  assert.throws(() => assertCompletePortfolioValuation({
+    totalAssetValue: 5000000,
+    positions: [{ ticker: '005930', name: '삼성전자', marketValue: null }],
+  }), /평가액이 없는 종목.*삼성전자/);
+  assert.equal(assertCompletePortfolioValuation({
+    totalAssetValue: 5000000,
+    positions: [{ ticker: '005930', marketValue: 4000000 }],
+  }), true);
 });
