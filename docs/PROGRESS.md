@@ -319,6 +319,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 2026-08-04 Discord 전환 1단계 인프라를 추가했다. 긴급·일일행동·시장브리핑·포트폴리오·세금정책·부동산정책·선행신호·성과·시스템점검 9개 채널을 하나의 base64 Webhook map 또는 채널별 환경변수로 라우팅한다. Webhook URL은 형식만 검사하고 로그에 출력하지 않으며, `allowed_mentions` 차단, Telegram HTML의 Discord Markdown 변환, 긴 메시지 분할, 10초 요청 timeout을 적용했다.
 - Discord Bot API 자동 프로비저너를 실제 서버에 적용했다. `01 핵심 신호`(긴급·일일행동·시장브리핑·선행신호), `02 자산 관리`(포트폴리오·성과), `03 정책 인텔리전스`(세금·부동산), `04 운영`(시스템점검)의 4개 카테고리로 정렬했다. 기존 리소스는 재사용하고 삭제하지 않으며 Webhook map은 ignored 파일에 `0600`으로 저장한다. 9개 채널 모두 실제 Webhook 수신을 확인했다.
 - Discord 병행 전송 마이그레이션을 시작했다. `DISCORD_REPORTS_ENABLED=true`인 24개 GitHub Actions Workflow에서 긴급뉴스→긴급, 다이제스트→시장브리핑, 종목·행동·타이밍→일일행동, 경제적 자유→포트폴리오, 정책 도메인→세금/부동산, 이상징후→선행신호, 추천·거래 성과→성과, 수집·가격·배포·Workflow 실패→시스템점검으로 분기한다. Discord 실패는 Telegram 성공과 버퍼·저장을 되돌리지 않으며 GitHub Secret에는 9개 Webhook 지도를 동기화했다.
+- Discord 메시지를 채널별 색상·고정 제목·Footer·시각·페이지가 있는 Embed 카드로 개선했다. Telegram HTML은 Discord Markdown으로 정리하고 본문은 Embed 제한보다 여유 있는 3,800자 단위로 분할한다. `DISCORD_USE_EMBEDS=false` 일반 텍스트 fallback과 `allowed_mentions` 차단은 유지한다.
 
 ## 다음 작업
 

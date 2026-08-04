@@ -8,6 +8,8 @@ const {
   isDiscordWebhookUrl,
   resolveDiscordWebhook,
   telegramHtmlToDiscordMarkdown,
+  buildDiscordEmbed,
+  buildDiscordPayload,
   splitDiscordMessage,
   sendDiscordMessage,
   inspectDiscordConfiguration,
@@ -58,6 +60,35 @@ test('Telegram HTML is converted to Discord Markdown and safe links', () => {
     telegramHtmlToDiscordMarkdown('<b>정책</b> <a href="https://example.com/?a=1&amp;b=2">원문</a> <i>주의</i>'),
     '**정책** [원문](https://example.com/?a=1&b=2) *주의*',
   );
+  assert.equal(
+    telegramHtmlToDiscordMarkdown('<strong>제목</strong><br><br><br><u>강조</u> <code>005930</code>&nbsp;'),
+    '**제목**\n\n__강조__ `005930`',
+  );
+});
+
+test('Discord embeds use readable channel themes and bounded descriptions', () => {
+  const embed = buildDiscordEmbed('시장 본문', {
+    channel: 'briefing',
+    index: 1,
+    total: 3,
+    now: '2026-08-04T08:00:00.000Z',
+  });
+  assert.equal(embed.title, '🗞️ 시장 브리핑 · 2/3');
+  assert.equal(embed.description, '시장 본문');
+  assert.equal(embed.color, 0x5865F2);
+  assert.equal(embed.footer.text, '#시장-브리핑 · Economic Agent');
+  assert.equal(embed.timestamp, '2026-08-04T08:00:00.000Z');
+});
+
+test('Discord payload defaults to embeds and supports explicit plain-text fallback', () => {
+  const rich = buildDiscordPayload('본문', { channel: 'portfolio' });
+  assert.equal(rich.embeds.length, 1);
+  assert.equal(rich.content, undefined);
+  assert.deepEqual(rich.allowed_mentions, { parse: [] });
+
+  const plain = buildDiscordPayload('본문', { channel: 'portfolio', useEmbeds: false });
+  assert.equal(plain.content, '본문');
+  assert.equal(plain.embeds, undefined);
 });
 
 test('Discord message splitter preserves all content within bounded chunks', () => {
@@ -84,6 +115,9 @@ test('Discord sender disables mentions, waits for delivery, and splits long mess
   assert.ok(result.messageCount > 1);
   assert.ok(calls.every(call => new URL(call.url).searchParams.get('wait') === 'true'));
   assert.ok(calls.every(call => call.body.allowed_mentions.parse.length === 0));
+  assert.ok(calls.every(call => call.body.embeds.length === 1));
+  assert.ok(calls.every(call => call.body.embeds[0].title.startsWith('🛠️ 시스템 점검')));
+  assert.ok(calls.every(call => call.body.embeds[0].description.length <= 45));
 });
 
 test('required Discord delivery fails closed when a channel is not configured', async () => {

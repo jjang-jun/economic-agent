@@ -500,6 +500,7 @@ SUPABASE_DB_PASSWORD=...
 # DISCORD_BOT_TOKEN=...            # 자동 채널/Webhook 구축용, 커밋 금지
 # DISCORD_GUILD_ID=...             # Discord 서버 ID
 # DISCORD_REPORTS_ENABLED=true     # 정기 리포트 Discord 병행 전송
+# DISCORD_USE_EMBEDS=false         # 선택: 채널별 Embed 카드 대신 일반 텍스트 사용
 # DISCORD_WEBHOOKS_JSON_BASE64=... # 채널별 Webhook JSON의 base64, docs/DISCORD_SETUP.md 참고
 # DISCORD_REQUEST_TIMEOUT_MS=10000
 # STRATEGY_MIN_EVALUATED=30

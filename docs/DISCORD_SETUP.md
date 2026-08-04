@@ -81,6 +81,12 @@ JSON 파일을 base64로 바꿔 `.env`의 `DISCORD_WEBHOOKS_JSON_BASE64`에 설�
 DISCORD_REPORTS_ENABLED=true
 ```
 
+Discord 메시지는 기본적으로 채널별 색상, 고정 제목, 본문, 페이지 번호, 기준 시각이 있는 Embed 카드로 전송됩니다. Telegram HTML의 굵게·기울임·밑줄·취소선·코드·링크는 Discord Markdown으로 변환하고 연속된 빈 줄은 정리합니다. 문제가 있을 때만 일반 텍스트로 되돌립니다.
+
+```env
+DISCORD_USE_EMBEDS=false
+```
+
 ```bash
 npm run discord:check
 npm run discord:smoke -- --channel=ops
@@ -119,5 +125,6 @@ Discord 실패는 로그에 남기되 Telegram 성공, 기사 버퍼 처리, 추
 - Webhook URL이 노출되면 Discord에서 즉시 삭제하고 새로 생성합니다.
 - `allowed_mentions`를 비활성화해 기사·AI 텍스트가 `@everyone` 알림을 만들지 못하게 합니다.
 - 메시지는 Discord 제한보다 여유 있게 분할합니다.
+- Embed 본문은 3,800자 단위로 분리하고 여러 장이면 제목에 `1/2`처럼 페이지를 표시합니다.
 - 한 채널 실패가 Telegram이나 다른 정기 작업을 중단시키지 않도록, 실제 리포트 연결은 병행 전송 단계에서 개별 적용합니다.
 - 양방향 Slash command와 매매 승인은 Webhook이 아니라 Discord Application/Interaction 서명 검증이 필요하므로 후속 단계에서 다룹니다.

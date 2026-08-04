@@ -63,7 +63,7 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - Optional deploy freshness check: `AGENT_SERVER_URL` or `CLOUD_RUN_SERVICE_URL`, with `EXPECTED_DEPLOY_SHA` when running outside GitHub Actions
 - Optional Supabase resilience tuning: `SUPABASE_REQUEST_TIMEOUT_MS`, `SUPABASE_RETRY_COUNT`, `SUPABASE_RETRY_DELAY_MS`, `SUPABASE_RETRY_MAX_DELAY_MS`, `SUPABASE_CIRCUIT_BREAKER_MS`
 - Optional Telegram network timeout: `TELEGRAM_REQUEST_TIMEOUT_MS`
-- Optional Discord provisioning: `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`; report delivery opt-in: `DISCORD_REPORTS_ENABLED=true`, `DISCORD_WEBHOOKS_JSON_BASE64` or `DISCORD_WEBHOOKS_JSON`, per-channel `DISCORD_WEBHOOK_<CHANNEL_KEY>`, and `DISCORD_REQUEST_TIMEOUT_MS`. Bot tokens and Webhook URLs are secrets and must not be logged or committed.
+- Optional Discord provisioning: `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`; report delivery opt-in: `DISCORD_REPORTS_ENABLED=true`, `DISCORD_WEBHOOKS_JSON_BASE64` or `DISCORD_WEBHOOKS_JSON`, per-channel `DISCORD_WEBHOOK_<CHANNEL_KEY>`, and `DISCORD_REQUEST_TIMEOUT_MS`. Discord uses channel-themed embeds by default; `DISCORD_USE_EMBEDS=false` enables the plain-text fallback. Bot tokens and Webhook URLs are secrets and must not be logged or committed.
 - Optional public EOD timeouts: `KRX_REQUEST_TIMEOUT_MS`, `KRX_CIRCUIT_BREAKER_MS`, `DATA_GO_KR_REQUEST_TIMEOUT_MS`
 - Optional private portfolio file: `PORTFOLIO_FILE`, defaulting to ignored `data/portfolio.json`
 - Optional private portfolio env for GitHub Actions: `PORTFOLIO_JSON_BASE64` or `PORTFOLIO_JSON`
