@@ -89,18 +89,26 @@ function countBy(items, getKey) {
 
 function summarizeTrades(trades, recommendations, options = {}) {
   const recommendationIds = new Set(recommendations.map(item => item.id));
-  const linked = trades.filter(trade => trade.recommendationId && recommendationIds.has(trade.recommendationId));
+  const buys = trades.filter(trade => trade.side === 'buy');
+  const sells = trades.filter(trade => trade.side === 'sell');
+  const linked = buys.filter(trade => trade.recommendationId && recommendationIds.has(trade.recommendationId));
+  const realized = sells.filter(trade => typeof trade.realizedPnlKrw === 'number');
   return {
     dataAvailable: options.dataAvailable !== false,
     persistenceAvailable: options.persistenceAvailable !== false,
     dataSource: options.dataSource || 'unknown',
     dataError: options.dataError || '',
     total: trades.length,
-    buy: trades.filter(trade => trade.side === 'buy').length,
-    sell: trades.filter(trade => trade.side === 'sell').length,
+    buy: buys.length,
+    sell: sells.length,
     linked: linked.length,
-    unlinked: trades.length - linked.length,
-    linkedRatePct: trades.length ? round((linked.length / trades.length) * 100) : null,
+    unlinked: buys.length - linked.length,
+    linkedRatePct: buys.length ? round((linked.length / buys.length) * 100) : null,
+    realizedPnlKnown: realized.length,
+    realizedPnlKrw: realized.length ? round(realized.reduce((sum, trade) => sum + trade.realizedPnlKrw, 0)) : null,
+    sellsWithReason: sells.filter(trade => trade.sellReason).length,
+    autoLinkedBuys: buys.filter(trade => trade.recommendationLinkSource === 'auto_ticker_match').length,
+    plannedTradesLinked: trades.filter(trade => trade.tradePlanId).length,
   };
 }
 

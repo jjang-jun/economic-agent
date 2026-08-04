@@ -1208,15 +1208,13 @@ function formatTradePerformanceReport(report) {
     hour12: false,
   });
   const topLines = (report.positions || [])
-    .filter(item => item.trade.side === 'buy')
     .slice(0, 5)
     .map(item => {
-      const trade = item.trade;
       const pnl = typeof item.pnl === 'number'
         ? ` · 손익 ${formatKRW(item.pnl)} (${typeof item.returnPct === 'number' ? `${item.returnPct}%` : '수익률 데이터 부족'})`
         : '';
-      const link = trade.recommendationId ? ' · 추천연결' : '';
-      return `▸ ${escapeHtml(trade.name || trade.ticker || trade.symbol)} ${formatKRW(item.entryAmount)}${pnl}${link}`;
+      const link = (item.recommendationIds || []).length > 0 ? ' · 추천연결' : '';
+      return `▸ ${escapeHtml(item.name || item.ticker || item.symbol)} ${formatKRW(item.entryAmount)}${pnl}${link}`;
     });
   const hasEvaluatedBuys = (report.evaluatedBuys ?? 0) > 0;
   const totalPnlText = hasEvaluatedBuys && typeof report.totalPnl === 'number' && typeof report.totalReturnPct === 'number'
@@ -1228,7 +1226,9 @@ function formatTradePerformanceReport(report) {
     `⏰ ${now}`,
     `거래: ${report.totalTrades}건 · 매수 ${report.buyTrades}건 · 매도 ${report.sellTrades}건`,
     `추천 연결: ${report.linkedRecommendations}건`,
-    `평가손익: ${totalPnlText}`,
+    `미실현 평가손익: ${totalPnlText}`,
+    `누적 실현손익: ${typeof report.realizedPnl === 'number' ? `${formatKRW(report.realizedPnl)} (${report.realizedPnlKnown ?? 0}건)` : '원가 데이터 부족'}`,
+    `매도 사유 기록: ${report.sellsWithReason ?? 0}/${report.sellTrades ?? 0}건`,
     topLines.length > 0 ? topLines.join('\n') : '아직 평가 가능한 실제 거래가 없습니다.',
   ].join('\n');
 }
@@ -1400,7 +1400,9 @@ function formatPerformanceReview(review) {
     `▸ 원인: ${trade.dataError || 'Supabase 또는 로컬 미러를 확인하세요'}`,
   ] : [
     `▸ 실제 거래: ${trade.total ?? 0}건`,
-    `▸ 추천과 연결된 거래: ${trade.linked ?? 0}건 (${linkedRate})`,
+    `▸ 추천과 연결된 매수: ${trade.linked ?? 0}/${trade.buy ?? 0}건 (${linkedRate}) · 자동 연결 ${trade.autoLinkedBuys ?? 0}건`,
+    `▸ 매매계획과 연결된 체결: ${trade.plannedTradesLinked ?? 0}건`,
+    `▸ 매도 실현손익: ${trade.realizedPnlKnown ? fmtKRW(trade.realizedPnlKrw) : '계산 가능 기록 없음'} · 사유 기록 ${trade.sellsWithReason ?? 0}/${trade.sell ?? 0}건`,
     `▸ 추천을 실제로 산 경우 평균: ${executedAvg}`,
     `▸ 추천했지만 매수하지 않은 경우 평균: ${missedAvg}`,
   ];
@@ -1409,6 +1411,9 @@ function formatPerformanceReview(review) {
   }
   if (tradeBehavior.buyTrades) {
     executionLines.push(`▸ 원칙 점검: 추천 미연결 매수 ${tradeBehavior.unlinkedBuys ?? 0}건, 관찰/차단 후보 매수 ${tradeBehavior.watchOnlyBuys ?? 0}건`);
+  }
+  if (tradeBehavior.sellTrades) {
+    executionLines.push(`▸ 매도 기록 품질: 사유 미입력 ${tradeBehavior.sellsWithoutReason ?? 0}건`);
   }
   const failureLines = failures.slice(0, 4).map(item => {
     const examples = (item.examples || []).length ? ` · 예: ${(item.examples || []).join(', ')}` : '';

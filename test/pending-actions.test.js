@@ -1,6 +1,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { ensureActionUsable, formatPendingActions, parseTradeMetadata } = require('../src/agent/pending-actions');
+const {
+  ensureActionUsable,
+  formatPendingActions,
+  parseTradeMetadata,
+  findRecommendationForTrade,
+  findTradePlan,
+} = require('../src/agent/pending-actions');
 
 function loadFreshPendingActions(envPatch = {}) {
   const keys = Object.keys(envPatch);
@@ -59,12 +65,40 @@ test('formatPendingActions renders empty state without persistence', async () =>
 test('parseTradeMetadata separates recommendation id from display name', () => {
   assert.deepEqual(
     parseTradeMetadata(['삼성전자', 'rec=2026-05-07:005930:bullish']),
-    { name: '삼성전자', recommendationId: '2026-05-07:005930:bullish' }
+    {
+      name: '삼성전자', recommendationId: '2026-05-07:005930:bullish', sellReason: '',
+      notes: '', fees: undefined, taxes: undefined, fxRate: undefined, currency: '',
+    }
   );
   assert.deepEqual(
     parseTradeMetadata(['Netflix', '--rec', 'rec-1']),
-    { name: 'Netflix', recommendationId: 'rec-1' }
+    {
+      name: 'Netflix', recommendationId: 'rec-1', sellReason: '',
+      notes: '', fees: undefined, taxes: undefined, fxRate: undefined, currency: '',
+    }
   );
+  const sale = parseTradeMetadata(['Micron', 'reason=목표가_도달', 'fees=0.2', 'fx=1390']);
+  assert.equal(sale.name, 'Micron');
+  assert.equal(sale.sellReason, '목표가 도달');
+  assert.equal(sale.fees, '0.2');
+  assert.equal(sale.fxRate, '1390');
+});
+
+test('trade metadata helpers auto-link only a recent approved matching recommendation and exact plan', () => {
+  const trade = { side: 'buy', ticker: '005930', symbol: '005930.KS', quantity: 3 };
+  const recommendation = {
+    id: 'rec-1', ticker: '005930', symbol: '005930.KS', createdAt: '2026-08-03T00:00:00Z',
+    riskReview: { approved: true, action: 'candidate' },
+    riskProfile: { riskReward: 2.5, entryReferencePrice: 70000, stopLossPrice: 65000 },
+  };
+  const linked = findRecommendationForTrade(trade, [recommendation], {
+    now: new Date('2026-08-04T00:00:00Z').getTime(),
+  });
+  assert.equal(linked.recommendation.id, 'rec-1');
+  assert.equal(linked.source, 'auto_ticker_match');
+  assert.equal(findTradePlan(trade, [{
+    id: 'plan-1', side: 'buy', ticker: '005930', quantity: 3, status: 'open',
+  }]).id, 'plan-1');
 });
 
 test('createPendingAction fails clearly when pending action persistence is unavailable', async () => {
@@ -90,7 +124,7 @@ test('createPendingAction fails clearly when pending action persistence is unava
     await assert.rejects(
       pendingActions.createPendingAction({
         chatId: 'private-chat',
-        text: '/buy 005930 1 1 smoke-buy',
+        text: '/cash 0',
       }),
       /pending action 저장 실패/,
     );

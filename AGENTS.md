@@ -29,7 +29,7 @@ RSS feeds
 - Send stock report: `npm run report`
 - Evaluate recommendation performance: `npm run evaluate`
 - List recent recommendations and IDs: `npm run recommendations:list`
-- Record an actual manual trade execution: `npm run trade:record -- --side buy --ticker 005930 --quantity 3 --price 266000`
+- Record an actual manual trade execution: `npm run trade:record -- --side buy --ticker 005930 --quantity 3 --price 266000`; add `--currency USD --fxRate 1390` for USD trades and `--reason` for sells
 - Record a portfolio cash flow: `npm run cashflow:record -- --type deposit --amount 1000000 --occurred-at 2026-08-01T09:00:00+09:00`
 - Review actual trade performance: `npm run trade:performance`
 - Send premarket/intraday timing alerts: `npm run timing:alert -- premarket`, `npm run timing:alert -- intraday`
@@ -109,7 +109,7 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - `src/utils/anomaly-performance.js`: research-only 1/5-trading-session evaluator and article-timing/factor-combination summary for stored market anomalies; never feeds live recommendation rules before readiness
 - `src/utils/performance-review.js`: summarizes recommendation and trade performance over weekly/monthly windows
 - `src/utils/local-research-worker.js`: optional monthly review sidecar for local Python OHLCV research; disabled unless `LOCAL_RESEARCH_WORKER_ENABLED=true`
-- `src/utils/trade-log.js`: stores actual manual trade executions in ignored local data and Supabase
+- `src/utils/trade-log.js`: stores actual manual trade executions in ignored local data and Supabase, including KRW settlement amount, recommendation/plan linkage, and sell realization metadata
 - `src/utils/portfolio-cash-flow.js`: stores signed deposit/withdrawal/dividend/interest/fee/tax events separately from trades
 - `src/utils/portfolio-return.js`: calculates daily-snapshot TWR, annualized MWR/XIRR, and same-window KOSPI excess return
 - `src/utils/decision-engine.js`: rule-based market regime, index trend scoring, and action guardrails

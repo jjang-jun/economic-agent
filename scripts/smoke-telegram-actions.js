@@ -61,6 +61,18 @@ async function getCurrentCashAmount() {
   return typeof portfolio.cashAmount === 'number' ? portfolio.cashAmount : 0;
 }
 
+async function getSmokeInstrument() {
+  const stored = await loadStoredPortfolio();
+  const portfolio = stored || normalizePortfolio(loadPortfolio());
+  const position = (portfolio.positions || []).find(item => Number(item.quantity) >= 1);
+  if (!position) throw new Error('Telegram sell smoke requires at least one held position');
+  return {
+    ticker: position.ticker || position.symbol,
+    name: String(position.name || 'smoke-position').replace(/\s+/g, '_'),
+    price: Number(position.avgPrice || position.currentPrice || 1),
+  };
+}
+
 async function assertPersistenceAvailable() {
   if (!isPersistenceEnabled()) {
     throw new Error('Supabase persistence is not configured for Telegram smoke');
@@ -93,10 +105,10 @@ async function runTelegramSmoke() {
   if (!chatId) throw new Error('TELEGRAM_SECRET_CHAT_ID or TELEGRAM_SMOKE_CHAT_ID is required');
 
   await assertPersistenceAvailable();
-  const cashAmount = await getCurrentCashAmount();
+  const [cashAmount, instrument] = await Promise.all([getCurrentCashAmount(), getSmokeInstrument()]);
   const commands = [
     { text: '/buy 005930 1 1 smoke-buy', expectedIntent: 'draft_buy' },
-    { text: '/sell 005930 1 1 smoke-sell', expectedIntent: 'draft_sell' },
+    { text: `/sell ${instrument.ticker} 1 ${instrument.price} ${instrument.name} reason=smoke`, expectedIntent: 'draft_sell' },
     { text: `/cash ${cashAmount}`, expectedIntent: 'draft_cash' },
   ];
 

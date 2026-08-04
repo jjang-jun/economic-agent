@@ -263,9 +263,11 @@ function loadLatestPortfolioSnapshot() {
 
 function applyTradeToPortfolio(rawPortfolio, trade) {
   const portfolio = normalizePortfolio(rawPortfolio);
-  const amount = typeof trade.amount === 'number'
-    ? trade.amount
-    : trade.quantity * trade.price;
+  const appliedTradeIds = Array.isArray(portfolio.appliedTradeIds) ? portfolio.appliedTradeIds : [];
+  if (trade.id && appliedTradeIds.includes(trade.id)) return portfolio;
+  const amount = typeof trade.cashAmountKrw === 'number'
+    ? trade.cashAmountKrw
+    : (typeof trade.amount === 'number' ? trade.amount : trade.quantity * trade.price);
   const positions = [...portfolio.positions];
   const symbol = trade.symbol || normalizeYahooSymbol(trade.ticker || '');
   const index = positions.findIndex(position => (
@@ -289,6 +291,13 @@ function applyTradeToPortfolio(rawPortfolio, trade) {
         symbol: existing.symbol || symbol,
         quantity: newQty,
         avgPrice: Math.round(newAvg * 100) / 100,
+        currency: existing.currency || trade.currency || '',
+        fxRate: trade.fxRate ?? existing.fxRate ?? null,
+        currentPrice: null,
+        marketValue: null,
+        costBasis: null,
+        unrealizedPnl: null,
+        unrealizedPnlPct: null,
       };
     } else {
       positions.push(normalizePosition({
@@ -297,6 +306,8 @@ function applyTradeToPortfolio(rawPortfolio, trade) {
         symbol,
         quantity: trade.quantity,
         avgPrice: trade.price,
+        currency: trade.currency || '',
+        fxRate: trade.fxRate ?? null,
       }));
     }
     portfolio.cashAmount = typeof portfolio.cashAmount === 'number'
@@ -310,7 +321,15 @@ function applyTradeToPortfolio(rawPortfolio, trade) {
     if (remaining <= 1e-9) {
       positions.splice(index, 1);
     } else {
-      positions[index] = { ...existing, quantity: remaining };
+      positions[index] = {
+        ...existing,
+        quantity: remaining,
+        currentPrice: null,
+        marketValue: null,
+        costBasis: null,
+        unrealizedPnl: null,
+        unrealizedPnlPct: null,
+      };
     }
     portfolio.cashAmount = typeof portfolio.cashAmount === 'number'
       ? portfolio.cashAmount + amount
@@ -318,6 +337,21 @@ function applyTradeToPortfolio(rawPortfolio, trade) {
   }
 
   portfolio.positions = positions;
+  portfolio.appliedTradeIds = trade.id
+    ? [...new Set([...appliedTradeIds, trade.id])].slice(-200)
+    : appliedTradeIds;
+  if (Array.isArray(portfolio.plannedTrades)) {
+    portfolio.plannedTrades = portfolio.plannedTrades.filter(plan => {
+      if (trade.tradePlanId && plan.id === trade.tradePlanId) return false;
+      return !(
+        (plan.status || 'open') === 'open'
+        && plan.side === trade.side
+        && Number(plan.quantity) === Number(trade.quantity)
+        && ((plan.ticker && trade.ticker && plan.ticker === trade.ticker)
+          || (plan.symbol && trade.symbol && plan.symbol === trade.symbol))
+      );
+    });
+  }
   portfolio.totalAssetValue = typeof portfolio.totalAssetValue === 'number'
     ? portfolio.totalAssetValue
     : portfolio.cashAmount;

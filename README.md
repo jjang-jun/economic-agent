@@ -231,6 +231,7 @@ Supabase 내부 로그가 `localhost:5432 connection refused`, `PGRST000/PGRST00
 ```bash
 npm run trade:plan -- --side sell --ticker DRAM --name "DRAM ETF" --quantity 30 --plannedDate 2026-05-11 --targetRemainingQuantity 170
 npm run trade:record -- --side buy --ticker 005930 --name 삼성전자 --quantity 3 --price 266000 --notes "1차 분할 진입"
+npm run trade:record -- --side sell --ticker MU --name Micron --quantity 1 --price 125 --currency USD --fxRate 1390 --reason "목표가 도달"
 npm run cashflow:record -- --type deposit --amount 1000000 --occurred-at 2026-08-01T09:00:00+09:00 --notes "추가 납입"
 npm run recommendations:list
 npm run action:report
@@ -269,9 +270,9 @@ npm run review:weekly -- --dry-run
 
 `trade:plan`은 아직 체결되지 않은 매수/매도 예정 작업을 `data/trades/trade-plans.json`과 포트폴리오 payload에 남깁니다. 일일 행동 리포트는 오늘까지 확인해야 할 열린 계획을 별도 섹션에 표시하고, 이후 `trade:record`가 같은 방향/종목/수량으로 기록되면 해당 계획을 자동으로 실행 완료 처리합니다. GitHub Actions에서도 보려면 계획 등록 후 `portfolio:sync-secret` 또는 `portfolio:seed-store`로 비공개 포트폴리오 원본을 동기화합니다.
 
-`trade:record`는 기본적으로 `data/portfolio.json`의 현금, 보유수량, 평균단가를 함께 갱신합니다. 거래만 기록하고 포트폴리오를 건드리지 않으려면 `--noPortfolio`를 붙입니다.
+`trade:record`는 기본적으로 `data/portfolio.json`의 현금, 보유수량, 평균단가를 함께 갱신합니다. 거래만 기록하고 포트폴리오를 건드리지 않으려면 `--noPortfolio`를 붙입니다. 해외 가격은 원화 현금에 반영할 `--fxRate`가 필요합니다. Telegram 거래는 추천·매매계획 자동 연결, 원화 환산, 매도 실현손익·사유 기록을 수행하며 동일 거래 ID 재승인 시 포트폴리오를 중복 변경하지 않습니다.
 
-대화형 Agent 배포 후에는 `portfolio:seed-store`로 현재 로컬 포트폴리오를 Supabase `portfolio_accounts`, `positions`에 올립니다. 이후 Telegram `/portfolio`는 Supabase 원본을 우선 읽고, `/cash`, `/buy`, `/sell` 승인도 Supabase 포트폴리오를 갱신합니다. `PORTFOLIO_JSON_BASE64`는 bootstrap/fallback 용도입니다. `portfolio:snapshot`은 Supabase 원본을 우선 읽어 현재가·환율로 평가한 뒤 `portfolio_snapshots`와 `portfolio_accounts`/`positions`를 함께 갱신합니다. 실제 매수/매도를 추천과 연결하려면 `/recommendations`로 리스크 기준을 통과한 최근 추천 ID를 확인한 뒤 `/buy 005930 3 70000 삼성전자 rec=추천ID`처럼 기록합니다. 손익비가 낮거나 리스크 리뷰를 통과하지 못한 종목은 기본 추천 목록에 나오지 않으며, 필요할 때만 `/recommendations blocked`로 차단/관찰 후보를 참고합니다.
+대화형 Agent 배포 후에는 `portfolio:seed-store`로 현재 로컬 포트폴리오를 Supabase `portfolio_accounts`, `positions`에 올립니다. 이후 Telegram `/portfolio`는 Supabase 원본을 우선 읽고, `/cash`, `/buy`, `/sell` 승인도 Supabase 포트폴리오를 갱신합니다. `PORTFOLIO_JSON_BASE64`는 bootstrap/fallback 용도입니다. `portfolio:snapshot`은 Supabase 원본을 우선 읽어 현재가·환율로 평가한 뒤 `portfolio_snapshots`와 `portfolio_accounts`/`positions`를 함께 갱신합니다. 최근 30일 안에 같은 종목의 리스크 승인 추천이 있으면 `/buy`가 가장 최근 추천을 자동 연결하며, 필요하면 `rec=추천ID`로 명시할 수 있습니다. 명시한 추천 ID가 없거나 종목이 다르면 초안 생성을 거부합니다. 손익비가 낮거나 리스크 리뷰를 통과하지 못한 종목은 자동 연결 대상이 아니며, 필요할 때만 `/recommendations blocked`로 참고합니다.
 
 ## 추천 생성 원칙
 
@@ -387,15 +388,15 @@ POST /telegram/webhook
 /portfolio
 /goal
 /risk
-/buy TICKER 수량 가격 [이름]
-/sell TICKER 수량 가격 [이름]
+/buy TICKER 수량 가격 [이름] [rec=추천ID] [fees=수수료] [fx=원화환율]
+/sell TICKER 수량 가격 [이름] reason=매도사유 [fees=수수료] [taxes=세금] [fx=원화환율]
 /cash 현금잔액
 /help
 ```
 
 포트폴리오와 경제적 자유 상태를 다루므로 Telegram `chat_id` allowlist를 통과한 채팅만 응답합니다. allowlist는 `TELEGRAM_SECRET_CHAT_ID`, `TELEGRAM_PRIVATE_CHAT_ID`, `TELEGRAM_AGENT_CHAT_ID`, `TELEGRAM_PORTFOLIO_CHAT_ID`, `TELEGRAM_CHAT_ID` 순서로 구성됩니다.
 
-`/buy`, `/sell`, `/cash`는 즉시 반영하지 않고 Supabase `pending_actions`에 초안을 만든 뒤 Telegram inline button의 `기록하기`/`취소` 승인으로 처리합니다.
+`/buy`, `/sell`, `/cash`는 즉시 반영하지 않고 Supabase `pending_actions`에 초안을 만든 뒤 Telegram inline button의 `기록하기`/`취소` 승인으로 처리합니다. 매수 초안은 같은 종목의 최근 30일 리스크 승인 추천과 열린 매매계획을 자동 연결하고 종목·수량·현금 잔액을 승인 전에 검증합니다. 매도 초안은 보유 수량, 평균단가, 환율을 기준으로 예상 실현손익을 보여주고 `reason=` 값을 거래 기록에 보존합니다. 해외 거래는 저장된 환율 또는 현재 USD/KRW를 사용하며 둘 다 없으면 `fx=` 입력을 요구합니다.
 
 Telegram webhook secret token을 쓰려면 아래 값을 설정하고, Bot API `setWebhook`에도 같은 secret token을 넣습니다.
 

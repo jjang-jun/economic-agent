@@ -5,6 +5,7 @@ const { normalizeYahooSymbol } = require('../sources/yahoo-finance');
 const { persistTradeExecutions, loadPersistedTradeExecutions } = require('./persistence');
 const { loadPortfolio, savePortfolioFile, applyTradeToPortfolio } = require('./portfolio');
 const { markMatchingTradePlanExecuted } = require('./trade-plan');
+const { isDomesticTicker } = require('../sources/price-provider');
 
 const DATA_DIR = path.join(__dirname, '..', '..', 'data', 'trades');
 const LOG_FILE = path.join(DATA_DIR, 'trade-executions.json');
@@ -71,6 +72,10 @@ function buildTradeExecution(input) {
   const price = Number(input.price);
   const fees = input.fees === undefined ? 0 : Number(input.fees);
   const taxes = input.taxes === undefined ? 0 : Number(input.taxes);
+  const currency = String(input.currency || (isDomesticTicker(ticker || symbol) ? 'KRW' : 'USD')).toUpperCase();
+  const fxRate = input.fxRate === undefined
+    ? (currency === 'KRW' ? 1 : null)
+    : Number(input.fxRate);
 
   if (!ticker && !symbol) throw new Error('ticker or symbol is required');
   if (!Number.isFinite(quantity) || quantity <= 0) throw new Error('quantity must be a positive number');
@@ -80,6 +85,9 @@ function buildTradeExecution(input) {
   const signedAmount = side === 'buy'
     ? grossAmount + (Number.isFinite(fees) ? fees : 0) + (Number.isFinite(taxes) ? taxes : 0)
     : grossAmount - (Number.isFinite(fees) ? fees : 0) - (Number.isFinite(taxes) ? taxes : 0);
+  const cashAmountKrw = typeof input.cashAmountKrw === 'number' && Number.isFinite(input.cashAmountKrw)
+    ? input.cashAmountKrw
+    : (Number.isFinite(fxRate) && fxRate > 0 ? signedAmount * fxRate : null);
 
   return {
     id: input.id || `${date}:${side}:${ticker || symbol}:${Date.parse(executedAt)}`,
@@ -92,9 +100,18 @@ function buildTradeExecution(input) {
     quantity,
     price,
     amount: signedAmount,
+    currency,
+    fxRate: Number.isFinite(fxRate) && fxRate > 0 ? fxRate : null,
+    cashAmountKrw,
     fees: Number.isFinite(fees) ? fees : 0,
     taxes: Number.isFinite(taxes) ? taxes : 0,
     recommendationId: input.recommendationId || '',
+    recommendationLinkSource: input.recommendationLinkSource || '',
+    tradePlanId: input.tradePlanId || '',
+    sellReason: input.sellReason || '',
+    realizedPnlKrw: typeof input.realizedPnlKrw === 'number' ? input.realizedPnlKrw : null,
+    realizedReturnPct: typeof input.realizedReturnPct === 'number' ? input.realizedReturnPct : null,
+    costBasisKrw: typeof input.costBasisKrw === 'number' ? input.costBasisKrw : null,
     notes: input.notes || '',
   };
 }
@@ -105,8 +122,9 @@ async function recordTradeExecution(input) {
   const byId = new Map(existing.filter(item => item.id).map(item => [item.id, item]));
   byId.set(trade.id, trade);
   const trades = [...byId.values()].sort((a, b) => new Date(a.executedAt) - new Date(b.executedAt));
+  const persisted = await persistTradeExecutions(trades);
+  if (persisted.error) throw new Error(`거래 저장 실패: ${persisted.error.message}`);
   saveTradeExecutions(trades);
-  await persistTradeExecutions(trades);
   markMatchingTradePlanExecuted(trade);
   if (input.updatePortfolio !== false) {
     const updatedPortfolio = applyTradeToPortfolio(loadPortfolio(), trade);

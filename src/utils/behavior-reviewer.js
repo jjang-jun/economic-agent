@@ -12,6 +12,7 @@ function getRecommendationMap(recommendations = []) {
 function reviewTradesAgainstRecommendations({ trades = [], recommendations = [] } = {}) {
   const recommendationMap = getRecommendationMap(recommendations);
   const buyTrades = trades.filter(trade => trade.side === 'buy');
+  const sellTrades = trades.filter(trade => trade.side === 'sell');
   const unlinkedBuys = buyTrades.filter(trade => !trade.recommendationId);
   const linkedBuys = buyTrades
     .map(trade => ({ trade, recommendation: recommendationMap.get(trade.recommendationId) }))
@@ -38,6 +39,8 @@ function reviewTradesAgainstRecommendations({ trades = [], recommendations = [] 
     watchOnlyBuys: watchOnlyBuys.length,
     lowRiskRewardBuys: lowRiskRewardBuys.length,
     missingStopBuys: missingStopBuys.length,
+    sellTrades: sellTrades.length,
+    sellsWithoutReason: sellTrades.filter(trade => !trade.sellReason).length,
     unlinkedBuyRatePct: buyTrades.length ? pct((unlinkedBuys.length / buyTrades.length) * 100) : null,
     watchOnlyBuyTickers: watchOnlyBuys.map(item => item.trade.ticker || item.trade.symbol).filter(Boolean),
     lowRiskRewardTickers: lowRiskRewardBuys.map(item => item.trade.ticker || item.trade.symbol).filter(Boolean),
@@ -88,6 +91,9 @@ function buildBehaviorReview({ trades = [], recommendations = [] } = {}) {
   }
   if (tradeReview.missingStopBuys > 0) {
     warnings.push(`손절 기준 없는 추천과 연결된 매수 ${tradeReview.missingStopBuys}건`);
+  }
+  if (tradeReview.sellsWithoutReason > 0) {
+    warnings.push(`매도 사유가 기록되지 않은 거래 ${tradeReview.sellsWithoutReason}건`);
   }
   if (recommendationHygiene.belowMinRiskReward > 0) {
     warnings.push(`호재 후보 중 최소 손익비 미달 ${recommendationHygiene.belowMinRiskReward}건`);

@@ -110,7 +110,10 @@ async function saveStoredPortfolio(portfolio, accountId = DEFAULT_ACCOUNT_ID) {
 
 async function updateStoredCash(cashAmount, accountId = DEFAULT_ACCOUNT_ID) {
   const portfolio = await loadStoredPortfolio(accountId);
-  if (!portfolio) return null;
+  if (!portfolio) {
+    if (isPersistenceEnabled()) throw new Error('Supabase 포트폴리오 원본을 읽을 수 없습니다. 변경을 중단합니다.');
+    return null;
+  }
   const previousCash = typeof portfolio.cashAmount === 'number' ? portfolio.cashAmount : 0;
   portfolio.cashAmount = cashAmount;
   portfolio.totalAssetValue = typeof portfolio.totalAssetValue === 'number'
@@ -123,7 +126,10 @@ async function updateStoredCash(cashAmount, accountId = DEFAULT_ACCOUNT_ID) {
 
 async function applyTradeToStoredPortfolio(trade, accountId = DEFAULT_ACCOUNT_ID) {
   const portfolio = await loadStoredPortfolio(accountId);
-  if (!portfolio) return null;
+  if (!portfolio) {
+    if (isPersistenceEnabled()) throw new Error('Supabase 포트폴리오 원본을 읽을 수 없습니다. 거래 반영을 중단합니다.');
+    return null;
+  }
   const updated = applyTradeToPortfolio(portfolio, trade);
   await saveStoredPortfolio(updated, accountId);
   return updated;

@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { enrichPortfolio, normalizePortfolio } = require('../src/utils/portfolio');
+const { enrichPortfolio, normalizePortfolio, applyTradeToPortfolio } = require('../src/utils/portfolio');
 
 test('normalizePortfolio preserves manual PnL percent override', () => {
   const portfolio = normalizePortfolio({
@@ -188,4 +188,24 @@ test('enrichPortfolio includes unclassified non-cash assets without treating the
   assert.equal(portfolio.totalAssetValue, 1300000);
   assert.equal(portfolio.cashAmount, 0);
   assert.equal(portfolio.positions[0].weight, 800000 / 1300000);
+});
+
+test('applyTradeToPortfolio converts USD settlement to KRW, closes plans, and is idempotent', () => {
+  const portfolio = {
+    cashAmount: 2000000,
+    totalAssetValue: 3000000,
+    positions: [],
+    plannedTrades: [{ id: 'plan-1', side: 'buy', ticker: 'MU', quantity: 2, status: 'open' }],
+  };
+  const trade = {
+    id: 'trade-1', side: 'buy', ticker: 'MU', symbol: 'MU', name: 'Micron',
+    quantity: 2, price: 100, currency: 'USD', fxRate: 1400,
+    amount: 200, cashAmountKrw: 280000, tradePlanId: 'plan-1',
+  };
+  const updated = applyTradeToPortfolio(portfolio, trade);
+  assert.equal(updated.cashAmount, 1720000);
+  assert.equal(updated.positions[0].quantity, 2);
+  assert.equal(updated.positions[0].currency, 'USD');
+  assert.equal(updated.plannedTrades.length, 0);
+  assert.equal(applyTradeToPortfolio(updated, trade).cashAmount, 1720000);
 });
