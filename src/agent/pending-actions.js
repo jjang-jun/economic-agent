@@ -372,6 +372,7 @@ async function confirmPendingAction(actionId, token, options = {}) {
     } else {
       savePortfolioFile(updatedPortfolio);
     }
+    const remainingPosition = positionForTrade(updatedPortfolio, trade);
     const actionResult = await persistPendingAction({
       id: row.id,
       chatId: row.chat_id,
@@ -393,6 +394,9 @@ async function confirmPendingAction(actionId, token, options = {}) {
         ? `실현손익: ${formatAmount(trade.realizedPnlKrw)} (${trade.realizedReturnPct}%)`
         : '',
       trade.side === 'sell' ? `매도 사유: ${escapeHtml(trade.sellReason || '미입력')}` : '',
+      `반영 후 현금: ${formatAmount(updatedPortfolio.cashAmount)}`,
+      `반영 후 보유: ${remainingPosition ? `${remainingPosition.quantity}주` : '0주'}`,
+      `기록 시각: ${new Date(trade.executedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour12: false })}`,
     ].filter(Boolean).join('\n');
   }
 

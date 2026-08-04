@@ -8,6 +8,9 @@ function formatKRW(value) {
 
 async function main() {
   const report = await buildTradePerformanceReport();
+  if (report.dataAvailable === false) {
+    throw new Error(`실제 거래 저장소 조회 실패: ${report.dataError || 'unknown'}`);
+  }
   console.log(`[거래성과] 전체 거래 ${report.totalTrades}건, 평가 가능 매수 ${report.evaluatedBuys}건`);
   console.log(`[거래성과] 평가손익 ${formatKRW(report.totalPnl)} (${report.totalReturnPct ?? 0}%)`);
 

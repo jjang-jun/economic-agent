@@ -15,6 +15,7 @@ const {
 } = require('./response-composer');
 const { createPendingAction, handlePendingActionCallback, formatPendingActions } = require('./pending-actions');
 const { formatRecentRecommendations } = require('./recommendations-view');
+const { formatRecentTrades, formatCurrentTradePerformance } = require('./trades-view');
 
 function getAllowedChatIds() {
   const privateIds = [
@@ -125,6 +126,20 @@ async function buildResponse(text) {
     };
   }
 
+  if (command === '/trades' || command === '/executions') {
+    return {
+      intent: 'recent_trades_requires_chat',
+      response: '최근 실제 거래 기록은 Telegram 대화에서만 조회할 수 있습니다.',
+    };
+  }
+
+  if (['/trade_performance', '/trade-performance', '/tradeperformance'].includes(command)) {
+    return {
+      intent: 'trade_performance_requires_chat',
+      response: '실제 거래 성과는 Telegram 대화에서만 조회할 수 있습니다.',
+    };
+  }
+
   if (isPendingActionCommand(command)) {
     return {
       intent: 'pending_action_requires_chat',
@@ -170,6 +185,16 @@ async function routeTelegramMessage(message = {}) {
     result = {
       intent: 'recent_recommendations',
       response: await formatRecentRecommendations({ limit: 5, includeBlocked }),
+    };
+  } else if (command === '/trades' || command === '/executions') {
+    result = {
+      intent: 'recent_trades',
+      response: await formatRecentTrades({ limit: 10 }),
+    };
+  } else if (['/trade_performance', '/trade-performance', '/tradeperformance'].includes(command)) {
+    result = {
+      intent: 'trade_performance',
+      response: await formatCurrentTradePerformance(),
     };
   } else if (isPendingActionCommand(command)) {
     try {

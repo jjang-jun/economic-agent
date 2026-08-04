@@ -1,4 +1,4 @@
-const { loadTradeExecutions } = require('./trade-log');
+const { loadTradeExecutionsWithStatus } = require('./trade-log');
 const { fetchCurrentPrice } = require('../sources/price-provider');
 
 function round(value, digits = 2) {
@@ -91,7 +91,18 @@ function buildTradeLedger(trades = []) {
 }
 
 async function buildTradePerformanceReport() {
-  const trades = await loadTradeExecutions();
+  const tradeStatus = await loadTradeExecutionsWithStatus();
+  if (tradeStatus.dataAvailable === false) {
+    return {
+      generatedAt: new Date().toISOString(),
+      dataAvailable: false,
+      dataSource: tradeStatus.source,
+      dataError: tradeStatus.error,
+      totalTrades: 0,
+      positions: [],
+    };
+  }
+  const trades = tradeStatus.trades;
   const ledger = buildTradeLedger(trades);
   const symbols = [...new Set(ledger.openPositions.map(position => position.symbol).filter(Boolean))];
   const needsUsdKrw = ledger.openPositions.some(position => position.currency === 'USD');
@@ -126,6 +137,8 @@ async function buildTradePerformanceReport() {
 
   return {
     generatedAt: new Date().toISOString(),
+    dataAvailable: true,
+    dataSource: tradeStatus.source,
     totalTrades: trades.length,
     buyTrades: trades.filter(trade => trade.side === 'buy').length,
     sellTrades: trades.filter(trade => trade.side === 'sell').length,

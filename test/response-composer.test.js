@@ -7,6 +7,8 @@ test('formatHelp documents approved portfolio mutation commands', () => {
 
   assert.match(help, /\/buy TICKER/);
   assert.match(help, /\/sell TICKER/);
+  assert.match(help, /\/trades/);
+  assert.match(help, /\/trade_performance/);
   assert.match(help, /\/cash 금액/);
   assert.match(help, /\/pending/);
   assert.match(help, /\/recommendations - 리스크 기준/);

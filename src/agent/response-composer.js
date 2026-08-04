@@ -115,6 +115,8 @@ function formatHelp() {
     '/pending - 대기 중인 승인 작업 확인',
     '/recommendations - 리스크 기준을 통과한 매수 검토 후보 확인',
     '/recommendations blocked - 차단/관찰 후보를 참고용으로 확인',
+    '/trades - 최근 승인한 실제 체결 기록',
+    '/trade_performance - 기록된 체결의 실현·미실현 성과',
     '/help - 명령어 보기',
     '',
     '매수/매도/현금 변경은 승인 버튼을 눌러야만 Supabase 포트폴리오에 반영됩니다.',

@@ -391,12 +391,16 @@ POST /telegram/webhook
 /buy TICKER 수량 가격 [이름] [rec=추천ID] [fees=수수료] [fx=원화환율]
 /sell TICKER 수량 가격 [이름] reason=매도사유 [fees=수수료] [taxes=세금] [fx=원화환율]
 /cash 현금잔액
+/trades
+/trade_performance
 /help
 ```
 
 포트폴리오와 경제적 자유 상태를 다루므로 Telegram `chat_id` allowlist를 통과한 채팅만 응답합니다. allowlist는 `TELEGRAM_SECRET_CHAT_ID`, `TELEGRAM_PRIVATE_CHAT_ID`, `TELEGRAM_AGENT_CHAT_ID`, `TELEGRAM_PORTFOLIO_CHAT_ID`, `TELEGRAM_CHAT_ID` 순서로 구성됩니다.
 
 `/buy`, `/sell`, `/cash`는 즉시 반영하지 않고 Supabase `pending_actions`에 초안을 만든 뒤 Telegram inline button의 `기록하기`/`취소` 승인으로 처리합니다. 매수 초안은 같은 종목의 최근 30일 리스크 승인 추천과 열린 매매계획을 자동 연결하고 종목·수량·현금 잔액을 승인 전에 검증합니다. 매도 초안은 보유 수량, 평균단가, 환율을 기준으로 예상 실현손익을 보여주고 `reason=` 값을 거래 기록에 보존합니다. 해외 거래는 저장된 환율 또는 현재 USD/KRW를 사용하며 둘 다 없으면 `fx=` 입력을 요구합니다.
+
+`/trades`는 최근 승인 체결 10건의 원화 반영액, 추천·계획 연결, 매도 실현손익과 사유를 보여줍니다. `/trade_performance`는 기록된 매수·매도 원장을 상계해 열린 수량의 미실현 성과와 매도 실현손익을 분리합니다. 둘 다 증권사 계좌 전체가 아니라 에이전트에 입력한 체결만 대상으로 하며, Supabase 조회 실패를 거래 0건으로 표시하지 않습니다.
 
 Telegram webhook secret token을 쓰려면 아래 값을 설정하고, Bot API `setWebhook`에도 같은 secret token을 넣습니다.
 

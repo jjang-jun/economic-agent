@@ -74,6 +74,7 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - `src/stock-report.js`: market close stock/sector analysis from the daily scored article archive
 - `src/evaluate-recommendations.js`: evaluates logged stock signals after 1/5/20 days
 - `scripts/record-trade.js`: records a manual buy/sell execution separately from AI recommendations
+- `src/agent/trades-view.js`: formats recent approved trade executions and recorded-trade-only realized/unrealized performance for Telegram `/trades` and `/trade_performance`
 - `scripts/trade-performance.js`: evaluates actual trade executions with current quotes and sends a Telegram report when trades exist
 - `scripts/performance-review.js`: writes weekly/monthly recommendation-vs-trade performance reviews
 - `scripts/model-performance-readiness.js`: reads Supabase mirrors and reports model/prompt sample readiness for recommendation performance
