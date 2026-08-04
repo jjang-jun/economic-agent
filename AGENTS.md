@@ -33,6 +33,7 @@ RSS feeds
 - Record a portfolio cash flow: `npm run cashflow:record -- --type deposit --amount 1000000 --occurred-at 2026-08-01T09:00:00+09:00`
 - Review actual trade performance: `npm run trade:performance`
 - Send premarket/intraday timing alerts: `npm run timing:alert -- premarket`, `npm run timing:alert -- intraday`
+- Sync the Telegram bot command menu: `npm run telegram:sync-commands`
 - Detect low-cost pre-news signals: `npm run pre-news:signal`
 - Evaluate stored market anomalies after 1/5 trading sessions: `npm run anomaly:evaluate`
 - Build weekly/monthly performance reviews: `npm run review:weekly`, `npm run review:monthly`

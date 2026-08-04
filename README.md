@@ -373,6 +373,7 @@ Telegram 대화형 Agent는 별도 서버로 실행합니다.
 
 ```bash
 npm run agent:server
+npm run telegram:sync-commands
 ```
 
 현재 endpoint:
@@ -401,6 +402,8 @@ POST /telegram/webhook
 `/buy`, `/sell`, `/cash`는 즉시 반영하지 않고 Supabase `pending_actions`에 초안을 만든 뒤 Telegram inline button의 `기록하기`/`취소` 승인으로 처리합니다. 매수 초안은 같은 종목의 최근 30일 리스크 승인 추천과 열린 매매계획을 자동 연결하고 종목·수량·현금 잔액을 승인 전에 검증합니다. 매도 초안은 보유 수량, 평균단가, 환율을 기준으로 예상 실현손익을 보여주고 `reason=` 값을 거래 기록에 보존합니다. 해외 거래는 저장된 환율 또는 현재 USD/KRW를 사용하며 둘 다 없으면 `fx=` 입력을 요구합니다.
 
 `/trades`는 최근 승인 체결 10건의 원화 반영액, 추천·계획 연결, 매도 실현손익과 사유를 보여줍니다. `/trade_performance`는 기록된 매수·매도 원장을 상계해 열린 수량의 미실현 성과와 매도 실현손익을 분리합니다. 둘 다 증권사 계좌 전체가 아니라 에이전트에 입력한 체결만 대상으로 하며, Supabase 조회 실패를 거래 0건으로 표시하지 않습니다.
+
+Telegram 입력창의 명령 메뉴는 `npm run telegram:sync-commands`로 동기화합니다. 이 명령은 webhook이나 거래 데이터를 변경하지 않고 Bot API의 명령 목록만 갱신합니다.
 
 Telegram webhook secret token을 쓰려면 아래 값을 설정하고, Bot API `setWebhook`에도 같은 secret token을 넣습니다.
 
