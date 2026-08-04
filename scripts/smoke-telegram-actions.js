@@ -55,6 +55,18 @@ async function smokeDraftAndCancel({ chatId, text, expectedIntent }) {
   };
 }
 
+async function smokeReadCommand({ chatId, text, expectedIntent, expectedText }) {
+  const result = await routeTelegramMessage({
+    message_id: messageId(),
+    chat: { id: chatId },
+    text,
+  });
+  assert.equal(result.allowed, true, `${text} should be allowed`);
+  assert.equal(result.intent, expectedIntent, `${text} intent`);
+  assert.match(result.response, expectedText, `${text} response`);
+  return { text, intent: result.intent, status: 'read_ok' };
+}
+
 async function getCurrentCashAmount() {
   const stored = await loadStoredPortfolio();
   const portfolio = stored || normalizePortfolio(loadPortfolio());
@@ -116,6 +128,18 @@ async function runTelegramSmoke() {
   for (const command of commands) {
     results.push(await smokeDraftAndCancel({ chatId, ...command }));
   }
+  results.push(await smokeReadCommand({
+    chatId,
+    text: '/trades',
+    expectedIntent: 'recent_trades',
+    expectedText: /최근 실제 체결 기록/,
+  }));
+  results.push(await smokeReadCommand({
+    chatId,
+    text: '/trade_performance',
+    expectedIntent: 'trade_performance',
+    expectedText: /실제 거래 성과/,
+  }));
 
   console.log(JSON.stringify({
     ok: true,
