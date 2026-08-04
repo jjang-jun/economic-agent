@@ -34,7 +34,11 @@ RSS feeds
 - Review actual trade performance: `npm run trade:performance`
 - Send premarket/intraday timing alerts: `npm run timing:alert -- premarket`, `npm run timing:alert -- intraday`
 - Sync the Telegram bot command menu: `npm run telegram:sync-commands`
+- Validate Discord report channels: `npm run discord:check`; send an explicit smoke using `npm run discord:smoke -- --channel=ops`
+- Preview Discord category/channel/Webhook provisioning: `npm run discord:provision`; apply only with explicit `npm run discord:provision -- --apply`
+- Sync ignored `data/discord-webhooks.json` to the GitHub Actions secret: `npm run discord:sync-secret`
 - Detect low-cost pre-news signals: `npm run pre-news:signal`
+- Collect official tax/real-estate/finance policy changes: `npm run policy:radar`; preview without persistence or Telegram using `npm run policy:radar -- --dry-run`
 - Evaluate stored market anomalies after 1/5 trading sessions: `npm run anomaly:evaluate`
 - Build weekly/monthly performance reviews: `npm run review:weekly`, `npm run review:monthly`
 - Check model/prompt performance sample readiness: `npm run model:performance` after `npm run db:pull`
@@ -59,6 +63,7 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - Optional deploy freshness check: `AGENT_SERVER_URL` or `CLOUD_RUN_SERVICE_URL`, with `EXPECTED_DEPLOY_SHA` when running outside GitHub Actions
 - Optional Supabase resilience tuning: `SUPABASE_REQUEST_TIMEOUT_MS`, `SUPABASE_RETRY_COUNT`, `SUPABASE_RETRY_DELAY_MS`, `SUPABASE_RETRY_MAX_DELAY_MS`, `SUPABASE_CIRCUIT_BREAKER_MS`
 - Optional Telegram network timeout: `TELEGRAM_REQUEST_TIMEOUT_MS`
+- Optional Discord provisioning: `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`; report delivery opt-in: `DISCORD_REPORTS_ENABLED=true`, `DISCORD_WEBHOOKS_JSON_BASE64` or `DISCORD_WEBHOOKS_JSON`, per-channel `DISCORD_WEBHOOK_<CHANNEL_KEY>`, and `DISCORD_REQUEST_TIMEOUT_MS`. Bot tokens and Webhook URLs are secrets and must not be logged or committed.
 - Optional public EOD timeouts: `KRX_REQUEST_TIMEOUT_MS`, `KRX_CIRCUIT_BREAKER_MS`, `DATA_GO_KR_REQUEST_TIMEOUT_MS`
 - Optional private portfolio file: `PORTFOLIO_FILE`, defaulting to ignored `data/portfolio.json`
 - Optional private portfolio env for GitHub Actions: `PORTFOLIO_JSON_BASE64` or `PORTFOLIO_JSON`
@@ -67,6 +72,7 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - Optional anomaly/news timing validation: `PRE_NEWS_EVIDENCE_LOOKBACK_HOURS` (default 12), `PRE_NEWS_FOLLOW_UP_HOURS` (default 24)
 - Optional evidence gates: `STRATEGY_MIN_EVALUATED`, `STRATEGY_MIN_LINKED_TRADES`; `EVALUATION_ALLOW_CURRENT_FALLBACK` should remain false in normal operation.
 - Optional local research worker: `LOCAL_RESEARCH_WORKER_ENABLED=true` enables the monthly review sidecar that calls `scripts/local-backtest-worker.py`; `LOCAL_RESEARCH_WORKER_PROVIDER` and `LOCAL_RESEARCH_MAX_TICKERS` tune provider and ticker count.
+- Optional policy radar tuning: `POLICY_RADAR_BOOTSTRAP_HOURS` controls first-run history suppression and `POLICY_RADAR_MAX_EVENTS` caps one Telegram report.
 - `.env` is private and must not be committed.
 
 ## File Map
@@ -83,6 +89,8 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - `watchlist.domesticMomentum`: domestic leaders monitored for price/volume momentum even when same-day news recommendations are absent
 - `src/sources/`: RSS, DART, BOK, FRED integrations
 - `src/sources/dart-api.js`: OpenDART disclosure fetcher, optional `DART_API_KEY`
+- `src/sources/policy-fetcher.js`, `src/utils/policy-classifier.js`: official policy collector and deterministic tax/real-estate/loan/pension/capital-market stage classifier
+- `src/jobs/run-policy-radar.js`: isolated policy radar job with first-run baseline suppression and delivery retry state
 - `src/sources/yahoo-finance.js`: Yahoo chart quote fetcher for recommendation performance tracking and 5/20 day trend fields
 - `src/sources/naver-investor.js`: Naver Finance KOSPI investor net-buy flow parser
 - `src/filters/keyword-filter.js`: first-pass keyword gate
@@ -92,6 +100,8 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - `src/filters/relevance-matcher.js`: personal relevance matching
 - `src/analysis/`: AI prompt builders for digest/report
 - `src/notify/telegram.js`: Telegram formatting and sending
+- `src/notify/discord.js`, `src/notify/multi-channel.js`, `src/config/discord-channels.js`: read-only Discord webhook transport, opt-in Telegram parallel delivery with failure isolation, safe channel routing, message conversion/splitting, and configuration inspection
+- `scripts/provision-discord.js`: dry-run-by-default Discord category/channel/Webhook provisioner; aligns channels under purpose-specific categories, never deletes them, and writes secrets only to ignored local data
 - `src/utils/`: config, AI client, buffers, seen-article cache, indicators, daily summaries
 - `src/utils/ai-budget.js`: trims AI prompt inputs to control token use
 - `src/utils/urgent-alert-policy.js`: allows immediate alerts only for systemic events or fatal disclosures tied to holdings/`watchlist.criticalAlerts`
@@ -146,9 +156,10 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - `scripts/push-supabase.js`, `scripts/pull-supabase.js`: Supabase CLI push and local history mirror scripts
 - `scripts/import-local-history.js`: uploads existing ignored `data/*.json` history into Supabase after schema creation
 - `cloudbuild.yaml`: builds and deploys the Cloud Run service while keeping the image tag, revision label, and runtime `COMMIT_SHA` aligned
-- `.github/workflows/`: collector, five scheduled digest workflows, stock report, timing alert, pre-news signal, portfolio snapshot, recommendation evaluation, collector/price ops checks, and trade performance schedules. Collector ops runs at 12:05 and 23:50 KST to catch daytime collection gaps.
+- `.github/workflows/`: collector, five scheduled digest workflows, stock report, timing alert, pre-news signal, policy radar, portfolio snapshot, recommendation evaluation, collector/price ops checks, trade performance schedules, and a manual Discord infrastructure smoke. Policy radar runs at 10:10 and 18:10 KST on weekdays; collector ops runs at 12:05 and 23:50 KST to catch daytime collection gaps.
 - `docs/README.md`: docs index and folder roles
 - `docs/AGENT_HARNESS.md`: Codex/sub-agent long-running task contract, verification loop, and documentation cleanup rules
+- `docs/DISCORD_SETUP.md`: private Discord report channels, Webhook secret setup, local check, and Actions smoke procedure
 - `docs/PROGRESS.md`: human-readable development progress and current operating context
 - `docs/portfolio.example.json`: private `data/portfolio.json` template
 - `docs/trade-executions.example.json`: private `data/trades/trade-executions.json` template
@@ -161,6 +172,7 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - `data/recommendations/recommendations.json` is a local mirror/fallback for stock signals and evaluations. Supabase is the primary recommendation history store when configured.
 - `data/trades/trade-executions.json` is a local mirror for actual manual trade executions. Keep it separate from recommendations.
 - `data/portfolio-snapshots/YYYY-MM-DD.json` stores current-price portfolio valuation snapshots.
+- `data/policy-radar-state.json` is the ignored local fallback for official policy documents and last-notified content hashes; Supabase `policy_events`/`policy_event_versions` are primary when configured.
 - Supabase stores the same long-term history in Postgres when configured, including `investor_flows` for daily foreign/institution KOSPI net-buy data and `market_anomaly_signals` for anomaly/article timing plus market-wide flow-context validation.
 - `research_candidates` and `research_candidate_evaluations` store shadow research outcomes only; never treat them as approved recommendations or tradeable signals.
 - `data/supabase/*.json` and `data/economic-agent.db` are generated by `npm run db:pull` for local filesystem queries.

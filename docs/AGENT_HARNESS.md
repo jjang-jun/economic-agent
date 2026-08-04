@@ -19,6 +19,7 @@
 - `docs/PROGRESS.md`: 현재 운영 상태, 최근 변경, 다음 점검 항목
 - `docs/AGENT_PLATFORM.md`: Telegram Agent Server와 배포 구조
 - `docs/TELEGRAM_AGENT_DEPLOY.md`: webhook/Cloud Run 배포 절차
+- `docs/DISCORD_SETUP.md`: Discord 읽기 전용 리포트 채널과 Webhook/Actions 설정 절차
 - `docs/AGENT_HARNESS.md`: 장기 작업 계약, 검증 루프, handoff 규칙
 
 새로운 장기 지식은 대화에만 남기지 말고 위 문서 중 하나에 연결한다.

@@ -1,5 +1,9 @@
 name: Freedom Report (경제적 자유 상태)
 
+env:
+  DISCORD_REPORTS_ENABLED: "true"
+  DISCORD_WEBHOOKS_JSON_BASE64: ${{ secrets.DISCORD_WEBHOOKS_JSON_BASE64 }}
+
 permissions:
   contents: read
 

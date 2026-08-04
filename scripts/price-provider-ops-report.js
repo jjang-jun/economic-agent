@@ -5,6 +5,7 @@ const {
   buildPriceSourceQualityAnomalies,
 } = require('../src/utils/price-source-quality');
 const { sendTelegramMessage } = require('../src/notify/telegram');
+const { sendDiscordCopy } = require('../src/notify/multi-channel');
 
 function getKSTClock(now = new Date()) {
   const formatter = new Intl.DateTimeFormat('en-CA', {
@@ -149,7 +150,9 @@ async function main() {
     return;
   }
 
-  await sendTelegramMessage(formatSummary(summary, anomalies), { channel: 'private' });
+  const message = formatSummary(summary, anomalies);
+  await sendTelegramMessage(message, { channel: 'private' });
+  await sendDiscordCopy(message, 'ops');
   console.log('[price-provider-ops] Telegram 전송 완료');
 }
 

@@ -1,5 +1,9 @@
 name: Digest 오전장 점검 (11:50 KST)
 
+env:
+  DISCORD_REPORTS_ENABLED: "true"
+  DISCORD_WEBHOOKS_JSON_BASE64: ${{ secrets.DISCORD_WEBHOOKS_JSON_BASE64 }}
+
 permissions:
   contents: read
 

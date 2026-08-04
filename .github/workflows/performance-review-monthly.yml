@@ -1,5 +1,9 @@
 name: Performance Review Monthly (월간 성과 리뷰)
 
+env:
+  DISCORD_REPORTS_ENABLED: "true"
+  DISCORD_WEBHOOKS_JSON_BASE64: ${{ secrets.DISCORD_WEBHOOKS_JSON_BASE64 }}
+
 permissions:
   contents: read
 

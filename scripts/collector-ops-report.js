@@ -5,6 +5,7 @@ const {
   buildCollectorOpsAnomalies,
 } = require('../src/utils/collector-ops');
 const { sendTelegramMessage } = require('../src/notify/telegram');
+const { sendDiscordCopy } = require('../src/notify/multi-channel');
 
 function parseArgs(argv = process.argv.slice(2), env = process.env) {
   const options = {
@@ -106,10 +107,12 @@ async function main() {
     return;
   }
 
-  await sendTelegramMessage(formatSummary(summary, anomalies), {
+  const message = formatSummary(summary, anomalies);
+  await sendTelegramMessage(message, {
     channel: 'private',
     requireDelivery: true,
   });
+  await sendDiscordCopy(message, 'ops');
 }
 
 if (require.main === module) {

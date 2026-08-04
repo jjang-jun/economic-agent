@@ -32,6 +32,8 @@ const TABLES = [
   'source_cursors',
   'alert_events',
   'job_locks',
+  'policy_events',
+  'policy_event_versions',
 ];
 
 function assertConfig() {

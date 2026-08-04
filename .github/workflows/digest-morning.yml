@@ -1,5 +1,9 @@
 name: Digest 개장 전 브리핑 (08:20 KST)
 
+env:
+  DISCORD_REPORTS_ENABLED: "true"
+  DISCORD_WEBHOOKS_JSON_BASE64: ${{ secrets.DISCORD_WEBHOOKS_JSON_BASE64 }}
+
 permissions:
   contents: read
 

@@ -1,14 +1,14 @@
 # Agent Platform Direction
 
-Economic Agent의 대화 매개체는 Telegram을 유지하고, 실제 대화형 Agent 실행 플랫폼은 항상 요청을 받을 수 있는 Node.js 백엔드와 Supabase로 분리한다.
+Economic Agent의 정기 리포트 허브는 Discord로 점진 전환하고, Telegram은 긴급 알림과 매매 입력·승인 UI로 유지한다. 실제 대화형 Agent 실행 플랫폼은 항상 요청을 받을 수 있는 Node.js 백엔드와 Supabase로 분리한다.
 
 ## 최종 구조
 
 ```text
 사용자
-  -> Telegram Bot
-  -> Agent API Server
-  -> Supabase/Postgres
+  -> Discord 채널: 정책·행동·포트폴리오·성과·운영 리포트
+  -> Telegram Bot: 긴급 알림·매매 입력·승인
+  -> Agent API Server -> Supabase/Postgres
   -> 뉴스, 공시, 시장 데이터, 포트폴리오, 추천, 실제 거래 기록
 ```
 
@@ -22,6 +22,7 @@ GitHub Actions
   - 추천 성과 평가
   - 포트폴리오 스냅샷
   - 주간/월간 리뷰
+  - Discord 채널별 Webhook 전달
 
 Agent API Server
   - Telegram webhook 수신
@@ -32,6 +33,8 @@ Agent API Server
 ```
 
 GitHub Actions 단독으로는 사용자의 즉시 질문을 받기 어렵다. 배치형 루틴은 Actions가 맡고, 대화형 런타임은 별도 서버가 맡는다.
+
+Discord 1단계는 Incoming Webhook 기반 읽기 전용 전달이다. 채널과 Secret 구성은 `docs/DISCORD_SETUP.md`를 따르며, 양방향 Slash command는 Interaction 서명 검증을 포함한 후속 단계로 분리한다.
 
 ## 권장 실행 플랫폼
 
@@ -50,11 +53,25 @@ GitHub Actions 단독으로는 사용자의 즉시 질문을 받기 어렵다. �
 비추천:
 - GitHub Actions 단독 운영. 스케줄 작업에는 좋지만 실시간 대화에는 부적합하다.
 
-## Telegram 역할
+## Discord와 Telegram 역할
 
-Telegram은 알림 채널에서 대화형 투자 비서 UI로 확장한다.
+Discord는 긴 리포트와 분야별 기록을 보관하고, Telegram은 즉시 확인과 변경 승인을 담당한다.
 
-채널은 두 개로 분리한다.
+```text
+Discord
+  - 정책·세금·부동산
+  - 일일 행동·포트폴리오
+  - 선행신호 연구·성과 리뷰
+  - 운영 점검
+
+Telegram
+  - 시장 스트레스·긴급 공시
+  - 포트폴리오 조회
+  - 매수/매도 기록 초안
+  - 승인/취소 버튼
+```
+
+Telegram 채팅은 두 개로 분리한다.
 
 ```text
 TELEGRAM_CHAT_ID
@@ -164,7 +181,8 @@ Risk Engine 역할:
 ```text
 Supabase = 원본
 data/portfolio.json = 로컬 캐시
-Telegram = 입력/조회 UI
+Discord = 읽기 전용 리포트 허브
+Telegram = 긴급 알림·입력·승인 UI
 Agent Server = 계산/검증
 GitHub Actions = 정기 리포트
 ```

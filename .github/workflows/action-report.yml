@@ -1,5 +1,9 @@
 name: Action Report (일일 행동 리포트)
 
+env:
+  DISCORD_REPORTS_ENABLED: "true"
+  DISCORD_WEBHOOKS_JSON_BASE64: ${{ secrets.DISCORD_WEBHOOKS_JSON_BASE64 }}
+
 permissions:
   contents: read
 

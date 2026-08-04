@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const { sendTelegramMessage } = require('../src/notify/telegram');
+const { sendDiscordCopy } = require('../src/notify/multi-channel');
 
 function githubRunUrl(env = process.env) {
   if (env.GITHUB_SERVER_URL && env.GITHUB_REPOSITORY && env.GITHUB_RUN_ID) {
@@ -45,6 +46,7 @@ async function main() {
     channel: 'private',
     requireDelivery: true,
   });
+  await sendDiscordCopy(message, 'ops');
   console.log('[workflow-failure] private Telegram notification sent');
 }
 

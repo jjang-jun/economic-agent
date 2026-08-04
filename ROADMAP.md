@@ -129,17 +129,17 @@ freedomGoal: {
 
 ## 실행 플랫폼 방향
 
-대화 매개체는 Telegram을 유지한다. 다만 실시간 질의응답과 포트폴리오 변경 승인을 처리하려면 GitHub Actions가 아니라 항상 요청을 받을 수 있는 Node.js Agent Server가 필요하다.
+리포트 허브는 채널 구분이 쉬운 Discord로 점진 전환하고, Telegram은 긴급 알림과 매매 입력·승인을 유지한다. 실시간 질의응답과 포트폴리오 변경 승인은 GitHub Actions가 아니라 항상 요청을 받을 수 있는 Node.js Agent Server가 담당한다.
 
 ```text
-Telegram Bot
-  -> Node.js Agent API Server
-  -> Supabase/Postgres
+Discord report channels <- GitHub Actions / Agent Server
+Telegram trade approval -> Node.js Agent API Server -> Supabase/Postgres
 ```
 
 역할 분리:
 - GitHub Actions: 뉴스 수집, 다이제스트, 장마감 리포트, 성과평가, 주간/월간 리뷰
 - Agent Server: Telegram webhook, 포트폴리오 조회, 매수/매도 기록 초안, 승인 버튼, 리스크 질의
+- Discord Webhooks: 정책·행동·포트폴리오·선행신호·성과·운영 리포트의 채널별 읽기 전용 전달
 - Python worker: 로컬 백테스트, pykrx/FinanceDataReader 기반 OHLCV 조회, 대량 데이터 분석
 - Supabase: 기사, 추천, 실제 거래, 포트폴리오, 경제적 자유 목표, 대화 로그, pending action 기준 저장소
 - 로컬 JSON/SQLite: 분석 캐시와 백업
@@ -172,6 +172,9 @@ Codex 작업 위임 원칙:
 - [x] Telegram 다이제스트·장 마감 리포트에 결정론적 자금 흐름 섹션 추가. KOSPI 투자자 순매수와 ETF 가격·거래량 프록시를 분리 표시
 - [x] 가격·거래량 이상징후에 감지 시점과 같은 거래일 후속 KOSPI 수급 스냅샷 연결. 전 거래일·해외 종목·시장 전체 수급의 한계를 명시
 - [x] 가격·거래량 이상징후의 공식 EOD 1·5거래일 지속성, 기사 선후 시차, 요인 조합을 연구 전용으로 평가. 5일 표본 30건 전에는 추천 규칙 반영 보류
+- [x] 재정경제부·금융위원회·국토교통부 공식 문서를 투자 뉴스와 분리한 정책·자산 레이더 MVP. 세금·부동산·대출·연금·자본시장 분류와 정부안/정정/입법예고/시행 상태를 기록
+- [ ] 국가법령정보·국회 의안정보를 연결해 정부안 → 국회 제출 → 통과 → 공포 → 시행을 동일 정책 사건으로 추적
+- [ ] 관심 지역 실거래가·R-ONE 가격/거래 통계를 정책 레이더와 결합하고 개인 주택·대출 조건 기반 영향 계산 추가
 
 ## Phase 2: 히스토리 저장소
 - [x] Supabase/Postgres 도입
@@ -182,6 +185,7 @@ Codex 작업 위임 원칙:
 - [x] 가격 사용 이력 `price_snapshots` 저장
 - [x] 브리핑/리포트 입력 데이터도 DB에서 조회 가능하게 변경
 - [x] `market_anomaly_signals`에 감지 당시 근거 상태와 후속 첫 관련 기사 시각 저장
+- [x] `policy_events`, `policy_event_versions`에 공식 정책 원문과 변경 해시·알림 완료 상태 저장
 
 ## Phase 2.5: 가격 데이터 엔진
 - [x] 한국 주식 Yahoo 의존 축소
@@ -300,6 +304,11 @@ Codex 작업 위임 원칙:
 - [x] Render Blueprint와 5분 cron guard 추가
 - [x] 뉴스 수집 endpoint 수동 검증 스크립트 추가
 - [x] Telegram 승인 흐름 smoke script와 정기 점검 workflow 추가
+- [x] Discord 9개 리포트 채널의 Webhook 전송·비밀값 지도·수동 smoke 인프라 추가
+- [x] Bot API 기반 Discord 카테고리·채널·Webhook 멱등 프로비저너 추가. 핵심 신호·자산 관리·정책 인텔리전스·운영 구조로 정렬하며 기본 dry-run, 기존 리소스 삭제 금지
+- [x] 긴급·브리핑·행동·포트폴리오·정책·선행신호·성과·운영 리포트의 Discord 병행 전송 적용
+- [ ] 1~2주 누락·중복·가독성 비교 후 Telegram 정기 읽기 전용 리포트 축소 여부 결정
+- [ ] Discord Slash command와 Interaction 서명 검증을 구현한 뒤 조회 명령 이전 여부 결정
 
 ## 현재 가장 중요한 다음 작업
 1. 2026-07-29 `Restart project`로 복구한 Supabase가 안정적으로 유지되는지 확인한다. `PGRST000/PGRST002`와 내부 `localhost:5432 connection refused`가 같이 재발하면 SQL/Data API 설정을 바꾸지 말고, 비정상 `System` disk 사용량과 함께 티켓 `SU-419701`로 managed compute/disk 복구를 요청한다. 복구 후 `Telegram 승인 흐름 점검`과 `npm run db:pull`을 다시 실행한다.

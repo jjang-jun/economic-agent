@@ -17,6 +17,8 @@
 - **감성 강도 표시** — 강한 호재/호재/약한 호재/중립/약한 악재/악재/강한 악재 7단계
 - **섹터 자동 분류** — 반도체, 에너지·원자재, 금융·통화, 부동산, 거시경제, 테크, 무역·지정학, 공시·기업이벤트
 - **DART 공시 수집** — 주요 공시를 뉴스와 함께 스코어링하여 기업 이벤트 반영
+- **정책·자산 레이더** — 재정경제부·금융위원회·국토교통부 공식 발표를 세금·부동산·대출·연금·자본시장으로 분류하고 정부안/정정/입법예고/시행 상태와 행동 주의를 별도 Telegram으로 전달
+- **Discord 리포트 인프라** — 긴급·행동·포트폴리오·정책·선행신호·성과·운영을 채널별 Webhook으로 분리하고 Telegram 매매 승인과 독립적으로 점검
 - **프리마켓 스냅샷** — 개장 전/미국장 오픈 브리핑에 관심 지수·종목·원자재 가격 반영
 - **시장 레짐 추세 점수** — KOSPI/KOSDAQ/S&P/Nasdaq/반도체 5일·20일 흐름으로 RISK_ON/OFF 보강
 - **글로벌 ETF 자금이동 프록시** — 주식·지역·섹터·채권·금·달러 ETF 19개의 가격·거래량·상대강도로 위험선호/회피를 교차점검
@@ -53,6 +55,10 @@
 
 평일 하루 5회 ─ AI 다이제스트
   버퍼 기사 수집 → AI 요약 → Telegram 발송 성공 후 버퍼 비움
+
+평일 10:10·18:10 ─ 정책·자산 레이더 (AI 비용 없음)
+  정부 공식 RSS/보도자료 → 정책 분야·법적 단계 분류 → 변경 이력 저장
+  → 정부안은 행동 보류, 공포·시행은 적용일 점검 → private Telegram
 
 하루 1회 ─ 종목 분석 (AI 1회/일)
   일별 기사 + 글로벌 ETF 가격·거래량 자금이동 프록시 → AI 섹터/종목 분석 → Telegram 발송
@@ -197,7 +203,8 @@ Telegram 채팅창에서 명령어를 실제로 쓰기 위한 배포와 webhook 
 - `data/portfolio-snapshots/YYYY-MM-DD.json`: 보유 종목 현재가/평가손익 스냅샷
 - `data/action-reports/YYYY-MM-DD.json`: 신규 매수/관찰/보유/축소/매도 후보 일일 행동 리포트
 - `data/freedom/freedom-status.json`: 경제적 자유 목표와 현재 달성률
-- Supabase tables: `articles`, `daily_summaries`, `stock_reports`, `recommendations`, `recommendation_evaluations`, `research_candidates`, `research_candidate_evaluations`, `market_anomaly_signals`, `trade_executions`, `portfolio_cash_flows`, `portfolio_snapshots`, `market_snapshots`, `price_snapshots`, `investor_flows`, `decision_contexts`
+- `data/policy-radar-state.json`: Supabase 미설정 시 공식 정책 문서와 마지막 Telegram 통지 해시를 보존하는 로컬 fallback
+- Supabase tables: `articles`, `daily_summaries`, `stock_reports`, `recommendations`, `recommendation_evaluations`, `research_candidates`, `research_candidate_evaluations`, `market_anomaly_signals`, `trade_executions`, `portfolio_cash_flows`, `portfolio_snapshots`, `market_snapshots`, `price_snapshots`, `investor_flows`, `decision_contexts`, `policy_events`, `policy_event_versions`
 - Agent/Supabase tables: `financial_freedom_goals`, `portfolio_accounts`, `positions`, `risk_policy`, `conversation_messages`, `pending_actions`
 - `data/supabase/*.json`: Supabase 데이터를 내려받은 로컬 JSON 미러
 - `data/economic-agent.db`: Supabase 데이터를 내려받은 로컬 SQLite 미러
@@ -242,6 +249,7 @@ npm run review:weekly
 npm run review:monthly
 npm run agent:harness-check
 npm run security:audit
+npm run policy:radar -- --dry-run
 ```
 
 `action:report`의 신규/관찰 후보는 추천 당시 기준가와 최신 현재가를 함께 표시합니다. 현재가는 리포트 생성 시점에 다시 조회하되, 조회 실패 시에도 추천 당시 기준가와 손절 기준으로 리포트 생성을 계속합니다. 최근 뉴스 기반 추천이 없더라도 `watchlist.domesticMomentum`/`watchlist.globalMomentum` 대표주에서 20일 고점 근접, 거래량 증가, 상대강도 개선, 당일 급등이 포착되면 `가격 모멘텀 관찰` 섹션에 별도 표시합니다. 이미 보유 중인 급등 종목은 신규 추천에서 숨기지 않고 `추가매수/수익보호 점검`으로 분리해 눌림 대기, 추가매수 한도, 일부 이익 잠금 여부를 보여줍니다.
@@ -487,6 +495,13 @@ SUPABASE_DB_PASSWORD=...
 # MARKET_STRESS_CIRCUIT_BREAKER_PCT=-8
 # PRE_NEWS_EVIDENCE_LOOKBACK_HOURS=12
 # PRE_NEWS_FOLLOW_UP_HOURS=24
+# POLICY_RADAR_BOOTSTRAP_HOURS=72
+# POLICY_RADAR_MAX_EVENTS=10
+# DISCORD_BOT_TOKEN=...            # 자동 채널/Webhook 구축용, 커밋 금지
+# DISCORD_GUILD_ID=...             # Discord 서버 ID
+# DISCORD_REPORTS_ENABLED=true     # 정기 리포트 Discord 병행 전송
+# DISCORD_WEBHOOKS_JSON_BASE64=... # 채널별 Webhook JSON의 base64, docs/DISCORD_SETUP.md 참고
+# DISCORD_REQUEST_TIMEOUT_MS=10000
 # STRATEGY_MIN_EVALUATED=30
 # STRATEGY_MIN_LINKED_TRADES=10
 ```
@@ -512,11 +527,30 @@ npm run evaluate
 # 저장된 가격·거래량 이상징후만 수동 재평가 (공식 EOD 1·5거래일)
 npm run anomaly:evaluate
 
+# 공식 세금·부동산·금융정책 수집 및 private Telegram 전송
+npm run policy:radar
+
+# 저장·전송 없이 공식 정책 수집/분류 결과 미리보기
+npm run policy:radar -- --dry-run
+
+# Discord 채널 설정 확인 / #시스템-점검 실제 smoke
+npm run discord:check
+npm run discord:smoke -- --channel=ops
+
+# Bot API 구조 확인 / 목적별 카테고리·누락 채널·Webhook 실제 반영
+npm run discord:provision
+npm run discord:provision -- --apply
+
+# ignored data/discord-webhooks.json을 GitHub Actions Secret으로 동기화
+npm run discord:sync-secret
+
 # Supabase 스키마 적용 / 로컬 미러 동기화
 npm run db:push
 npm run db:import-local
 npm run db:pull
 ```
+
+정책 레이더는 공식 소스를 병렬로 확인하며, 한 기관의 RSS가 일시적으로 실패해도 다른 기관 결과는 계속 처리합니다. 실패한 기관은 리포트에 `미확인`으로 표시하고 다음 실행에서 재시도하며, 정부안·추진안은 확정 법률처럼 행동 신호로 승격하지 않습니다.
 
 ## AI 제공자 지원
 
@@ -571,11 +605,13 @@ AI 비용을 줄이기 위해 전체 히스토리를 매번 프롬프트에 넣�
 | `freedom-report.yml` | 금요일 16:20 KST | 경제적 자유 목표 달성률과 목표 속도 점검 |
 | `action-report.yml` | 평일 16:25 KST | 신규 매수/관찰/보유/축소/매도 후보 분리 |
 | `pre-news-signal.yml` | 평일 09:05~15:20 KST, 15분 간격 | 가격·거래량 이상징후 감지와 기사·공시 선후관계 기록 |
+| `policy-radar.yml` | 평일 10:10, 18:10 KST | 공식 세금·부동산·대출·연금·자본시장 정책의 신규/변경 상태를 private Telegram으로 전달 |
 | `evaluate-recommendations.yml` | 평일 17:30 KST | 추천 성과 평가 |
 | `trade-performance.yml` | 금요일 17:40 KST | 실제 거래 성과 평가 |
 | `performance-review-weekly.yml` | 금요일 18:10 KST | 주간 성과 리뷰 |
 | `performance-review-monthly.yml` | 매월 1일 18:20 KST | 월간 성과 리뷰 |
 | `telegram-smoke-actions.yml` | 평일 08:10 KST | Telegram 승인 버튼 흐름 점검. Supabase 장애를 성공으로 스킵하지 않고 workflow 실패로 표시 |
+| `discord-smoke.yml` | 수동 실행 | Discord 채널 Webhook 설정 검증 및 지정 채널 smoke 전송 |
 | `collector-ops-report.yml` | 평일 12:05, 23:50 KST | 수집기 운영 상태 점검. 마지막 성공 시각이 오래되면 수집 공백으로 경고 |
 | `price-provider-ops-report.yml` | 평일 23:55 KST | 가격 provider 품질 점검. GitHub Actions가 크게 지연되면 새벽 텔레그램 전송은 건너뜀 |
 | `deploy-freshness.yml` | 평일 09:20 KST | 서버 `/version`의 배포 커밋과 GitHub 최신 커밋 비교 |
@@ -589,6 +625,8 @@ AI 비용을 줄이기 위해 전체 히스토리를 매번 프롬프트에 넣�
 GitHub 저장소의 **Settings > Secrets and variables > Actions**에 환경 변수를 등록하세요. DART 공시 수집을 쓰려면 `DART_API_KEY`도 Secret에 추가합니다.
 
 기존 공유방을 계속 쓰되 포트폴리오·거래·경제적 자유 리포트를 별도 방으로 보내려면 `TELEGRAM_PRIVATE_CHAT_ID` 또는 `TELEGRAM_SECRET_CHAT_ID`를 Secret에 추가합니다. 설정하지 않으면 민감 리포트도 기존 `TELEGRAM_CHAT_ID`로 fallback됩니다.
+
+Discord 채널 분리 설정은 [`docs/DISCORD_SETUP.md`](docs/DISCORD_SETUP.md)를 따릅니다. 1단계는 읽기 전용 리포트 인프라이며 기존 Telegram 긴급 알림과 매매 입력·승인은 유지합니다.
 
 Supabase 저장을 GitHub Actions에서도 활성화하려면 `SUPABASE_PROJECT_URL`, `SUPABASE_PUBLISHABLE_KEY`를 Secret에 추가합니다. `SUPABASE_DB_PASSWORD`는 로컬에서 `npm run db:push`를 실행할 때만 필요합니다.
 

@@ -1,4 +1,4 @@
-name: Collector Ops Report (수집기 운영 점검)
+name: Policy & Asset Radar (세금·부동산·금융정책)
 
 env:
   DISCORD_REPORTS_ENABLED: "true"
@@ -9,18 +9,16 @@ permissions:
 
 on:
   schedule:
-    # KST 12:05 = UTC 03:05. 장중 수집 공백을 당일에 감지한다.
-    - cron: '5 3 * * 1-5'
-    # KST 23:50 = UTC 14:50
-    - cron: '50 14 * * 1-5'
+    # KST 10:10, 18:10 = UTC 01:10, 09:10 (weekdays)
+    - cron: '10 1,9 * * 1-5'
   workflow_dispatch:
 
 concurrency:
-  group: economic-agent-collector-ops-report
+  group: economic-agent-policy-radar
   cancel-in-progress: false
 
 jobs:
-  report:
+  policy-radar:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -28,26 +26,32 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
+
+      - uses: actions/cache@v5
+        with:
+          path: data/
+          key: policy-radar-${{ github.run_id }}
+          restore-keys: policy-radar-
+
       - run: npm ci
-      - name: Build and send collector ops report
-        run: npm run collector:ops-report
+
+      - name: Collect and send official policy changes
+        run: npm run policy:radar
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TELEGRAM_PRIVATE_CHAT_ID: ${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}
           TELEGRAM_SECRET_CHAT_ID: ${{ secrets.TELEGRAM_SECRET_CHAT_ID }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          SUPABASE_REQUEST_TIMEOUT_MS: 10000
-          TELEGRAM_REQUEST_TIMEOUT_MS: 10000
+
       - name: Notify private chat on failure
         if: failure()
-        run: npm run notify:workflow-failure -- "Collector Ops Report (수집기 운영 점검)" "Build and send collector ops report"
+        run: npm run notify:workflow-failure -- "Policy & Asset Radar (세금·부동산·금융정책)" "Collect and send official policy changes"
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          TELEGRAM_PRIVATE_CHAT_ID: ${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}
           TELEGRAM_SECRET_CHAT_ID: ${{ secrets.TELEGRAM_SECRET_CHAT_ID }}
-          TELEGRAM_REQUEST_TIMEOUT_MS: 10000
+          TELEGRAM_PRIVATE_CHAT_ID: ${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

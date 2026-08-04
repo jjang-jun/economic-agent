@@ -6,5 +6,6 @@
 - `AGENT_PLATFORM.md`: Telegram Agent Server, Supabase, GitHub Actions 역할 분리
 - `PROGRESS.md`: 현재 개발 상태, 운영 체크리스트, 다음 작업
 - `TELEGRAM_AGENT_DEPLOY.md`: Telegram webhook과 Cloud Run/Scheduler 배포 절차
+- `DISCORD_SETUP.md`: Discord 읽기 전용 리포트 채널과 Webhook/Actions Secret 설정 절차
 
 이전 `memory/`와 `CLAUDE.md`는 현재 운영/AI 참조 기준에서 제외되어 삭제했습니다. 과거 내용은 Git 히스토리에서 확인합니다.

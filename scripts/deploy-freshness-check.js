@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const { sendTelegramMessage } = require('../src/notify/telegram');
+const { sendDiscordCopy } = require('../src/notify/multi-channel');
 
 function parseArgs(argv = process.argv.slice(2), env = process.env) {
   const options = {
@@ -127,6 +128,7 @@ async function main() {
   if (!result.ok) {
     if (!options.noTelegram) {
       await sendTelegramMessage(message, { channel: 'private' });
+      await sendDiscordCopy(message, 'ops');
     }
     process.exit(1);
   }
