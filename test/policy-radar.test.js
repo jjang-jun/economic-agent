@@ -9,7 +9,7 @@ const {
   formatPolicyRadarReport,
   splitPolicyRadarReports,
   sendPolicyRadarReport,
-} = require('../src/notify/policy-telegram');
+} = require('../src/notify/policy-report');
 
 function event(overrides = {}) {
   return {
@@ -54,7 +54,7 @@ test('already notified content is quiet while changed content retries', () => {
   assert.deepEqual(selectPolicyNotifications([changed], existing).notify.map(item => item.id), ['policy:1']);
 });
 
-test('policy Telegram report exposes stage, action, official source, and partial failures', () => {
+test('policy report exposes stage, action, official source, and partial failures', () => {
   const message = formatPolicyRadarReport({
     events: [event({ title: 'ISA <개편안>' })],
     successfulSourceCount: 2,
@@ -68,7 +68,7 @@ test('policy Telegram report exposes stage, action, official source, and partial
   assert.doesNotMatch(message, /\n{3,}/);
 });
 
-test('long policy reports are split below Telegram limits without dropping events', async () => {
+test('long policy reports are split below Discord limits without dropping events', async () => {
   const events = Array.from({ length: 7 }, (_, index) => event({
     id: `policy:${index}`,
     title: `정책 ${index} ${'상세'.repeat(30)}`,
@@ -99,8 +99,7 @@ test('policy report routes tax and real-estate events to separate Discord channe
     successfulSourceCount: 2,
     sourceResults: [],
   }, {
-    sender: async () => {},
-    discordSender: async (message, channel) => discord.push({ message, channel }),
+    sender: async (message, channel) => discord.push({ message, channel }),
   });
   assert.deepEqual(discord.map(item => item.channel), ['policy_tax', 'policy_real_estate']);
   assert.match(discord[0].message, /ISA 세제개편안/);

@@ -1,0 +1,76 @@
+name: Discord Worker Portability
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/discord-agent-worker.js'
+      - 'src/agent/discord-mention-router.js'
+      - 'src/agent/natural-action-parser.js'
+      - 'src/config/discord-access.js'
+      - 'test/discord-mention-router.test.js'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/discord-worker-portability.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'scripts/discord-agent-worker.js'
+      - 'src/agent/discord-mention-router.js'
+      - 'src/agent/natural-action-parser.js'
+      - 'src/config/discord-access.js'
+      - 'test/discord-mention-router.test.js'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/discord-worker-portability.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: economic-agent-discord-worker-portability-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  portability:
+    name: Node 22 on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - windows-latest
+          - macos-latest
+          - ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Check portable Node runtime
+        run: npm run discord:agent-worker:check
+      - name: Test mention worker contract
+        run: node --test test/discord-mention-router.test.js
+
+  notify:
+    needs: portability
+    if: failure() && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Notify Discord on failure
+        run: npm run notify:workflow-failure -- "Discord Worker Portability" "Node 22 Windows/macOS/Linux matrix"
+        env:
+          GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

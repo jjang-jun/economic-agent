@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { formatPerformanceReview } = require('../src/notify/telegram');
+const { formatPerformanceReview } = require('../src/notify/reports');
 
 test('formatPerformanceReview explains recommendation and execution metrics in plain Korean', () => {
   const message = formatPerformanceReview({

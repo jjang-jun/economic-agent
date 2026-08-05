@@ -7,22 +7,22 @@ function readWorkflow(name) {
   return fs.readFileSync(path.join(__dirname, '..', '.github', 'workflows', name), 'utf8');
 }
 
-test('weekly performance review workflow notifies private Telegram on failure', () => {
+test('weekly performance review workflow notifies Discord on failure', () => {
   const workflow = readWorkflow('performance-review-weekly.yml');
 
   assert.match(workflow, /name: Build and send weekly performance review/);
-  assert.match(workflow, /name: Notify private chat on failure/);
+  assert.match(workflow, /name: Notify Discord on failure/);
   assert.match(workflow, /if: failure\(\)/);
   assert.match(workflow, /npm run notify:workflow-failure -- "Performance Review Weekly \(주간 성과 리뷰\)" "Build and send weekly performance review"/);
   assert.match(workflow, /GITHUB_RUN_URL:/);
   assert.doesNotMatch(workflow, /PORTFOLIO_JSON_BASE64:/);
 });
 
-test('monthly performance review workflow notifies private Telegram on failure', () => {
+test('monthly performance review workflow notifies Discord on failure', () => {
   const workflow = readWorkflow('performance-review-monthly.yml');
 
   assert.match(workflow, /name: Build and send monthly performance review/);
-  assert.match(workflow, /name: Notify private chat on failure/);
+  assert.match(workflow, /name: Notify Discord on failure/);
   assert.match(workflow, /if: failure\(\)/);
   assert.match(workflow, /npm run notify:workflow-failure -- "Performance Review Monthly \(월간 성과 리뷰\)" "Build and send monthly performance review"/);
   assert.match(workflow, /GITHUB_RUN_URL:/);

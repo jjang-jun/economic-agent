@@ -4,19 +4,18 @@ const {
   buildCollectorOpsSummary,
   buildCollectorOpsAnomalies,
 } = require('../src/utils/collector-ops');
-const { sendTelegramMessage } = require('../src/notify/telegram');
-const { sendDiscordCopy } = require('../src/notify/multi-channel');
+const { sendReport } = require('../src/notify/reports');
 
 function parseArgs(argv = process.argv.slice(2), env = process.env) {
   const options = {
     days: Number(env.COLLECTOR_OPS_DAYS || 1),
-    noTelegram: false,
+    noReport: false,
   };
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg === '--noTelegram' || arg === '--no-telegram') {
-      options.noTelegram = true;
+    if (arg === '--no-report') {
+      options.noReport = true;
       continue;
     }
     if (arg === '--days') {
@@ -92,27 +91,23 @@ function formatSummary(summary, anomalies) {
 }
 
 async function main() {
-  const { days, noTelegram } = parseArgs();
+  const { days, noReport } = parseArgs();
   const summary = await buildCollectorOpsSummary({ days });
   const anomalies = buildCollectorOpsAnomalies(summary);
   console.log(JSON.stringify({ days, summary, anomalies }, null, 2));
 
-  if (noTelegram) {
-    console.log('[collector-ops] --noTelegram 지정. Telegram 전송 생략.');
+  if (noReport) {
+    console.log('[collector-ops] --no-report 지정. Discord 전송 생략.');
     return;
   }
 
   if (anomalies.length === 0 && process.env.COLLECTOR_OPS_SEND_OK !== '1') {
-    console.log('[collector-ops] 이상치 없음. Telegram 전송 생략.');
+    console.log('[collector-ops] 이상치 없음. Discord 전송 생략.');
     return;
   }
 
   const message = formatSummary(summary, anomalies);
-  await sendTelegramMessage(message, {
-    channel: 'private',
-    requireDelivery: true,
-  });
-  await sendDiscordCopy(message, 'ops');
+  await sendReport(message, 'ops');
 }
 
 if (require.main === module) {

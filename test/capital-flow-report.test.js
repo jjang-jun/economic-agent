@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { buildCapitalFlowSnapshot } = require('../src/utils/capital-flow-report');
-const { formatCapitalFlowSection } = require('../src/notify/telegram');
+const { formatCapitalFlowSection } = require('../src/notify/reports');
 
 test('capital flow snapshot keeps actual investor flow separate from ETF proxy', () => {
   const snapshot = buildCapitalFlowSnapshot({

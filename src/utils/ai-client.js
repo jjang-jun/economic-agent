@@ -140,7 +140,7 @@ async function chatDetailed(prompt, options = {}) {
   let result;
 
   if (config.provider === 'anthropic') {
-    result = await chatAnthropic(config, prompt, maxTokens);
+    result = await chatAnthropic(config, prompt, maxTokens, options);
   } else if (config.provider === 'openai') {
     result = await chatOpenAI(config, prompt, maxTokens, options);
   } else {
@@ -173,7 +173,7 @@ async function chatDetailed(prompt, options = {}) {
 }
 
 // Anthropic Messages API
-async function chatAnthropic(config, prompt, maxTokens) {
+async function chatAnthropic(config, prompt, maxTokens, options = {}) {
   const res = await fetch(`${config.baseUrl}/v1/messages`, {
     method: 'POST',
     headers: {
@@ -186,6 +186,7 @@ async function chatAnthropic(config, prompt, maxTokens) {
       max_tokens: maxTokens,
       messages: [{ role: 'user', content: prompt }],
     }),
+    signal: options.signal,
   });
 
   if (!res.ok) {
@@ -257,6 +258,7 @@ async function chatOpenAI(config, prompt, maxTokens, options = {}) {
       'Authorization': `Bearer ${config.apiKey}`,
     },
     body: JSON.stringify(body),
+    signal: options.signal,
   });
 
   if (!res.ok) {
@@ -310,6 +312,7 @@ async function chatOpenAICompatible(config, prompt, maxTokens, options = {}) {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
+    signal: options.signal,
   });
 
   if (!res.ok) {

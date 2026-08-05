@@ -1,5 +1,4 @@
-const { sendTelegramMessage } = require('./telegram');
-const { sendDiscordCopy } = require('./multi-channel');
+const { sendDiscordReport } = require('./discord-reports');
 
 const DOMAIN_LABELS = {
   tax: '세금·절세계좌',
@@ -86,12 +85,7 @@ function splitPolicyRadarReports(report = {}, maxChars = 3900) {
 
 async function sendPolicyRadarReport(report, options = {}) {
   const reports = splitPolicyRadarReports(report, options.maxChars);
-  for (const part of reports) {
-    await (options.sender || sendTelegramMessage)(formatPolicyRadarReport(part), {
-      channel: options.channel || 'private',
-      requireDelivery: true,
-    });
-  }
+  let delivered = false;
   const targets = [
     {
       channel: 'policy_tax',
@@ -111,8 +105,12 @@ async function sendPolicyRadarReport(report, options = {}) {
     if (target.events.length === 0) continue;
     const discordReports = splitPolicyRadarReports({ ...report, events: target.events }, options.maxChars);
     for (const part of discordReports) {
-      await (options.discordSender || sendDiscordCopy)(formatPolicyRadarReport(part), target.channel);
+      const result = await (options.sender || sendDiscordReport)(formatPolicyRadarReport(part), target.channel);
+      if (result?.delivered || (options.sender && result !== false)) delivered = true;
     }
+  }
+  if (!delivered && reports.length > 0) {
+    throw new Error('Policy notification delivery failed: no channel delivered');
   }
   return true;
 }

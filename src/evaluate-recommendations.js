@@ -1,7 +1,7 @@
 const { evaluateRecommendations } = require('./utils/recommendation-log');
 const { evaluateResearchCandidates } = require('./utils/research-candidate-log');
 const { evaluateMarketAnomalySignals } = require('./utils/anomaly-performance');
-const { sendPerformanceReport } = require('./notify/telegram');
+const { sendPerformanceReport } = require('./notify/reports');
 
 async function main() {
   console.log(`[${new Date().toISOString()}] 추천 성과 평가 시작`);

@@ -360,7 +360,7 @@ function buildDashboardHtml(data = {}) {
     </section>
     <section class="panel">
       <h2>최근 매수 검토 후보</h2>
-      <p class="muted">손익비와 리스크 리뷰를 통과한 후보만 표시합니다. 차단/관찰 후보는 Telegram의 /recommendations blocked에서 확인합니다.</p>
+      <p class="muted">손익비와 리스크 리뷰를 통과한 후보만 표시합니다. 차단/관찰 후보는 Discord의 /recommendations blocked에서 확인합니다.</p>
       <table>
         <thead><tr><th>일자</th><th>종목</th><th>의견</th><th>리스크 판정</th><th>진입가</th><th>손절가</th><th>근거/차단</th></tr></thead>
         <tbody>${renderRecommendationRows(data.recommendations || [])}</tbody>

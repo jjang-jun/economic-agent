@@ -9,14 +9,14 @@ const {
   saveActionReport,
 } = require('../src/utils/action-report');
 const { loadOpenTradePlans } = require('../src/utils/trade-plan');
-const { sendActionReport, formatActionReport } = require('../src/notify/telegram');
+const { sendActionReport, formatActionReport } = require('../src/notify/reports');
 
 function hasFlag(name) {
   return process.argv.includes(name);
 }
 
-function shouldSkipTelegram(argv = process.argv) {
-  return argv.includes('--noTelegram') || argv.includes('--no-telegram');
+function shouldSkipReport(argv = process.argv) {
+  return argv.includes('--no-report');
 }
 
 function isPlanRelevantToPortfolio(plan = {}, portfolio = {}) {
@@ -79,7 +79,7 @@ async function main() {
   console.log(`[행동리포트] 신규 ${report.newBuyCandidates.length}건, 관찰 ${report.watchOnlyCandidates.length}건, 모멘텀 ${report.momentumWatchCandidates.length}건, 보유 ${report.holdCandidates.length}건, 축소 ${report.reduceCandidates.length}건, 매도 ${report.sellCandidates.length}건`);
   console.log(`[행동리포트] 포트폴리오 평가 ${portfolioValuation.quotePositionCount}/${portfolioValuation.positionCount}개 가격 갱신 · Supabase 동기화 ${synchronized ? '완료' : '해당 없음'}`);
 
-  if (shouldSkipTelegram()) {
+  if (shouldSkipReport()) {
     console.log(formatActionReport(report));
     return;
   }
@@ -99,5 +99,5 @@ module.exports = {
   hasFlag,
   assertCompletePortfolioValuation,
   isPlanRelevantToPortfolio,
-  shouldSkipTelegram,
+  shouldSkipReport,
 };

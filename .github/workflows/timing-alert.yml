@@ -48,10 +48,6 @@ jobs:
         if: github.event.schedule == '45 23 * * 0-4' || github.event.inputs.mode == 'premarket'
         run: npm run timing:alert -- premarket
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          TELEGRAM_PRIVATE_CHAT_ID: ${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}
-          TELEGRAM_SECRET_CHAT_ID: ${{ secrets.TELEGRAM_SECRET_CHAT_ID }}
           PORTFOLIO_JSON_BASE64: ${{ secrets.PORTFOLIO_JSON_BASE64 }}
           PORTFOLIO_JSON: ${{ secrets.PORTFOLIO_JSON }}
           SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
@@ -62,22 +58,14 @@ jobs:
         if: github.event.schedule != '45 23 * * 0-4' && github.event.inputs.mode != 'premarket'
         run: npm run timing:alert -- intraday
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          TELEGRAM_PRIVATE_CHAT_ID: ${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}
-          TELEGRAM_SECRET_CHAT_ID: ${{ secrets.TELEGRAM_SECRET_CHAT_ID }}
           PORTFOLIO_JSON_BASE64: ${{ secrets.PORTFOLIO_JSON_BASE64 }}
           PORTFOLIO_JSON: ${{ secrets.PORTFOLIO_JSON }}
           SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
-      - name: Notify private chat on failure
+      - name: Notify Discord on failure
         if: failure()
         run: npm run notify:workflow-failure -- "Timing Alert (장전·장중 매매 타이밍)" "Build and send timing alert"
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_SECRET_CHAT_ID: ${{ secrets.TELEGRAM_SECRET_CHAT_ID }}
-          TELEGRAM_PRIVATE_CHAT_ID: ${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { formatPerformanceReport, formatTradePerformanceReport } = require('../src/notify/telegram');
+const { formatPerformanceReport, formatTradePerformanceReport } = require('../src/notify/reports');
 
 test('formatPerformanceReport does not render NaN for empty evaluations', () => {
   const message = formatPerformanceReport([]);
@@ -40,4 +40,3 @@ test('formatTradePerformanceReport does not turn missing evaluation into zero pe
   assert.match(message, /평가손익: 데이터 부족/);
   assert.doesNotMatch(message, /\(0%\)/);
 });
-

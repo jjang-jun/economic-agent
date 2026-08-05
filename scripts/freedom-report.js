@@ -1,11 +1,11 @@
 const { loadPortfolio, enrichPortfolio, loadLatestPortfolioSnapshot } = require('../src/utils/portfolio');
 const { buildFreedomStatus, saveFreedomStatus } = require('../src/utils/freedom-engine');
 const { persistFinancialFreedomGoal } = require('../src/utils/persistence');
-const { sendFreedomStatus, formatFreedomStatus } = require('../src/notify/telegram');
+const { sendFreedomStatus, formatFreedomStatus } = require('../src/notify/reports');
 
 function parseArgs(argv = process.argv.slice(2)) {
   return {
-    telegram: argv.includes('--telegram'),
+    discord: argv.includes('--discord'),
     noPersist: argv.includes('--noPersist') || argv.includes('--no-persist'),
     noSave: argv.includes('--noSave') || argv.includes('--no-save'),
   };
@@ -36,7 +36,7 @@ async function main(options = parseArgs()) {
   const file = options.noSave ? null : saveFreedomStatus(status);
   if (!options.noPersist) await persistFinancialFreedomGoal(status);
 
-  if (options.telegram) {
+  if (options.discord) {
     const sent = await sendFreedomStatus(status);
     if (!sent) throw new Error('경제적 자유 현황 전송 실패');
   }

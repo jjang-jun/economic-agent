@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { formatActionReport } = require('../src/notify/telegram');
+const { formatActionReport } = require('../src/notify/reports');
 const {
   buildActionReport,
   buildPortfolioValuationContext,

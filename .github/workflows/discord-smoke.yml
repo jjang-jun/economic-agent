@@ -8,6 +8,9 @@ permissions:
   contents: read
 
 on:
+  schedule:
+    # 월~금 08:10 KST = 일~목 23:10 UTC. 첫 장전 브리핑 전에 Discord 전달 경로를 확인한다.
+    - cron: '10 23 * * 0-4'
   workflow_dispatch:
     inputs:
       channel:
@@ -41,16 +44,12 @@ jobs:
           node-version: '22'
       - run: npm ci
       - name: Validate and send Discord smoke
-        run: npm run discord:smoke -- --channel=${{ inputs.channel }}
+        run: npm run discord:smoke -- --channel=${{ inputs.channel || 'ops' }}
         env:
           DISCORD_WEBHOOKS_JSON_BASE64: ${{ secrets.DISCORD_WEBHOOKS_JSON_BASE64 }}
 
-      - name: Notify private chat on failure
+      - name: Notify Discord on failure
         if: failure()
         run: npm run notify:workflow-failure -- "Discord Infrastructure Smoke" "Validate and send Discord smoke"
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_SECRET_CHAT_ID: ${{ secrets.TELEGRAM_SECRET_CHAT_ID }}
-          TELEGRAM_PRIVATE_CHAT_ID: ${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

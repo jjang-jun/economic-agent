@@ -1,7 +1,7 @@
 {
   "name": "economic-agent",
   "version": "2.0.0",
-  "description": "경제 뉴스 자동 수집 · AI 분석 · Telegram 알림 에이전트",
+  "description": "경제적 자유 의사결정 루프를 지원하는 개인 AI 경제 사무실",
   "main": "src/check-news.js",
   "engines": {
     "node": ">=22"
@@ -38,12 +38,12 @@
     "prices:backfill-eod": "node --env-file-if-exists=.env scripts/backfill-eod-prices.js",
     "backtest:worker": "python3 scripts/local-backtest-worker.py",
     "agent:server": "node --env-file-if-exists=.env src/server/index.js",
-    "telegram:set-webhook": "node --env-file-if-exists=.env scripts/set-telegram-webhook.js",
-    "telegram:sync-commands": "node --env-file-if-exists=.env scripts/sync-telegram-commands.js",
-    "telegram:smoke-actions": "node --env-file-if-exists=.env scripts/smoke-telegram-actions.js",
     "discord:check": "node --env-file-if-exists=.env scripts/discord-infra.js",
     "discord:smoke": "node --env-file-if-exists=.env scripts/discord-infra.js --send-test",
     "discord:provision": "node --env-file-if-exists=.env scripts/provision-discord.js",
+    "discord:sync-commands": "node --env-file-if-exists=.env scripts/sync-discord-commands.js",
+    "discord:agent-worker:check": "node scripts/discord-agent-worker.js --runtime-check",
+    "discord:agent-worker": "node --env-file-if-exists=.env scripts/discord-agent-worker.js",
     "discord:sync-secret": "node --env-file-if-exists=.env scripts/sync-discord-secret.js",
     "notify:workflow-failure": "node --env-file-if-exists=.env scripts/notify-workflow-failure.js",
     "collector:call": "node --env-file-if-exists=.env scripts/call-news-collector.js",
@@ -58,7 +58,7 @@
     "economic",
     "news",
     "agent",
-    "telegram",
+    "discord",
     "ai",
     "rss"
   ],

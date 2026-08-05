@@ -144,10 +144,10 @@ test('buildPriceProviderDecision prioritizes failures over fallback usage', () =
   assert.equal(decision.label, 'API 키/토큰/네트워크 장애 우선 점검');
 });
 
-test('price provider ops args support noTelegram and explicit days', () => {
-  assert.deepEqual(parseArgs(['--noTelegram'], {}), { days: 1, noTelegram: true });
-  assert.deepEqual(parseArgs(['--days', '7'], {}), { days: 7, noTelegram: false });
-  assert.deepEqual(parseArgs(['--days=3', '--no-telegram'], {}), { days: 3, noTelegram: true });
+test('price provider ops args support no-report and explicit days', () => {
+  assert.deepEqual(parseArgs(['--no-report'], {}), { days: 1, noReport: true });
+  assert.deepEqual(parseArgs(['--days', '7'], {}), { days: 7, noReport: false });
+  assert.deepEqual(parseArgs(['--days=3', '--no-report'], {}), { days: 3, noReport: true });
 });
 
 test('price provider ops summary includes provider decision and anomalies', () => {

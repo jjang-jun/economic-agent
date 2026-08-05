@@ -1,17 +1,29 @@
 # Economic Agent Roadmap
 
 ## North Star
-Economic Agent의 최종 목적은 오늘 살 종목을 찍는 것이 아니라, 내 순자산이 경제적 자유 목표에 도달할 확률을 높이는 투자 운영체제가 되는 것이다.
+Economic Agent의 최종 목적은 오늘 살 종목을 찍는 것이 아니라, 내 순자산이 경제적 자유 목표에 도달할 확률을 높이는 **개인 AI 경제 사무실**이 되는 것이다.
 
 ```
 경제적 자유 목표
   -> 시장/공시/가격/수급 데이터 수집
+  -> 세금/부동산/연금/자본시장 정책 변화 추적
   -> 시장 레짐과 행동 가능 범위 판단
-  -> 종목 후보와 손익비/리스크 도출
+  -> 내 자산과 종목 후보의 기대효과/손익비/리스크 도출
   -> 내 포트폴리오 기준 포지션 사이징 적용
-  -> 추천/실행/성과/행동 위반 기록
+  -> 사용자 확인과 승인
+  -> 추천/결정/실행/성과/행동 위반 기록
   -> 매주 복기, 매월 목표 달성률 갱신
 ```
+
+## 현재 범위와 미래 범위
+
+현재 저장소는 경제·투자·자산관리 도메인에 집중한다.
+
+- 포함: 경제 정보 수집, 정책 변화, 시장 판단, 포트폴리오 행동, 리스크, 거래 기록, 성과 검증, 경제적 자유 추적, 비공개 대화·승인
+- 제외: 범용 개발 조직, 개인 이메일·일정 전체 접근, 여러 프로젝트의 독립 에이전트 팀, 다수 봇 간 자유 대화, 일반 목적 자체 개선 플랫폼
+- 원칙: 새 기능은 경제적 자유 목표의 상태 파악·의사결정·실행·검증 중 하나를 실질적으로 개선해야 한다.
+
+범용 개인 AI 조직 운영체제는 별도 미래 프로젝트로 다루며 `docs/future/AI_AGENT_TEAM_BLUEPRINT.md`를 설계 기준으로 사용한다. `economic-agent`는 그 운영체제의 첫 실전 도메인이자 검증된 도구 집합이 될 수 있지만, 현재 저장소 안에서 범용 플랫폼으로 확장하지 않는다.
 
 ## Economic Agent 헌법
 
@@ -27,12 +39,14 @@ Economic Agent의 최종 목적은 오늘 살 종목을 찍는 것이 아니라,
 10. 레버리지는 실전 성과가 충분히 검증되기 전까지 금지한다.
 11. 매주 원칙 위반 거래를 복기한다.
 12. 매월 경제적 자유 목표 달성률을 업데이트한다.
+13. 외부 행동과 자산 변경은 사용자가 확인하고 승인한다.
+14. Discord와 AI 대화는 인터페이스이며, 구조화 데이터와 결정의 기준 저장소를 대신하지 않는다.
 
 ## 4개 엔진 구조
 
 ## 런타임 언어 원칙
 
-Node.js를 운영 런타임의 중심으로 둔다. Telegram webhook, Cloud Run HTTP 서버, GitHub Actions CLI, Supabase REST, 뉴스/공시/가격 API 호출은 대부분 I/O 중심이므로 Node.js가 적합하다.
+Node.js를 운영 런타임의 중심으로 둔다. Discord Interaction/Gateway, Cloud Run HTTP 서버, GitHub Actions CLI, Supabase REST, 뉴스/공시/가격 API 호출은 대부분 I/O 중심이므로 Node.js가 적합하다.
 
 Python은 별도 서버가 아니라 데이터 분석 worker로 둔다. pykrx/FinanceDataReader, 백테스트, 대량 OHLCV 처리, 통계/퀀트 리서치처럼 Python 생태계가 유리한 작업만 Python 스크립트로 분리하고, Node.js가 필요 시 호출하거나 로컬/배치에서 실행한다.
 
@@ -129,17 +143,17 @@ freedomGoal: {
 
 ## 실행 플랫폼 방향
 
-리포트 허브는 채널 구분이 쉬운 Discord로 점진 전환하고, Telegram은 긴급 알림과 매매 입력·승인을 유지한다. 실시간 질의응답과 포트폴리오 변경 승인은 GitHub Actions가 아니라 항상 요청을 받을 수 있는 Node.js Agent Server가 담당한다.
+리포트, 긴급 알림, 매매 기록 초안과 승인은 Discord로 통합한다. Discord 자연어 초안·승인은 `pending_actions` 엔진을 사용한다. 실시간 질의응답과 포트폴리오 변경 승인은 GitHub Actions가 아니라 항상 요청을 받을 수 있는 Node.js Agent Server와 Gateway worker가 담당한다.
 
 ```text
 Discord report channels <- GitHub Actions / Agent Server
-Telegram trade approval -> Node.js Agent API Server -> Supabase/Postgres
+Discord mention + approval -> Node.js Agent API Server -> Supabase/Postgres
 ```
 
 역할 분리:
 - GitHub Actions: 뉴스 수집, 다이제스트, 장마감 리포트, 성과평가, 주간/월간 리뷰
-- Agent Server: Telegram webhook, 포트폴리오 조회, 매수/매도 기록 초안, 승인 버튼, 리스크 질의
-- Discord Webhooks: 정책·행동·포트폴리오·선행신호·성과·운영 리포트의 채널별 읽기 전용 전달
+- Agent Server: Discord Interaction, 포트폴리오 조회, 매수/매도 기록 초안, 승인 버튼, 리스크 질의
+- Discord Webhooks: 긴급·정책·행동·포트폴리오·선행신호·성과·운영 리포트의 채널별 전달
 - Python worker: 로컬 백테스트, pykrx/FinanceDataReader 기반 OHLCV 조회, 대량 데이터 분석
 - Supabase: 기사, 추천, 실제 거래, 포트폴리오, 경제적 자유 목표, 대화 로그, pending action 기준 저장소
 - 로컬 JSON/SQLite: 분석 캐시와 백업
@@ -169,7 +183,7 @@ Codex 작업 위임 원칙:
 - [x] 포트폴리오 설정 초안
 - [x] 종목 리포트에 행동 가드레일 추가
 - [x] 가격·거래량 이상징후의 감지시각과 기사·DART 선후관계 저장. 저장소 장애·날짜 단위 공시는 판단 보류하고 추천으로 자동 승격하지 않음
-- [x] Telegram 다이제스트·장 마감 리포트에 결정론적 자금 흐름 섹션 추가. KOSPI 투자자 순매수와 ETF 가격·거래량 프록시를 분리 표시
+- [x] Discord 다이제스트·장 마감 리포트에 결정론적 자금 흐름 섹션 추가. KOSPI 투자자 순매수와 ETF 가격·거래량 프록시를 분리 표시
 - [x] 가격·거래량 이상징후에 감지 시점과 같은 거래일 후속 KOSPI 수급 스냅샷 연결. 전 거래일·해외 종목·시장 전체 수급의 한계를 명시
 - [x] 가격·거래량 이상징후의 공식 EOD 1·5거래일 지속성, 기사 선후 시차, 요인 조합을 연구 전용으로 평가. 5일 표본 30건 전에는 추천 규칙 반영 보류
 - [x] 재정경제부·금융위원회·국토교통부 공식 문서를 투자 뉴스와 분리한 정책·자산 레이더 MVP. 세금·부동산·대출·연금·자본시장 분류와 정부안/정정/입법예고/시행 상태를 기록
@@ -209,8 +223,8 @@ Codex 작업 위임 원칙:
 ## Phase 3: 포트폴리오 기반 의사결정
 - [x] 비공개 포트폴리오 파일/Secret 로딩 구조
 - [x] 실제 매매 실행 기록이 포트폴리오 현금/수량/평단을 갱신
-- [x] Telegram 거래 초안의 추천·매매계획 자동 연결, 국내/해외 원화 환산, 매도 실현손익·사유 기록, 중복 승인 방지
-- [x] Telegram 최근 체결·실제 거래 성과 조회와 승인 완료 후 현금·잔여수량 영수증
+- [x] Discord 거래 초안의 추천·매매계획 자동 연결, 국내/해외 원화 환산, 매도 실현손익·사유 기록, 중복 승인 방지
+- [x] Discord 최근 체결·실제 거래 성과 조회와 승인 완료 후 현금·잔여수량 영수증
 - [x] 실제 첫 보유 종목 입력 후 운영 데이터 축적
 - [x] 종목별 현재가와 평가손익 자동 계산
 - [x] 매수 후보, 관찰 후보, 보유, 축소, 매도 후보 분리
@@ -268,16 +282,16 @@ Codex 작업 위임 원칙:
 - [x] 월간 리뷰 포트폴리오 우선 표시와 추천 후보→관찰/차단→승인 퍼널
 - [x] 입출금/배당/비용 현금흐름 원장과 linked Modified Dietz·MWR·KOSPI 비교 성과
 - [x] 주말 수집 공백, 누적 버퍼, 과거 가격 스냅샷으로 인한 운영 오탐 제거
-- [x] Telegram 명령어 또는 간단한 대시보드
+- [x] Discord 명령어와 간단한 대시보드
 - [x] 수동 매매 실행 기록 입력
 - [x] 실제 거래 현재가 기준 성과 리포트
-- [x] 평일 장마감 후 경제적 자유 상태 private Telegram 리포트
+- [x] 평일 장마감 후 경제적 자유 상태 Discord 리포트
 - [x] 5분 뉴스 수집 workflow concurrency 적용
 - [x] `performance-lab.js`로 추천/실거래/미실행 추천 성과를 분리 분석
 - [x] `behavior-reviewer.js`로 원칙 위반 거래와 반복 행동 패턴을 경고
-- [x] 주요 GitHub Actions 실패 시 private Telegram 알림: 뉴스 백업 수집, 다이제스트, Action Report, 성과 리뷰, 운영 점검, 포트폴리오 스냅샷, 장마감 분석, 추천 평가, 실제 거래 성과
-- [x] 주간 의존성 취약점 점검 workflow와 실패 시 private Telegram 알림
-- [x] main push 품질 게이트: `npm test`, `npm run agent:harness-check`, 실패 시 private Telegram 알림
+- [x] 주요 GitHub Actions 실패 시 Discord 운영 알림: 뉴스 백업 수집, 다이제스트, Action Report, 성과 리뷰, 운영 점검, 포트폴리오 스냅샷, 장마감 분석, 추천 평가, 실제 거래 성과
+- [x] 주간 의존성 취약점 점검 workflow와 실패 시 Discord 운영 알림
+- [x] main push 품질 게이트: `npm test`, `npm run agent:harness-check`, 실패 시 Discord 운영 알림
 
 ## Phase 7: 경제적 자유 엔진
 - [x] `freedom-engine.js` 추가
@@ -287,38 +301,41 @@ Codex 작업 위임 원칙:
 - [x] 최대낙폭 발생 시 목표 지연 기간 추정
 - [x] 월간 리뷰에 경제적 자유 목표 달성률 포함
 - [x] 대시보드 첫 탭을 Freedom 중심으로 재구성
-- [x] `freedom:report -- --telegram`과 `freedom-report.yml`로 목표 달성 속도 정기 점검
+- [x] `freedom:report -- --discord`와 `freedom-report.yml`로 목표 달성 속도 정기 점검
 
-## Phase 8: 대화형 Agent 플랫폼
-- [x] Telegram을 대화 UI로 유지하고 Agent Server를 별도 런타임으로 분리하는 방향 결정
+## Phase 8: 대화형 AI 경제 사무실
+- [x] Discord를 단일 대화 UI로 정하고 Agent Server와 Gateway worker를 분리
 - [x] `docs/AGENT_PLATFORM.md` 작성
-- [x] 공유방/비공개방 Telegram 라우팅 분리: `TELEGRAM_CHAT_ID`, `TELEGRAM_PRIVATE_CHAT_ID`
 - [x] Supabase 원본 포트폴리오 테이블 추가: `portfolio_accounts`, `positions`, `risk_policy`
 - [x] 대화/승인 테이블 추가: `conversation_messages`, `pending_actions`
-- [x] `src/server/telegram-webhook.js` 추가
 - [x] `src/agent/agent-router.js`와 기본 명령어 라우팅 추가
 - [x] `/portfolio`, `/goal`, `/risk` 조회 명령 구현
 - [x] `/buy`, `/sell`, `/cash`를 pending action + 버튼 승인 방식으로 구현
-- [x] Telegram `chat_id` allowlist와 webhook secret 검증
+- [x] Discord guild/user/channel allowlist와 Interaction 서명 검증
 - [x] Cloud Run 또는 Fly.io/Render 배포 문서 추가
 - [x] Render Blueprint와 5분 cron guard 추가
 - [x] 뉴스 수집 endpoint 수동 검증 스크립트 추가
-- [x] Telegram 승인 흐름 smoke script와 정기 점검 workflow 추가
 - [x] Discord 9개 리포트 채널의 Webhook 전송·비밀값 지도·수동 smoke 인프라 추가
 - [x] Bot API 기반 Discord 카테고리·채널·Webhook 멱등 프로비저너 추가. 핵심 신호·자산 관리·정책 인텔리전스·운영 구조로 정렬하며 기본 dry-run, 기존 리소스 삭제 금지
-- [x] 긴급·브리핑·행동·포트폴리오·정책·선행신호·성과·운영 리포트의 Discord 병행 전송 적용
-- [ ] 1~2주 누락·중복·가독성 비교 후 Telegram 정기 읽기 전용 리포트 축소 여부 결정
-- [ ] Discord Slash command와 Interaction 서명 검증을 구현한 뒤 조회 명령 이전 여부 결정
+- [x] 긴급·브리핑·행동·포트폴리오·정책·선행신호·성과·운영 리포트의 Discord 전송 적용
+- [x] 사용하지 않는 이전 메시징 전송·webhook·smoke 코드를 제거하고 Discord를 필수 전달 경로로 통합
+- [x] Discord Slash command와 Ed25519 Interaction 서명 검증, guild/user/channel allowlist, ephemeral 읽기 전용 조회 구현
+- [x] Discord 직접 멘션만 받는 최소-intent Gateway worker와 보수적 자연어 조회·매수/매도/현금 초안 파서 구현
+- [x] Discord 자연어 변경을 기존 `pending_actions`에 연결하고 요청자 범위의 기록/취소 버튼 및 component 서명 검증 구현
+- [x] Gateway worker를 Node.js 22 기반 Windows/macOS/Linux 공통 런타임으로 고정하고 네트워크 없는 호환성 검사 및 3-OS Actions matrix 추가
+- [x] 하나의 Discord 봇 뒤에 투자·부동산·세금/연금·포트폴리오·리스크·데이터 검증 역할을 분리하고 결정론적 `to/cc`, 역할별 SSoT·AI 호출·대화 namespace·토큰 상한 구현
+- [ ] 항상 켜진 PC/VM에 Gateway worker를 배치하고 개인 채널 실사용 smoke 수행
 
 ## 현재 가장 중요한 다음 작업
-1. 2026-07-29 `Restart project`로 복구한 Supabase가 안정적으로 유지되는지 확인한다. `PGRST000/PGRST002`와 내부 `localhost:5432 connection refused`가 같이 재발하면 SQL/Data API 설정을 바꾸지 말고, 비정상 `System` disk 사용량과 함께 티켓 `SU-419701`로 managed compute/disk 복구를 요청한다. 복구 후 `Telegram 승인 흐름 점검`과 `npm run db:pull`을 다시 실행한다.
-2. 이번 운영 안정성 변경을 원격 main과 Cloud Run에 반영한 뒤 `npm run deploy:freshness`, 다음 scheduled `Telegram 승인 흐름 점검`, `Price Provider Ops Report`, `Quality Gate` 성공 여부를 재확인한다.
+1. 2026-07-29 `Restart project`로 복구한 Supabase가 안정적으로 유지되는지 확인한다. `PGRST000/PGRST002`와 내부 `localhost:5432 connection refused`가 같이 재발하면 SQL/Data API 설정을 바꾸지 말고, 비정상 `System` disk 사용량과 함께 티켓 `SU-419701`로 managed compute/disk 복구를 요청한다. 복구 후 Discord 개인 채널 승인 흐름과 `npm run db:pull`을 다시 실행한다.
+2. 이번 운영 안정성 변경을 원격 main과 Cloud Run에 반영한 뒤 `npm run deploy:freshness`, 다음 `Discord Infrastructure Smoke`, `Price Provider Ops Report`, `Quality Gate` 성공 여부를 재확인한다.
 3. Alibaba Cloud 국제 리전 키를 준비해 `AI_PROVIDER=qwen`, `AI_MODEL=qwen3.7-flash`, thinking disabled로 다이제스트 canary를 먼저 실행한다. 공개 뉴스만 넣은 DeepSeek V4 Flash를 최저비용 비교군으로 두고, 정확한 포트폴리오/거래 데이터는 데이터 처리 정책을 승인하기 전 제외한다.
 4. 최신 미러 생성 후 `npm run model:performance`로 `stock-analysis-v2.3`의 Qwen/DeepSeek/GPT-5.6 메타데이터를 수집한다. 운영 전환 판단은 승인 후보의 고정 20거래일 평가가 최소 30건 쌓인 뒤 하며, 한국어 고유명사·숫자·JSON 준수율·지연·실제 추천 성과가 확인되기 전에는 전체 workflow를 한 번에 전환하지 않는다.
 5. `price_provider_attempts`에서 provider별 빈 응답률을 본다. Alpha Vantage/FMP/Tiingo가 계속 100% empty면 API key/endpoint/rate-limit 설정을 고치거나, 유효하지 않은 provider 호출을 줄여 Yahoo fallback 전에 불필요한 지연과 로그 소음을 낮춘다.
 6. 실제 거래 기록과 추천 연결률을 주간 리뷰에서 확인한다. 추천을 보고도 실행하지 않은 후보의 성과가 반복적으로 좋으면 action report의 진입 타이밍/분할 매수 기준을 재조정한다.
 7. 월간 로컬 리서치 worker 결과가 실제 월간 리뷰 의사결정에 도움이 되는지 확인한다. 도움이 없으면 기본 비활성 유지, 도움이 있으면 리서치 대상 선정 기준을 보유/추천/워치리스트별로 분리한다.
 8. 인증 `/dashboard`의 실제 사용 빈도를 보고 탭 분리, 가격 provider 차트, 추천 성과 모델별 차트 추가 여부를 결정한다.
+9. Discord Interaction 환경변수와 endpoint를 Cloud Run에 반영하고 guild 명령을 동기화한다. Windows/macOS/Linux 중 선택한 항상 켜진 PC/VM에서 `discord:agent-worker:check`를 통과시킨 뒤 Gateway worker를 배치해 개인 채널에서 멘션 자연어 초안→기록/취소 버튼→Supabase 반영과 미허용 사용자 차단을 smoke 검증한다. 실제 증권사 주문은 연결하지 않는다.
 
 ## 운영 루프
 

@@ -1,6 +1,6 @@
 const http = require('http');
 const pkg = require('../../package.json');
-const { handleTelegramWebhook } = require('./telegram-webhook');
+const { handleDiscordInteraction } = require('./discord-interactions');
 const { handleDashboardRequest } = require('./dashboard');
 const { runNewsCollector } = require('../jobs/run-news-collector');
 
@@ -9,15 +9,18 @@ const STARTED_AT = new Date().toISOString();
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
-    let body = '';
+    const chunks = [];
+    let byteLength = 0;
     req.on('data', chunk => {
-      body += chunk;
-      if (body.length > 1_000_000) {
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      chunks.push(buffer);
+      byteLength += buffer.length;
+      if (byteLength > 1_000_000) {
         reject(new Error('request body too large'));
         req.destroy();
       }
     });
-    req.on('end', () => resolve(body));
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
     req.on('error', reject);
   });
 }
@@ -68,9 +71,9 @@ async function requestHandler(req, res) {
     return;
   }
 
-  if (req.method === 'POST' && url.pathname === '/telegram/webhook') {
+  if (req.method === 'POST' && url.pathname === '/discord/interactions') {
     const body = await readBody(req);
-    await handleTelegramWebhook(req, res, body);
+    await handleDiscordInteraction(req, res, body);
     return;
   }
 

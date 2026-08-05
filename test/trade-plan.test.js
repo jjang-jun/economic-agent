@@ -5,7 +5,7 @@ const os = require('os');
 const path = require('path');
 
 const tradePlan = require('../src/utils/trade-plan');
-const { formatActionReport } = require('../src/notify/telegram');
+const { formatActionReport } = require('../src/notify/reports');
 
 test('buildTradePlan creates an open planned trade with target remaining quantity', () => {
   const plan = tradePlan.buildTradePlan({

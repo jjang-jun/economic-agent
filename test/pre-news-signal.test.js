@@ -13,7 +13,7 @@ const {
   updateSignalMarketFlow,
   flowObservationKey,
 } = require('../src/utils/pre-news-signal');
-const { formatPreNewsSignalReport } = require('../src/notify/telegram');
+const { formatPreNewsSignalReport } = require('../src/notify/reports');
 
 const now = new Date('2026-05-11T01:05:00.000Z');
 

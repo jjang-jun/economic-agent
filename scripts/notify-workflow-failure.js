@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
-const { sendTelegramMessage } = require('../src/notify/telegram');
-const { sendDiscordCopy } = require('../src/notify/multi-channel');
+const { sendReport } = require('../src/notify/reports');
 
 function githubRunUrl(env = process.env) {
   if (env.GITHUB_SERVER_URL && env.GITHUB_REPOSITORY && env.GITHUB_RUN_ID) {
@@ -42,12 +41,8 @@ async function main() {
     runUrl: process.env.GITHUB_RUN_URL || githubRunUrl(),
   });
 
-  await sendTelegramMessage(message, {
-    channel: 'private',
-    requireDelivery: true,
-  });
-  await sendDiscordCopy(message, 'ops');
-  console.log('[workflow-failure] private Telegram notification sent');
+  await sendReport(message, 'ops');
+  console.log('[workflow-failure] failure notification delivered');
 }
 
 if (require.main === module) {

@@ -2,7 +2,7 @@ const { loadBuffer, clearBuffer } = require('./utils/article-buffer');
 const { dedupeArticles } = require('./utils/article-identity');
 const { fetchAllIndicators } = require('./utils/indicators');
 const { generateDigest } = require('./analysis/digest');
-const { sendDigest } = require('./notify/telegram');
+const { sendDigest } = require('./notify/reports');
 const { saveDailySummary } = require('./utils/daily-summary');
 const { archiveScoredArticles } = require('./utils/article-archive');
 const { fetchMarketSnapshot } = require('./utils/market-snapshot');
@@ -74,7 +74,7 @@ async function main() {
   }
   digest.sessionResolution = sessionResolution;
 
-  // Telegram 전송
+  // Discord 전송
   const sent = await sendDigest(digest);
   if (!sent) {
     throw new Error('다이제스트 전송 실패, 버퍼를 보존합니다.');

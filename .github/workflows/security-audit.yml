@@ -30,12 +30,8 @@ jobs:
       - name: Run dependency security audit
         run: npm run security:audit
 
-      - name: Notify private chat on failure
+      - name: Notify Discord on failure
         if: failure()
         run: npm run notify:workflow-failure -- "Security Audit (의존성 취약점 점검)" "Run dependency security audit"
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          TELEGRAM_PRIVATE_CHAT_ID: ${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}
-          TELEGRAM_SECRET_CHAT_ID: ${{ secrets.TELEGRAM_SECRET_CHAT_ID }}
           GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

@@ -14,7 +14,7 @@ test('security audit workflow runs npm audit weekly and notifies on failure', ()
   assert.match(workflow, /timeout-minutes: 10/);
   assert.match(workflow, /name: Run dependency security audit/);
   assert.match(workflow, /run: npm run security:audit/);
-  assert.match(workflow, /name: Notify private chat on failure/);
+  assert.match(workflow, /name: Notify Discord on failure/);
   assert.match(workflow, /if: failure\(\)/);
   assert.match(workflow, /npm run notify:workflow-failure -- "Security Audit \(의존성 취약점 점검\)" "Run dependency security audit"/);
   assert.match(workflow, /GITHUB_RUN_URL:/);

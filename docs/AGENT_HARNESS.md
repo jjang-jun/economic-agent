@@ -6,7 +6,7 @@
 
 - 하루 이상 이어질 수 있는 기능 변경
 - 여러 파일이나 저장소 문서를 함께 바꾸는 변경
-- 투자 로직, 운영 workflow, 데이터 저장소, Telegram 메시지처럼 실패 비용이 큰 변경
+- 투자 로직, 운영 workflow, 데이터 저장소, Discord 메시지처럼 실패 비용이 큰 변경
 - sub-agent를 병렬로 쓰는 작업
 
 작은 오타 수정, 단일 테스트 보강, 단순 문서 정리는 `AGENTS.md`의 Working Rules만 따르면 된다.
@@ -17,9 +17,9 @@
 
 - `ROADMAP.md`: 장기 제품 방향, phase, 다음 우선순위
 - `docs/PROGRESS.md`: 현재 운영 상태, 최근 변경, 다음 점검 항목
-- `docs/AGENT_PLATFORM.md`: Telegram Agent Server와 배포 구조
-- `docs/TELEGRAM_AGENT_DEPLOY.md`: webhook/Cloud Run 배포 절차
-- `docs/DISCORD_SETUP.md`: Discord 읽기 전용 리포트 채널과 Webhook/Actions 설정 절차
+- `docs/future/AI_AGENT_TEAM_BLUEPRINT.md`: 현재 범위 밖의 미래 개인 AI 조직 운영체제 설계
+- `docs/AGENT_PLATFORM.md`: Discord Agent Server·Gateway worker와 배포 구조
+- `docs/DISCORD_SETUP.md`: Discord 리포트·Slash 조회·Gateway 멘션·경제 전문가 `to/cc` 설정 절차
 - `docs/AGENT_HARNESS.md`: 장기 작업 계약, 검증 루프, handoff 규칙
 
 새로운 장기 지식은 대화에만 남기지 말고 위 문서 중 하나에 연결한다.
@@ -37,7 +37,7 @@ Scope:
 - 바꾸지 않을 파일/모듈
 
 Safety:
-- 네트워크/API/Telegram/Supabase 호출 여부
+- 네트워크/API/Discord/Supabase 호출 여부
 - 데이터 삭제, 버퍼 clear, 원격 push 여부
 - 실패해도 정기 운영을 막지 않는 fallback
 
@@ -65,7 +65,7 @@ Handoff:
 - 코드 변경: `npm test` 또는 변경 모듈 로딩/포맷 테스트
 - 문서 맵 변경: `npm run agent:harness-check`
 - workflow 변경: UTC와 KST 시간을 함께 확인
-- Telegram/Supabase/외부 API 변경: dry-run 또는 private channel smoke를 우선 사용
+- Discord/Supabase/외부 API 변경: dry-run 또는 private channel smoke를 우선 사용
 - 로컬 Python worker 변경: provider가 없어도 JSON 실패로 끝나는지 확인
 - MCP가 연결된 작업: Supabase MCP는 DB/로그 확인, GitHub MCP는 Actions/PR 상태 확인, Playwright MCP는 dashboard/browser 흐름 검증에 우선 사용한다.
 

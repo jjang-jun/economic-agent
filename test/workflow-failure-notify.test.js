@@ -9,7 +9,7 @@ const {
 
 test('formatWorkflowFailureMessage renders actionable private alert', () => {
   const message = formatWorkflowFailureMessage({
-    workflowName: 'Telegram 승인 흐름 점검',
+    workflowName: 'Discord 승인 흐름 점검',
     jobName: 'Smoke pending action flow',
     branch: 'main',
     sha: '9646e1f123456',
@@ -18,7 +18,7 @@ test('formatWorkflowFailureMessage renders actionable private alert', () => {
   });
 
   assert.match(message, /Workflow 실패 알림/);
-  assert.match(message, /Telegram 승인 흐름 점검/);
+  assert.match(message, /Discord 승인 흐름 점검/);
   assert.match(message, /Smoke pending action flow/);
   assert.match(message, /9646e1f/);
   assert.match(message, /GitHub Actions 로그 보기/);
@@ -32,7 +32,7 @@ test('githubRunUrl builds actions run URL from GitHub environment', () => {
   }), 'https://github.com/jjang-jun/economic-agent/actions/runs/123');
 });
 
-test('every GitHub Actions workflow has a private failure notification step', () => {
+test('every GitHub Actions workflow has a Discord failure notification step', () => {
   const workflowDir = path.join(__dirname, '..', '.github', 'workflows');
   const workflowFiles = fs.readdirSync(workflowDir)
     .filter((file) => file.endsWith('.yml') || file.endsWith('.yaml'));
@@ -42,7 +42,7 @@ test('every GitHub Actions workflow has a private failure notification step', ()
   for (const file of workflowFiles) {
     const workflow = fs.readFileSync(path.join(workflowDir, file), 'utf8');
 
-    assert.match(workflow, /name: Notify private chat on failure/, file);
+    assert.match(workflow, /name: Notify Discord on failure/, file);
     assert.match(workflow, /if: failure\(\)/, file);
     assert.match(workflow, /npm run notify:workflow-failure --/, file);
     assert.match(workflow, /GITHUB_RUN_URL:/, file);

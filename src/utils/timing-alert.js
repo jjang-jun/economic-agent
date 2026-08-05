@@ -215,7 +215,7 @@ async function buildTimingAlertReport({ recommendations = [], portfolio = {}, mo
     date: getKSTDate(now),
     createdAt: now.toISOString(),
     mode,
-    // Telegram 후보는 리스크와 진입 타이밍을 모두 통과한 경우로 제한한다.
+    // Discord 즉시 후보는 리스크와 진입 타이밍을 모두 통과한 경우로 제한한다.
     // 관찰 후보는 보고서에는 남기되 즉시 알림 대상으로 올리지 않는다.
     candidates: readyCandidates,
     watchCandidates: candidates.filter(item => item.status !== 'ready'),

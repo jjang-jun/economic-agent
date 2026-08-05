@@ -19,11 +19,11 @@ const {
   updateSignalMarketFlow,
   marketFlowContextKey,
 } = require('../src/utils/pre-news-signal');
-const { sendPreNewsSignalReport, formatPreNewsSignalReport } = require('../src/notify/telegram');
+const { sendPreNewsSignalReport, formatPreNewsSignalReport } = require('../src/notify/reports');
 
 function parseArgs(argv = process.argv.slice(2)) {
   return {
-    noTelegram: argv.includes('--noTelegram') || argv.includes('--no-telegram'),
+    noReport: argv.includes('--no-report'),
     noState: argv.includes('--noState') || argv.includes('--no-state'),
     includeEmpty: argv.includes('--include-empty'),
   };
@@ -91,7 +91,7 @@ async function main() {
 
   console.log(`[데이터 이상징후] 감시 ${report.universeCount}개, 확인 필요 ${filtered.candidates.length}개, 낮은 강도 관찰 ${report.watch.length}개`);
 
-  if (options.noTelegram) {
+  if (options.noReport) {
     console.log(formatPreNewsSignalReport(filtered));
     return;
   }

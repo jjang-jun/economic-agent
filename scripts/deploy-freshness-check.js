@@ -1,20 +1,19 @@
 #!/usr/bin/env node
 
-const { sendTelegramMessage } = require('../src/notify/telegram');
-const { sendDiscordCopy } = require('../src/notify/multi-channel');
+const { sendReport } = require('../src/notify/reports');
 
 function parseArgs(argv = process.argv.slice(2), env = process.env) {
   const options = {
     url: env.AGENT_SERVER_URL || env.CLOUD_RUN_SERVICE_URL || env.RENDER_SERVICE_URL || '',
     expectedSha: env.EXPECTED_DEPLOY_SHA || env.GITHUB_SHA || '',
-    noTelegram: false,
+    noReport: false,
     timeoutMs: Number(env.DEPLOY_FRESHNESS_TIMEOUT_MS || 8000),
   };
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (arg === '--noTelegram' || arg === '--no-telegram') {
-      options.noTelegram = true;
+    if (arg === '--no-report') {
+      options.noReport = true;
       continue;
     }
     if (arg === '--url' && argv[i + 1]) {
@@ -126,9 +125,8 @@ async function main() {
 
   console.log(message.replace(/<[^>]+>/g, ''));
   if (!result.ok) {
-    if (!options.noTelegram) {
-      await sendTelegramMessage(message, { channel: 'private' });
-      await sendDiscordCopy(message, 'ops');
+    if (!options.noReport) {
+      await sendReport(message, 'ops');
     }
     process.exit(1);
   }

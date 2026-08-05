@@ -1,11 +1,5 @@
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
-const TELEGRAM_PRIVATE_CHAT_ID = process.env.TELEGRAM_PRIVATE_CHAT_ID
-  || process.env.TELEGRAM_SECRET_CHAT_ID
-  || process.env.TELEGRAM_AGENT_CHAT_ID
-  || process.env.TELEGRAM_PORTFOLIO_CHAT_ID;
 const { officialTickerName } = require('../config/ticker-names');
-const { sendDiscordCopy } = require('./multi-channel');
+const { sendDiscordReport } = require('./discord-reports');
 
 const TAG_MAP = {
   portfolio: '포트폴리오',
@@ -298,87 +292,10 @@ function formatMessage(article) {
   return lines.filter(l => l !== '').join('\n');
 }
 
-function getTelegramChatId(channel = 'public') {
-  if (channel === 'private') return TELEGRAM_PRIVATE_CHAT_ID || TELEGRAM_CHAT_ID;
-  return TELEGRAM_CHAT_ID;
-}
-
-function getTelegramRequestTimeoutMs() {
-  const value = Number(process.env.TELEGRAM_REQUEST_TIMEOUT_MS || 10_000);
-  if (!Number.isFinite(value) || value < 0) return 10_000;
-  return Math.floor(value);
-}
-
-async function fetchTelegram(url, options = {}) {
-  const timeoutMs = getTelegramRequestTimeoutMs();
-  const requestOptions = timeoutMs > 0
-    ? {
-        ...options,
-        signal: options.signal
-          ? AbortSignal.any([options.signal, AbortSignal.timeout(timeoutMs)])
-          : AbortSignal.timeout(timeoutMs),
-      }
-    : options;
-
-  try {
-    return await fetch(url, requestOptions);
-  } catch (err) {
-    if (err?.name === 'TimeoutError') {
-      throw new Error(`Telegram request timed out after ${timeoutMs}ms`, { cause: err });
-    }
-    throw err;
-  }
-}
-
-async function sendTelegramMessage(text, options = {}) {
-  const chatId = options.chatId || getTelegramChatId(options.channel || 'public');
-  if (!TELEGRAM_BOT_TOKEN || !chatId) {
-    if (options.requireDelivery) {
-      throw new Error('Telegram delivery is required but bot token or chat ID is not configured');
-    }
-    console.warn('[Telegram] 봇 토큰 또는 채팅 ID가 설정되지 않았습니다.');
-    console.log('[알림 미리보기]\n' + text);
-    return;
-  }
-
-  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-
-  const payload = {
-    chat_id: chatId,
-    text,
-    parse_mode: 'HTML',
-    disable_web_page_preview: true,
-  };
-  if (options.replyMarkup) payload.reply_markup = options.replyMarkup;
-
-  const res = await fetchTelegram(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Telegram 전송 실패: ${res.status} ${body}`);
-  }
-}
-
-async function answerTelegramCallbackQuery(callbackQueryId, text = '') {
-  if (!TELEGRAM_BOT_TOKEN || !callbackQueryId) return;
-  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`;
-  const res = await fetchTelegram(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      callback_query_id: callbackQueryId,
-      text,
-      show_alert: false,
-    }),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Telegram callback 응답 실패: ${res.status} ${body}`);
-  }
+async function sendReport(text, discordChannel, options = {}) {
+  const result = await sendDiscordReport(text, discordChannel, options);
+  if (result?.delivered) return result;
+  throw new Error(`Discord report delivery failed: ${result?.error || 'no delivery'}`);
 }
 
 async function notifyArticles(articles) {
@@ -386,8 +303,7 @@ async function notifyArticles(articles) {
   for (const article of articles) {
     const message = formatMessage(article);
     try {
-      await sendTelegramMessage(message, { requireDelivery: true });
-      await sendDiscordCopy(message, 'urgent');
+      await sendReport(message, 'urgent');
       sent++;
       if (articles.length > 1) {
         await new Promise(r => setTimeout(r, 1000));
@@ -395,17 +311,16 @@ async function notifyArticles(articles) {
     } catch (err) {
       if (err.message.includes('429')) {
         const wait = parseInt(err.message.match(/retry after (\d+)/)?.[1] || '5', 10);
-        console.warn(`[Telegram] Rate limit, ${wait}초 대기 후 재시도...`);
+        console.warn(`[Discord] Rate limit, ${wait}초 대기 후 재시도...`);
         await new Promise(r => setTimeout(r, wait * 1000));
         try {
-          await sendTelegramMessage(message, { requireDelivery: true });
-          await sendDiscordCopy(message, 'urgent');
+          await sendReport(message, 'urgent');
           sent++;
         } catch (retryErr) {
-          console.error(`[Telegram] 재시도 실패: ${article.title} - ${retryErr.message}`);
+          console.error(`[Discord] 재시도 실패: ${article.title} - ${retryErr.message}`);
         }
       } else {
-        console.error(`[Telegram] 전송 실패: ${article.title} - ${err.message}`);
+        console.error(`[Discord] 전송 실패: ${article.title} - ${err.message}`);
       }
     }
   }
@@ -590,8 +505,7 @@ function formatStockReport(report) {
 async function sendStockReport(report) {
   const message = formatStockReport(report);
   try {
-    await sendTelegramMessage(message, { channel: 'private', requireDelivery: true });
-    await sendDiscordCopy(message, 'action');
+    await sendReport(message, 'action');
     console.log('[종목분석] 리포트 전송 완료');
     return true;
   } catch (err) {
@@ -895,8 +809,7 @@ function formatActionReport(report) {
 async function sendActionReport(report) {
   const message = formatActionReport(report);
   try {
-    await sendTelegramMessage(message, { channel: 'private', requireDelivery: true });
-    await sendDiscordCopy(message, 'action');
+    await sendReport(message, 'action');
     console.log('[행동리포트] 전송 완료');
     return true;
   } catch (err) {
@@ -966,8 +879,7 @@ function formatTimingAlertReport(report = {}) {
 
 async function sendTimingAlertReport(report) {
   const message = formatTimingAlertReport(report);
-  await sendTelegramMessage(message, { channel: 'private', requireDelivery: true });
-  await sendDiscordCopy(message, 'action');
+  await sendReport(message, 'action');
   return true;
 }
 
@@ -1042,8 +954,7 @@ function formatPreNewsSignalReport(report = {}) {
 
 async function sendPreNewsSignalReport(report) {
   const message = formatPreNewsSignalReport(report);
-  await sendTelegramMessage(message, { channel: 'private', requireDelivery: true });
-  await sendDiscordCopy(message, 'pre_news');
+  await sendReport(message, 'pre_news');
   return true;
 }
 
@@ -1134,8 +1045,7 @@ function formatDigest(digest) {
 async function sendDigest(digest) {
   const message = formatDigest(digest);
   try {
-    await sendTelegramMessage(message, { requireDelivery: true });
-    await sendDiscordCopy(message, 'briefing');
+    await sendReport(message, 'briefing');
     console.log(`[다이제스트] ${digest.sessionName} 전송 완료`);
     return true;
   } catch (err) {
@@ -1197,8 +1107,7 @@ function formatPerformanceReport(completed) {
 async function sendPerformanceReport(completed) {
   const message = formatPerformanceReport(completed);
   try {
-    await sendTelegramMessage(message, { channel: 'private', requireDelivery: true });
-    await sendDiscordCopy(message, 'performance');
+    await sendReport(message, 'performance');
     console.log('[성과평가] 리포트 전송 완료');
     return true;
   } catch (err) {
@@ -1245,8 +1154,7 @@ function formatTradePerformanceReport(report) {
 async function sendTradePerformanceReport(report) {
   const message = formatTradePerformanceReport(report);
   try {
-    await sendTelegramMessage(message, { channel: 'private', requireDelivery: true });
-    await sendDiscordCopy(message, 'performance');
+    await sendReport(message, 'performance');
     console.log('[거래성과] 리포트 전송 완료');
     return true;
   } catch (err) {
@@ -1330,8 +1238,7 @@ function formatFreedomStatus(status = {}) {
 async function sendFreedomStatus(status) {
   const message = formatFreedomStatus(status);
   try {
-    await sendTelegramMessage(message, { channel: 'private', requireDelivery: true });
-    await sendDiscordCopy(message, 'portfolio');
+    await sendReport(message, 'portfolio');
     console.log('[경제적자유] 리포트 전송 완료');
     return true;
   } catch (err) {
@@ -1614,8 +1521,7 @@ function formatPerformanceReview(review) {
 async function sendPerformanceReview(review) {
   const message = formatPerformanceReview(review);
   try {
-    await sendTelegramMessage(message, { channel: 'private', requireDelivery: true });
-    await sendDiscordCopy(message, 'performance');
+    await sendReport(message, 'performance');
     console.log('[성과리뷰] 리포트 전송 완료');
     return true;
   } catch (err) {
@@ -1625,6 +1531,6 @@ async function sendPerformanceReview(review) {
 }
 
 module.exports = {
-  notifyArticles, sendStockReport, sendDigest, sendPerformanceReport, sendTradePerformanceReport, sendPerformanceReview, sendActionReport, sendTimingAlertReport, sendPreNewsSignalReport, sendFreedomStatus, sendTelegramMessage, answerTelegramCallbackQuery, getTelegramChatId,
+  notifyArticles, sendStockReport, sendDigest, sendPerformanceReport, sendTradePerformanceReport, sendPerformanceReview, sendActionReport, sendTimingAlertReport, sendPreNewsSignalReport, sendFreedomStatus, sendReport,
   formatMessage, formatStockReport, formatDigest, formatDigestMarketSignal, formatCapitalFlowSection, formatPerformanceReport, formatTradePerformanceReport, formatPerformanceReview, formatActionReport, formatTimingAlertReport, formatPreNewsSignalReport, formatFreedomStatus,
 };

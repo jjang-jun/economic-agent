@@ -7,6 +7,5 @@ module.exports = {
   URGENT_EVENT_DEDUP_HOURS: Number(process.env.URGENT_EVENT_DEDUP_HOURS || 24),
   MAX_SEEN: 15000,
   RSS_TIMEOUT_MS: 10000,
-  TELEGRAM_DELAY_MS: 1000,
   TIMEZONE: 'Asia/Seoul',
 };

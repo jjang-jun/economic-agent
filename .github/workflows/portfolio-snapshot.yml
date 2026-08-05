@@ -45,12 +45,8 @@ jobs:
           SUPABASE_RETRY_COUNT: 5
           SUPABASE_RETRY_DELAY_MS: 1000
 
-      - name: Notify private chat on failure
+      - name: Notify Discord on failure
         if: failure()
         run: npm run notify:workflow-failure -- "Portfolio Snapshot (포트폴리오 평가)" "Build portfolio snapshot"
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          TELEGRAM_PRIVATE_CHAT_ID: ${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}
-          TELEGRAM_SECRET_CHAT_ID: ${{ secrets.TELEGRAM_SECRET_CHAT_ID }}
           GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

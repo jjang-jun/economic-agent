@@ -274,7 +274,7 @@ test('isCollectorWindow allows KST weekday collection hours only', () => {
   assert.equal(isCollectorWindow(new Date('2026-05-09T10:20:00+09:00')), false);
 });
 
-test('sent alert events suppress duplicate immediate Telegram sends', () => {
+test('sent alert events suppress duplicate immediate Discord sends', () => {
   const existing = buildExistingAlertSets([
     { article_id: 'a1', alert_type: 'immediate', status: 'sent' },
     { article_id: 'a2', alert_type: 'digest', status: 'buffered' },

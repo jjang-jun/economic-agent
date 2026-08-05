@@ -30,10 +30,6 @@ jobs:
       - name: Build and send price provider ops report
         run: npm run price-provider:ops-report
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_PRIVATE_CHAT_ID: ${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}
-          TELEGRAM_SECRET_CHAT_ID: ${{ secrets.TELEGRAM_SECRET_CHAT_ID }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -41,12 +37,8 @@ jobs:
           PRICE_PROVIDER_MAX_EMPTY_RATE_PCT: '90'
           PRICE_PROVIDER_MIN_ATTEMPTS: '5'
           PRICE_PROVIDER_MAX_FALLBACK_RATE_PCT: '80'
-      - name: Notify private chat on failure
+      - name: Notify Discord on failure
         if: failure()
         run: npm run notify:workflow-failure -- "Price Provider Ops Report (가격 데이터 점검)" "Build and send price provider ops report"
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          TELEGRAM_PRIVATE_CHAT_ID: ${{ secrets.TELEGRAM_PRIVATE_CHAT_ID }}
-          TELEGRAM_SECRET_CHAT_ID: ${{ secrets.TELEGRAM_SECRET_CHAT_ID }}
           GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

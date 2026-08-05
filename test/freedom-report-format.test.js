@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { formatFreedomStatus } = require('../src/notify/telegram');
+const { formatFreedomStatus } = require('../src/notify/reports');
 
 test('formatFreedomStatus explains target progress and stress without internal jargon', () => {
   const message = formatFreedomStatus({

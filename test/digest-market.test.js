@@ -15,7 +15,7 @@ const {
 } = require('../src/utils/daily-summary');
 const {
   formatDigest,
-} = require('../src/notify/telegram');
+} = require('../src/notify/reports');
 const {
   getSymbolsForSession,
 } = require('../src/utils/market-snapshot');
@@ -209,7 +209,7 @@ test('strong fresh semiconductor rebound overrides a contradictory bearish AI mo
   });
 });
 
-test('digest prompt exposes freshness and final mood is reconciled before Telegram formatting', async () => {
+test('digest prompt exposes freshness and final mood is reconciled before report formatting', async () => {
   let capturedPrompt = '';
   const digest = await generateDigest(
     [{ id: 'article-1', title: '반도체 급반등', score: 5, sentiment: 'bullish' }],
@@ -252,13 +252,13 @@ test('digest prompt exposes freshness and final mood is reconciled before Telegr
   assert.equal(digest.market_mood, 'bullish');
   assert.equal(digest.marketMoodReview.overridden, true);
 
-  const telegram = formatDigest(digest);
-  assert.match(telegram, /호재/);
-  assert.match(telegram, /단기 호재 · 중기 하락 추세 경계/);
-  assert.match(telegram, /오래된 시세 2개 제외/);
-  assert.match(telegram, /AI 초안 악재→호재 보정/);
-  assert.match(telegram, /자금 흐름/);
-  assert.match(telegram, /외국인 3,200억 순매수 · 기관 1,200억 순매도/);
+  const message = formatDigest(digest);
+  assert.match(message, /호재/);
+  assert.match(message, /단기 호재 · 중기 하락 추세 경계/);
+  assert.match(message, /오래된 시세 2개 제외/);
+  assert.match(message, /AI 초안 악재→호재 보정/);
+  assert.match(message, /자금 흐름/);
+  assert.match(message, /외국인 3,200억 순매수 · 기관 1,200억 순매도/);
 });
 
 test('daily summary audit preserves final and original AI mood by session', () => {

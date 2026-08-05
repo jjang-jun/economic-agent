@@ -9,19 +9,19 @@ const {
   markTimingAlertsSent,
   saveTimingAlertState,
 } = require('../src/utils/timing-alert');
-const { sendTimingAlertReport, formatTimingAlertReport } = require('../src/notify/telegram');
+const { sendTimingAlertReport, formatTimingAlertReport } = require('../src/notify/reports');
 
 function parseArgs(argv = process.argv.slice(2)) {
   const options = {
     mode: 'intraday',
-    noTelegram: false,
+    noReport: false,
     noState: false,
   };
 
   for (const arg of argv) {
     if (arg === 'premarket' || arg === '--premarket') options.mode = 'premarket';
     else if (arg === 'intraday' || arg === '--intraday') options.mode = 'intraday';
-    else if (arg === '--noTelegram' || arg === '--no-telegram') options.noTelegram = true;
+    else if (arg === '--no-report') options.noReport = true;
     else if (arg === '--noState' || arg === '--no-state') options.noState = true;
   }
 
@@ -96,7 +96,7 @@ async function main() {
 
   console.log(`[타이밍알림] ${resolved.mode} 후보 ${filteredReport.candidates.length}건`);
 
-  if (options.noTelegram) {
+  if (options.noReport) {
     console.log(formatTimingAlertReport(filteredReport));
     return;
   }

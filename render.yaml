@@ -9,12 +9,20 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: TELEGRAM_BOT_TOKEN
+      - key: DISCORD_APPLICATION_ID
         sync: false
-      - key: TELEGRAM_SECRET_CHAT_ID
+      - key: DISCORD_PUBLIC_KEY
         sync: false
-      - key: TELEGRAM_WEBHOOK_SECRET
+      - key: DISCORD_GUILD_ID
         sync: false
+      - key: DISCORD_ALLOWED_USER_IDS
+        sync: false
+      - key: DISCORD_ALLOWED_CHANNEL_IDS
+        sync: false
+      - key: DISCORD_WEBHOOKS_JSON_BASE64
+        sync: false
+      - key: DISCORD_REPORTS_ENABLED
+        value: "true"
       - key: JOB_SECRET
         sync: false
       - key: DASHBOARD_SECRET
@@ -71,12 +79,10 @@ services:
         value: production
       - key: COLLECTOR_TRIGGER_SOURCE
         value: render_cron
-      - key: TELEGRAM_BOT_TOKEN
+      - key: DISCORD_WEBHOOKS_JSON_BASE64
         sync: false
-      - key: TELEGRAM_CHAT_ID
-        sync: false
-      - key: TELEGRAM_SECRET_CHAT_ID
-        sync: false
+      - key: DISCORD_REPORTS_ENABLED
+        value: "true"
       - key: SUPABASE_PROJECT_URL
         sync: false
       - key: SUPABASE_PUBLISHABLE_KEY

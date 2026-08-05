@@ -7,7 +7,7 @@ const {
   markTimingAlertsSent,
 } = require('../src/utils/timing-alert');
 const { resolveTimingMode } = require('../scripts/timing-alert');
-const { formatTimingAlertReport } = require('../src/notify/telegram');
+const { formatTimingAlertReport } = require('../src/notify/reports');
 
 const now = new Date('2026-05-11T01:05:00.000Z');
 
@@ -136,7 +136,7 @@ test('formatTimingAlertReport labels first entry as conditional for watch candid
   assert.match(message, /조건 충족 시 1차 400,000원 \(4주\)/);
 });
 
-test('premarket report keeps watch candidates out of Telegram candidates', async () => {
+test('premarket report keeps watch candidates out of Discord alert candidates', async () => {
   const blockedRecommendation = {
     ...recommendation,
     riskProfile: { ...recommendation.riskProfile, tradeable: false },
@@ -163,7 +163,7 @@ test('getTimingSession separates premarket and intraday by KST clock', () => {
 
 test('resolveTimingMode switches delayed scheduled premarket run to intraday', () => {
   const resolved = resolveTimingMode(
-    { mode: 'premarket', noTelegram: false, noState: false },
+    { mode: 'premarket', noReport: false, noState: false },
     { GITHUB_EVENT_NAME: 'schedule' },
     new Date('2026-05-12T01:25:00.000Z'),
   );
@@ -175,7 +175,7 @@ test('resolveTimingMode switches delayed scheduled premarket run to intraday', (
 
 test('resolveTimingMode skips scheduled intraday run after market close', () => {
   const resolved = resolveTimingMode(
-    { mode: 'intraday', noTelegram: false, noState: false },
+    { mode: 'intraday', noReport: false, noState: false },
     { GITHUB_EVENT_NAME: 'schedule' },
     new Date('2026-05-12T07:10:00.000Z'),
   );

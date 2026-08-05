@@ -188,10 +188,10 @@ test('summarizeCollectorOps marks stale collector success during expected window
   assert.deepEqual(buildCollectorOpsAnomalies(summary), ['마지막 성공 후 119분 경과']);
 });
 
-test('collector ops args support noTelegram and explicit days', () => {
-  assert.deepEqual(parseArgs(['--noTelegram'], {}), { days: 1, noTelegram: true });
-  assert.deepEqual(parseArgs(['--days', '7'], {}), { days: 7, noTelegram: false });
-  assert.deepEqual(parseArgs(['--days=3', '--no-telegram'], {}), { days: 3, noTelegram: true });
+test('collector ops args support no-report and explicit days', () => {
+  assert.deepEqual(parseArgs(['--no-report'], {}), { days: 1, noReport: true });
+  assert.deepEqual(parseArgs(['--days', '7'], {}), { days: 7, noReport: false });
+  assert.deepEqual(parseArgs(['--days=3', '--no-report'], {}), { days: 3, noReport: true });
 });
 
 test('collector ops summary includes anomalies and alert counts', () => {

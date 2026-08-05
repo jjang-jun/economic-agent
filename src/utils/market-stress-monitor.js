@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { fetchCurrentPrice } = require('../sources/price-provider');
-const { sendTelegramMessage } = require('../notify/telegram');
+const { sendReport } = require('../notify/reports');
 const {
   loadAlertEventsForArticles,
   persistAlertEvents,
@@ -139,7 +139,7 @@ async function monitorMarketStress(options = {}) {
   }
 
   const quoteFetcher = options.quoteFetcher || fetchCurrentPrice;
-  const alertSender = options.alertSender || sendTelegramMessage;
+  const alertSender = options.alertSender || (message => sendReport(message, 'urgent'));
   const alertLoader = options.alertLoader || loadAlertEventsForArticles;
   const alertPersister = options.alertPersister || persistAlertEvents;
   const snapshotPersister = options.snapshotPersister || persistMarketSnapshots;

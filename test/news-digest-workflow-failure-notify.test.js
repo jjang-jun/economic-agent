@@ -45,17 +45,17 @@ const cases = [
 ];
 
 for (const { file, workflowName, stepName } of cases) {
-  test(`${file} notifies private Telegram on failure`, () => {
+  test(`${file} notifies Discord on failure`, () => {
     const workflow = readWorkflow(file);
 
     assert.match(workflow, new RegExp(`name: ${escapeRegExp(stepName)}`));
-    assert.match(workflow, /name: Notify private chat on failure/);
+    assert.match(workflow, /name: Notify Discord on failure/);
     assert.match(workflow, /if: failure\(\)/);
     assert.match(
       workflow,
       new RegExp(`npm run notify:workflow-failure -- "${escapeRegExp(workflowName)}" "${escapeRegExp(stepName)}"`),
     );
-    assert.match(workflow, /TELEGRAM_PRIVATE_CHAT_ID:/);
+    assert.match(workflow, /DISCORD_REPORTS_ENABLED:/);
     assert.match(workflow, /GITHUB_RUN_URL:/);
   });
 }

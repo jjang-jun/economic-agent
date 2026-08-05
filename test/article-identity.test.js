@@ -9,7 +9,7 @@ const {
 
 test('normalizeUrl removes tracking parameters', () => {
   assert.equal(
-    normalizeUrl('https://example.com/news/1?utm_source=x&ref=telegram&id=7#section'),
+    normalizeUrl('https://example.com/news/1?utm_source=x&ref=chat&id=7#section'),
     'example.com/news/1?id=7'
   );
 });

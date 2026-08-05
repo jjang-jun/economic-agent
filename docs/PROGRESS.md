@@ -4,22 +4,26 @@
 
 ## 목표
 
-이 프로젝트의 목표는 단순 뉴스 요약이 아니라 다음 투자 의사결정 루프를 자동화하고 검증하는 것입니다.
+이 프로젝트의 목표는 단순 뉴스 요약이나 종목 추천기가 아니라, **내 순자산이 경제적 자유 목표에 도달할 확률을 높이는 개인 AI 경제 사무실**이 되는 것입니다. AI는 분석 참모로서 상태 파악과 행동 후보·리스크·성과 검증을 돕고, 외부 행동과 자산 변경의 최종 판단은 사용자가 맡습니다.
 
 ```
-시장/공시/가격/지표 수집
+경제적 자유 목표와 포트폴리오 상태
+  -> 시장/공시/정책/가격/수급 수집
   -> 시장 레짐 판단
-  -> 종목 후보와 리스크 도출
+  -> 내 자산 영향과 종목 후보·리스크 도출
   -> 포트폴리오 기준 행동 가드레일 적용
-  -> 추천/실행/성과 기록
+  -> 사용자 확인·승인
+  -> 추천/결정/실행/성과 기록
   -> 누적 히스토리로 개선
 ```
+
+범용 개인 AI 조직 운영체제는 현재 구현 범위에서 분리하고 `docs/future/AI_AGENT_TEAM_BLUEPRINT.md`에 미래 설계로 보존합니다. 현재 저장소는 경제적 자유 목표에 직접 기여하는 경제·투자·자산관리 도메인에 집중합니다.
 
 ## 현재 상태
 
 - 뉴스/RSS/DART 공시 수집: 동작
 - 로컬 스코어링: 키워드, 섹터, FinBERT 기반으로 동작
-- Telegram 즉시 알림: score 5 중 보유/명시적 critical 종목의 치명 공시 또는 시장 전체 사건만 대상
+- Discord 즉시 알림: score 5 중 보유/명시적 critical 종목의 치명 공시 또는 시장 전체 사건만 대상
 - 정기 AI 다이제스트: 평일 08:20, 11:50, 15:45, 17:10, 22:40 KST
 - 장 마감 종목 리포트: 당일 기사 아카이브 기반
 - 추천 성과 평가: 1일/5일/20일, KOSPI 벤치마크 대비 평가
@@ -29,6 +33,8 @@
 - AI 토큰 절약: 상위 기사/핵심 스냅샷만 프롬프트에 사용
 
 ## 최근 변경
+
+> 2026-08-05 이전 항목은 당시 운영 상태를 보존한 역사 기록입니다. 그 안의 이전 메시징 플랫폼 명령·환경변수·배포 경로는 현재 실행 지침이 아니며, 현재 운영은 Discord 단독 기준입니다.
 
 ### 2026-05-06
 
@@ -320,6 +326,13 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - Discord Bot API 자동 프로비저너를 실제 서버에 적용했다. `01 핵심 신호`(긴급·일일행동·시장브리핑·선행신호), `02 자산 관리`(포트폴리오·성과), `03 정책 인텔리전스`(세금·부동산), `04 운영`(시스템점검)의 4개 카테고리로 정렬했다. 기존 리소스는 재사용하고 삭제하지 않으며 Webhook map은 ignored 파일에 `0600`으로 저장한다. 9개 채널 모두 실제 Webhook 수신을 확인했다.
 - Discord 병행 전송 마이그레이션을 시작했다. `DISCORD_REPORTS_ENABLED=true`인 24개 GitHub Actions Workflow에서 긴급뉴스→긴급, 다이제스트→시장브리핑, 종목·행동·타이밍→일일행동, 경제적 자유→포트폴리오, 정책 도메인→세금/부동산, 이상징후→선행신호, 추천·거래 성과→성과, 수집·가격·배포·Workflow 실패→시스템점검으로 분기한다. Discord 실패는 Telegram 성공과 버퍼·저장을 되돌리지 않으며 GitHub Secret에는 9개 Webhook 지도를 동기화했다.
 - Discord 메시지를 채널별 색상·고정 제목·Footer·시각·페이지가 있는 Embed 카드로 개선했다. Telegram HTML은 Discord Markdown으로 정리하고 본문은 Embed 제한보다 여유 있는 3,800자 단위로 분할한다. `DISCORD_USE_EMBEDS=false` 일반 텍스트 fallback과 `allowed_mentions` 차단은 유지한다.
+- Discord 전달 경로의 조용한 누락을 줄이기 위해 `discord-smoke.yml`을 평일 08:10 KST에 예약했다. 첫 장전 브리핑 10분 전에 9개 Webhook 설정을 검증하고 `#시스템-점검`에 설정 수·배포 커밋·Actions 링크가 포함된 health 카드를 보내며, 실패는 private Telegram Workflow 장애 알림으로 승격한다. 수동 실행의 채널 선택 기능은 유지한다.
+- 2026-08-04 프로젝트 North Star를 뉴스 에이전트에서 `경제적 자유 목표 달성 확률을 높이는 개인 AI 경제 사무실`로 명확히 했다. 범용 개발·법무·이메일·다중 프로젝트 팀은 현재 범위에서 제외하고, 향후 개인 AI 조직 운영체제의 SSoT·`to/cc`·다중 인스턴스·승인·기억·이메일 Draft 설계를 `docs/future/AI_AGENT_TEAM_BLUEPRINT.md`에 별도로 보존했다.
+- 2026-08-04 Discord 읽기 전용 Interaction 경로를 추가했다. Cloud Run의 `POST /discord/interactions`가 원문 body의 Ed25519 서명과 5분 timestamp freshness, guild/user/선택적 channel allowlist를 검증하고 `/portfolio`, `/goal`, `/risk`, `/recommendations`, `/trades`, `/trade-performance`를 ephemeral deferred 응답으로 제공한다. 응답은 기존 Telegram 포맷을 Discord Markdown으로 변환하며 Interaction token은 저장하지 않는다. `/buy`, `/sell`, `/cash`는 Slash 명령으로 등록하지 않는다.
+- 2026-08-04 Discord 멘션 자연어 worker를 추가했다. 항상 켜진 PC/VM의 최소-intent Gateway 연결이 직접 멘션과 명시된 guild/user/channel만 처리한다. 완료형 자연어 `샀어/매수했어`, `팔았어/매도했어`, 현금 잔액 입력을 보수적으로 canonical command로 변환하고, 종목·수량·가격이 불명확하면 추측하지 않는다. 변경은 기존 `pending_actions` 초안과 요청자별 `기록하기/취소` 버튼을 거치며 `DISCORD_MENTION_ACTIONS_ENABLED`는 기본 비활성이다. 상담 질문은 거래로 승격하지 않고 실제 증권사 주문은 수행하지 않는다.
+- 2026-08-05 Discord Gateway worker의 실행 계약을 Windows·macOS·Linux 공통 Node.js 22+ 런타임으로 명시했다. worker와 npm 명령에는 OS 전용 셸·절대 경로를 사용하지 않으며 `discord:agent-worker:check`가 네트워크 없이 현재 플랫폼, Node 버전, fetch/WebSocket/timeout 지원을 검사한다. `Discord Worker Portability` Workflow도 Windows·macOS·Ubuntu 실제 runner에서 동일 검사와 멘션 테스트를 실행한다. Gateway 재연결은 공통 코드가 담당하고 재부팅 자동 시작만 Windows 서비스 관리자·macOS `launchd`·Linux `systemd` 같은 호스트 계층이 담당한다. 대화·승인 SSoT는 Supabase에 유지해 실행 OS가 바뀌어도 동일 상태를 사용한다.
+- 2026-08-05 하나의 `@Economic Agent` 뒤에 경제 도메인 전문가 팀을 추가했다. 결정론적 router가 투자·부동산·세금/연금·포트폴리오·리스크·데이터 검증 중 주 담당 1명과 의사결정 질문의 검토자 최대 2명을 선택한다. 각 역할은 필요한 SSoT 범위만 로딩하고 별도 AI 호출·출력 토큰 상한·호출 제한 시간·`expert:<role_id>` 대화 namespace를 사용한다. 검토 실패는 주 답변을 폐기하지 않고, 정책 단계·기준 시점·데이터 공백·자동 실행 금지 규율을 공통 적용한다. 기능은 provider 개인정보 처리 확인 전까지 `DISCORD_EXPERT_RESPONSES_ENABLED=false`가 기본이다.
+- 2026-08-05 메시징 플랫폼을 Discord로 완전히 통합했다. 이전 전송 모듈, webhook endpoint, 명령 동기화, 승인 smoke 스크립트·workflow, 환경변수와 배포 문서를 제거했다. 공용 리포트 포맷은 `src/notify/reports.js`, 정책 리포트는 `policy-report.js`, Discord 필수 전달 계약은 `discord-reports.js`로 분리했다. 기존 Supabase 알림 이력과 마이그레이션 열은 데이터 보존을 위해 삭제하지 않았다. `DISCORD_ALLOWED_USER_IDS`는 봇 사용 허용 목록이며 비어 있으면 모두 거부한다.
 
 ## 다음 작업
 
@@ -328,9 +341,10 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 3. 실제 입출금이 발생할 때 `cashflow:record`로 기록하고, 다음 월간 리뷰에서 TWR/MWR와 KOSPI 비교가 생성되는지 확인한다.
 4. Qwen 메타데이터가 붙고 리스크 승인을 받은 추천의 20거래일 평가가 30건 이상 쌓이면 `npm run db:pull && npm run model:performance`로 모델 효과를 평가한다. 그 전에는 지연·JSON 준수율·비용만 canary 지표로 본다.
 5. 가격 provider의 `해외/글로벌 가격 API 보강 검토` 판단이 주간/월간 리뷰에서 반복되는지 모니터링하되, 최근 1일 점검은 정상이라 Massive 과금은 필요성이 명확해질 때까지 보류
-6. 다음 실제 workflow 실패 시 private 알림 도착 여부 재확인
+6. 다음 실제 workflow 실패 시 Discord `#시스템-점검` 알림 도착 여부 재확인
 7. `/dashboard` 실제 사용 빈도에 따라 탭 분리와 상세 차트 추가 여부 결정
 8. 월간 리서치 worker 결과를 다음 월간 리뷰에서 실제 의사결정에 도움이 되는지 확인
-9. 다음 실제 매매에서 Telegram `/buy` 또는 `/sell ... reason=사유` 초안의 추천·계획 연결, 원화 반영액, 실현손익을 확인하고 주간 리뷰의 연결률·매도 사유 기록률을 검증
+9. 다음 실제 매매에서 Discord 자연어 매수/매도 초안의 추천·계획 연결, 원화 반영액, 실현손익을 확인하고 주간 리뷰의 연결률·매도 사유 기록률을 검증
 10. `policy-radar.yml` 배포 후 첫 예약 실행의 공식 소스별 건수와 국토교통부 RSS 복구 여부를 확인한다. 다음 단계는 국가법령정보와 국회 의안 상태를 연결해 정부안부터 시행까지 동일 사건으로 추적하는 것이다.
-11. Discord 병행 전송을 1~2주 관찰해 누락·중복·모바일 가독성을 비교한다. 안정화 전까지 Telegram을 병행하고, 이후에도 긴급 알림·거래 입력·승인은 Telegram에 유지한다.
+11. Discord 단독 전송을 관찰해 긴급·브리핑·행동·정책·성과·운영 채널의 누락과 모바일 가독성을 확인한다.
+12. Agent Server에 Discord 환경변수를 넣고 배포한 뒤 Developer Portal의 Interaction URL을 연결하고 `npm run discord:sync-commands`를 실행한다. 선택한 Windows/macOS/Linux 상시 호스트에서 `npm run discord:agent-worker:check` 후 `npm run discord:agent-worker`를 배치한다. 개인 `#포트폴리오` 채널에서 여섯 Slash 조회와 멘션 자연어 초안, 기록/취소 버튼, 요청자·채널 경계, 미허용 사용자 차단을 smoke 검증한다.

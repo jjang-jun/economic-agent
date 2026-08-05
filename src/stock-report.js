@@ -4,7 +4,7 @@ const { filterByKeywords } = require('./filters/keyword-filter');
 // 종목 분석은 로컬 스코어러로 충분 (AI는 analyzeStocks에서만 사용)
 const { scoreArticles } = require('./filters/local-scorer');
 const { analyzeStocks } = require('./analysis/stock-analyzer');
-const { sendStockReport } = require('./notify/telegram');
+const { sendStockReport } = require('./notify/reports');
 const { fetchAllIndicators } = require('./utils/indicators');
 const { saveDailySummary } = require('./utils/daily-summary');
 const { archiveScoredArticles, loadScoredArticles, getKSTDate } = require('./utils/article-archive');

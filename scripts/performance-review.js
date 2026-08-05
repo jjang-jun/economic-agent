@@ -1,11 +1,11 @@
 const { buildPerformanceReview, savePerformanceReview } = require('../src/utils/performance-review');
-const { sendPerformanceReview } = require('../src/notify/telegram');
+const { sendPerformanceReview } = require('../src/notify/reports');
 const { persistPerformanceReview } = require('../src/utils/persistence');
 
 function parseArgs(argv = process.argv.slice(2)) {
   const options = {
     period: 'weekly',
-    noTelegram: false,
+    noReport: false,
     noPersist: false,
     noSave: false,
   };
@@ -15,8 +15,8 @@ function parseArgs(argv = process.argv.slice(2)) {
       options.period = arg;
       continue;
     }
-    if (arg === '--noTelegram' || arg === '--no-telegram') {
-      options.noTelegram = true;
+    if (arg === '--no-report') {
+      options.noReport = true;
       continue;
     }
     if (arg === '--noPersist' || arg === '--no-persist') {
@@ -28,7 +28,7 @@ function parseArgs(argv = process.argv.slice(2)) {
       continue;
     }
     if (arg === '--dry-run') {
-      options.noTelegram = true;
+      options.noReport = true;
       options.noPersist = true;
       options.noSave = true;
       continue;
@@ -39,7 +39,7 @@ function parseArgs(argv = process.argv.slice(2)) {
 }
 
 async function main() {
-  const { period, noTelegram, noPersist, noSave } = parseArgs();
+  const { period, noReport, noPersist, noSave } = parseArgs();
   if (!['weekly', 'monthly'].includes(period)) {
     throw new Error('period must be weekly or monthly');
   }
@@ -61,8 +61,8 @@ async function main() {
     console.log(`[성과리뷰] ${period} review built without local save`);
   }
   console.log(`[성과리뷰] 추천 ${review.recommendationSummary.total}건, 거래 ${review.tradeSummary.total}건`);
-  if (noTelegram) {
-    console.log('[성과리뷰] Telegram 전송 생략');
+  if (noReport) {
+    console.log('[성과리뷰] Discord 전송 생략');
   } else {
     const sent = await sendPerformanceReview(review);
     if (!sent) throw new Error('성과 리뷰 전송 실패');

@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { formatStockReport } = require('../src/notify/telegram');
+const { formatStockReport } = require('../src/notify/reports');
 
 test('formatStockReport explains regime, VIX, USD/KRW, and risk reward blockers', () => {
   const message = formatStockReport({

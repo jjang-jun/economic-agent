@@ -18,7 +18,7 @@ test('quality gate workflow runs tests and harness check on main pushes', () => 
   assert.match(workflow, /run: npm test/);
   assert.match(workflow, /name: Check agent harness docs/);
   assert.match(workflow, /run: npm run agent:harness-check/);
-  assert.match(workflow, /name: Notify private chat on failure/);
+  assert.match(workflow, /name: Notify Discord on failure/);
   assert.match(workflow, /if: failure\(\) && github\.event_name != 'pull_request'/);
   assert.match(workflow, /npm run notify:workflow-failure -- "Quality Gate \(테스트와 문서 점검\)" "Run test suite \/ Check agent harness docs"/);
   assert.match(workflow, /GITHUB_RUN_URL:/);

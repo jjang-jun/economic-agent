@@ -6,10 +6,31 @@ const {
 
 function parseArgs(argv = process.argv.slice(2)) {
   const channelArg = argv.find(arg => arg.startsWith('--channel='));
+  const requestedChannel = channelArg ? channelArg.slice('--channel='.length).trim() : '';
   return {
     sendTest: argv.includes('--send-test') || argv.includes('--sendTest'),
-    channel: channelArg ? channelArg.slice('--channel='.length) : 'ops',
+    channel: requestedChannel || 'ops',
   };
+}
+
+function githubRunUrl(env = process.env) {
+  if (!env.GITHUB_SERVER_URL || !env.GITHUB_REPOSITORY || !env.GITHUB_RUN_ID) return '';
+  return `${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}`;
+}
+
+function buildSmokeMessage({ target, configured, total, now = new Date(), env = process.env }) {
+  const scheduled = env.GITHUB_EVENT_NAME === 'schedule';
+  const sha = String(env.GITHUB_SHA || '').slice(0, 7);
+  const runUrl = env.GITHUB_RUN_URL || githubRunUrl(env);
+  return [
+    '**Discord 전송 상태: 정상**',
+    `점검 방식: ${scheduled ? '평일 장전 자동 점검' : '수동 점검'}`,
+    `Webhook 설정: **${configured}/${total}개 정상**`,
+    `수신 채널: \`#${target.name}\``,
+    sha ? `배포 커밋: \`${sha}\`` : '',
+    `점검 시각: ${now.toISOString()}`,
+    runUrl ? `[GitHub Actions 실행 보기](${runUrl})` : '',
+  ].filter(Boolean).join('\n');
 }
 
 function formatConfigurationReport(rows) {
@@ -37,15 +58,14 @@ async function main(options = parseArgs()) {
 
   const target = rows.find(row => row.key === options.channel);
   if (!target?.configured) throw new Error(`Discord ${options.channel} 채널 webhook이 설정되지 않았습니다.`);
-  const result = await sendDiscordMessage([
-    '🧪 **Economic Agent Discord 연결 점검**',
-    `채널: \`#${target.name}\``,
-    `시각: ${new Date().toISOString()}`,
-    '결과: Webhook 수신 정상',
-  ].join('\n'), {
+  const result = await sendDiscordMessage(buildSmokeMessage({
+    target,
+    configured: configured.length,
+    total: rows.length,
+  }), {
     channel: options.channel,
     requireDelivery: true,
-    telegramHtml: false,
+    reportHtml: false,
     username: 'Economic Agent',
   });
   console.log(`[Discord] #${target.name} smoke 전송 완료 (${result.messageCount}개 메시지)`);
@@ -61,6 +81,8 @@ if (require.main === module) {
 
 module.exports = {
   parseArgs,
+  githubRunUrl,
+  buildSmokeMessage,
   formatConfigurationReport,
   main,
 };

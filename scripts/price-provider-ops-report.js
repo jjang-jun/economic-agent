@@ -4,8 +4,7 @@ const {
   buildPriceSourceQualitySummary,
   buildPriceSourceQualityAnomalies,
 } = require('../src/utils/price-source-quality');
-const { sendTelegramMessage } = require('../src/notify/telegram');
-const { sendDiscordCopy } = require('../src/notify/multi-channel');
+const { sendReport } = require('../src/notify/reports');
 
 function getKSTClock(now = new Date()) {
   const formatter = new Intl.DateTimeFormat('en-CA', {
@@ -36,13 +35,13 @@ function shouldSendScheduledOpsReport(now = new Date(), env = process.env) {
 function parseArgs(argv = process.argv.slice(2), env = process.env) {
   const options = {
     days: Number(env.PRICE_PROVIDER_OPS_DAYS || 1),
-    noTelegram: false,
+    noReport: false,
   };
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg === '--noTelegram' || arg === '--no-telegram') {
-      options.noTelegram = true;
+    if (arg === '--no-report') {
+      options.noReport = true;
       continue;
     }
     if (arg === '--days') {
@@ -131,29 +130,28 @@ function formatSummary(summary, anomalies) {
 }
 
 async function main() {
-  const { days, noTelegram } = parseArgs();
+  const { days, noReport } = parseArgs();
   if (!shouldSendScheduledOpsReport()) {
-    console.log(`[price-provider-ops] 지연 실행 감지. 예정 시간대 밖(${getKSTClock().label})이라 Telegram 전송을 건너뜁니다.`);
+    console.log(`[price-provider-ops] 지연 실행 감지. 예정 시간대 밖(${getKSTClock().label})이라 Discord 전송을 건너뜁니다.`);
     return;
   }
   const summary = await buildPriceSourceQualitySummary({ days });
   const anomalies = buildPriceSourceQualityAnomalies(summary);
   console.log(JSON.stringify({ days, summary, anomalies }, null, 2));
 
-  if (noTelegram) {
-    console.log('[price-provider-ops] --noTelegram 지정. Telegram 전송 생략.');
+  if (noReport) {
+    console.log('[price-provider-ops] --no-report 지정. Discord 전송 생략.');
     return;
   }
 
   if (anomalies.length === 0 && process.env.PRICE_PROVIDER_SEND_OK !== '1') {
-    console.log('[price-provider-ops] 이상치 없음. Telegram 전송 생략.');
+    console.log('[price-provider-ops] 이상치 없음. Discord 전송 생략.');
     return;
   }
 
   const message = formatSummary(summary, anomalies);
-  await sendTelegramMessage(message, { channel: 'private' });
-  await sendDiscordCopy(message, 'ops');
-  console.log('[price-provider-ops] Telegram 전송 완료');
+  await sendReport(message, 'ops');
+  console.log('[price-provider-ops] 알림 전송 완료');
 }
 
 if (require.main === module) {

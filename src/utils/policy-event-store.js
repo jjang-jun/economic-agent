@@ -45,6 +45,56 @@ function fromRow(row) {
   };
 }
 
+function policyEventTime(event = {}) {
+  const value = Date.parse(event.publishedAt || event.published_at || event.lastSeenAt || event.last_seen_at || '');
+  return Number.isFinite(value) ? value : 0;
+}
+
+function filterRecentPolicyEvents(events = [], options = {}) {
+  const domains = new Set((options.domains || []).filter(Boolean).map(String));
+  const limit = Math.max(1, Math.min(30, Number(options.limit || 8)));
+  return (events || [])
+    .filter(event => {
+      if (domains.size === 0) return true;
+      const eventDomains = [event.domain, ...(event.domains || [])].filter(Boolean).map(String);
+      return eventDomains.some(domain => domains.has(domain));
+    })
+    .sort((a, b) => policyEventTime(b) - policyEventTime(a))
+    .slice(0, limit);
+}
+
+async function loadRecentPolicyEvents(options = {}) {
+  const limit = Math.max(1, Math.min(30, Number(options.limit || 8)));
+  if (!isPersistenceEnabled()) {
+    const state = loadLocalState();
+    return {
+      events: filterRecentPolicyEvents(Object.values(state.events || {}), options),
+      source: 'local',
+      error: '',
+    };
+  }
+
+  const result = await selectRows('policy_events', {
+    select: '*',
+    order: 'published_at.desc.nullslast,last_seen_at.desc',
+    limit: String(Math.max(limit * 4, 20)),
+  });
+  if (result.error || !Array.isArray(result.rows)) {
+    const state = loadLocalState();
+    const localEvents = filterRecentPolicyEvents(Object.values(state.events || {}), options);
+    return {
+      events: localEvents,
+      source: localEvents.length > 0 ? 'local_fallback' : 'unavailable',
+      error: result.error?.message || '정책 이벤트 응답 없음',
+    };
+  }
+  return {
+    events: filterRecentPolicyEvents(result.rows.map(fromRow), options),
+    source: 'supabase',
+    error: '',
+  };
+}
+
 async function loadPolicyEventState(events = []) {
   if (!isPersistenceEnabled()) {
     const state = loadLocalState();
@@ -167,8 +217,10 @@ function pendingPolicyEvents(events = [], existingById = new Map()) {
 }
 
 module.exports = {
+  filterRecentPolicyEvents,
   getStateFile,
   loadLocalState,
+  loadRecentPolicyEvents,
   saveLocalState,
   loadPolicyEventState,
   savePolicyEvents,

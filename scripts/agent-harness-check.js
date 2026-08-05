@@ -40,6 +40,26 @@ const checks = [
     message: 'docs/README.md must index AGENT_HARNESS.md',
   },
   {
+    file: 'docs/future/AI_AGENT_TEAM_BLUEPRINT.md',
+    pattern: '# Personal AI Organization Blueprint',
+    message: 'future personal AI organization blueprint must exist',
+  },
+  {
+    file: 'docs/README.md',
+    pattern: 'future/AI_AGENT_TEAM_BLUEPRINT.md',
+    message: 'docs/README.md must index the future AI organization blueprint',
+  },
+  {
+    file: 'AGENTS.md',
+    pattern: 'docs/future/AI_AGENT_TEAM_BLUEPRINT.md',
+    message: 'AGENTS.md must keep the generic AI organization outside the current economic scope',
+  },
+  {
+    file: 'README.md',
+    pattern: 'docs/future/AI_AGENT_TEAM_BLUEPRINT.md',
+    message: 'README.md must link the future AI organization blueprint',
+  },
+  {
     file: 'AGENTS.md',
     pattern: 'docs/AGENT_HARNESS.md',
     message: 'AGENTS.md must point Codex to the harness doc',

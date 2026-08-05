@@ -1053,7 +1053,6 @@ async function persistAlertEvents(events) {
       article_id: event.articleId,
       alert_type: event.alertType,
       sent_at: event.sentAt || null,
-      telegram_message_id: event.telegramMessageId || null,
       status: event.status || 'pending',
       payload: event.payload || {},
     }));

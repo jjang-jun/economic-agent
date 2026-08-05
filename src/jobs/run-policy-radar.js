@@ -6,7 +6,7 @@ const {
   markPolicyEventsNotified,
   pendingPolicyEvents,
 } = require('../utils/policy-event-store');
-const { sendPolicyRadarReport, formatPolicyRadarReport } = require('../notify/policy-telegram');
+const { sendPolicyRadarReport, formatPolicyRadarReport } = require('../notify/policy-report');
 const { tryAcquireJobLock, releaseJobLock } = require('../utils/persistence');
 
 function uniqueEvents(events = []) {
@@ -112,14 +112,14 @@ async function runPolicyRadar(options = {}) {
       return { ok: true, sent: false, ...report };
     }
 
-    if (options.noTelegram) {
+    if (options.noReport) {
       console.log(formatPolicyRadarReport(report));
       return { ok: true, sent: false, preview: true, ...report };
     }
 
     await (options.sendReport || sendPolicyRadarReport)(report);
     await markPolicyEventsNotified(report.events, stored.byId, { now: now.toISOString() });
-    console.log(`[정책레이더] Telegram ${report.events.length}건 전송 완료`);
+    console.log(`[정책레이더] Discord ${report.events.length}건 전송 완료`);
     return { ok: true, sent: true, ...report };
   } finally {
     if (!shouldSkipLock) await releaseJobLock(jobName);

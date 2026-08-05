@@ -7,25 +7,25 @@ function readWorkflow(name) {
   return fs.readFileSync(path.join(__dirname, '..', '.github', 'workflows', name), 'utf8');
 }
 
-test('collector ops workflow notifies private Telegram on failure', () => {
+test('collector ops workflow notifies Discord on failure', () => {
   const workflow = readWorkflow('collector-ops-report.yml');
 
   assert.match(workflow, /5 3 \* \* 1-5/);
   assert.match(workflow, /50 14 \* \* 1-5/);
   assert.match(workflow, /name: Build and send collector ops report/);
-  assert.match(workflow, /name: Notify private chat on failure/);
+  assert.match(workflow, /name: Notify Discord on failure/);
   assert.match(workflow, /if: failure\(\)/);
   assert.match(workflow, /SUPABASE_REQUEST_TIMEOUT_MS: 10000/);
-  assert.match(workflow, /TELEGRAM_REQUEST_TIMEOUT_MS: 10000/);
+  assert.match(workflow, /DISCORD_REPORTS_ENABLED: ["']?true["']?/);
   assert.match(workflow, /npm run notify:workflow-failure -- "Collector Ops Report \(수집기 운영 점검\)" "Build and send collector ops report"/);
   assert.match(workflow, /GITHUB_RUN_URL:/);
 });
 
-test('price provider ops workflow notifies private Telegram on failure', () => {
+test('price provider ops workflow notifies Discord on failure', () => {
   const workflow = readWorkflow('price-provider-ops-report.yml');
 
   assert.match(workflow, /name: Build and send price provider ops report/);
-  assert.match(workflow, /name: Notify private chat on failure/);
+  assert.match(workflow, /name: Notify Discord on failure/);
   assert.match(workflow, /if: failure\(\)/);
   assert.match(workflow, /npm run notify:workflow-failure -- "Price Provider Ops Report \(가격 데이터 점검\)" "Build and send price provider ops report"/);
   assert.match(workflow, /GITHUB_RUN_URL:/);

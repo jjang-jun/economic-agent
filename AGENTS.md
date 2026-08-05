@@ -1,8 +1,11 @@
 # Economic Agent - Codex Guide
 
 ## Project Summary
-- Personal economic news agent written in Node.js CommonJS.
-- Collector runs every 5 minutes, scores economic news locally, sends urgent items to Telegram, and stores non-urgent score 4 items for scheduled digests.
+- Personal AI economic office written in Node.js CommonJS. Its North Star is increasing the probability that the user's net worth reaches the financial-freedom goal.
+- It connects economic news, disclosures, policy, prices, capital-flow context, portfolio state, human decisions, actual trades, and measured outcomes into one auditable loop.
+- AI is an analytical adviser, not the final decision-maker. External actions and portfolio changes require human confirmation; automated brokerage execution is out of scope.
+- The generic personal AI organization and multi-agent operating-system concept is future work documented in `docs/future/AI_AGENT_TEAM_BLUEPRINT.md`, not a reason to broaden this repository beyond the economic domain.
+- Collector runs every 5 minutes, scores economic news locally, sends urgent items to Discord, and stores non-urgent score 4 items for scheduled digests.
 - Scheduled digests and stock reports use the provider-agnostic AI client in `src/utils/ai-client.js`.
 - Runtime target: Node.js 22+.
 
@@ -18,7 +21,7 @@ RSS feeds
   -> score 5 urgent articles: strict immediate policy (systemic event or fatal holding/explicit critical-alert disclosure)
   -> other score 5 articles: digest buffer
   -> score 4 articles: article buffer
-  -> scheduled AI digest/report + Telegram
+  -> scheduled AI digest/report + Discord
 ```
 
 ## Important Commands
@@ -33,12 +36,15 @@ RSS feeds
 - Record a portfolio cash flow: `npm run cashflow:record -- --type deposit --amount 1000000 --occurred-at 2026-08-01T09:00:00+09:00`
 - Review actual trade performance: `npm run trade:performance`
 - Send premarket/intraday timing alerts: `npm run timing:alert -- premarket`, `npm run timing:alert -- intraday`
-- Sync the Telegram bot command menu: `npm run telegram:sync-commands`
 - Validate Discord report channels: `npm run discord:check`; send an explicit smoke using `npm run discord:smoke -- --channel=ops`
 - Preview Discord category/channel/Webhook provisioning: `npm run discord:provision`; apply only with explicit `npm run discord:provision -- --apply`
 - Sync ignored `data/discord-webhooks.json` to the GitHub Actions secret: `npm run discord:sync-secret`
+- Sync read-only Discord guild Slash commands: `npm run discord:sync-commands`
+- Validate the portable Discord runtime: `npm run discord:agent-worker:check`; the worker supports Node.js 22+ on Windows, macOS, and Linux without OS-specific shell commands
+- Run the always-on Discord mention worker: `npm run discord:agent-worker`; natural portfolio mutations remain disabled unless `DISCORD_MENTION_ACTIONS_ENABLED=true`
+- Discord economic expert responses remain disabled unless `DISCORD_EXPERT_RESPONSES_ENABLED=true`; `DISCORD_EXPERT_MAX_REVIEWERS` is capped at 2, each AI call is bounded by `DISCORD_EXPERT_TIMEOUT_MS`, and primary/reviewer token budgets use `AI_EXPERT_MAX_TOKENS`/`AI_EXPERT_REVIEW_MAX_TOKENS`
 - Detect low-cost pre-news signals: `npm run pre-news:signal`
-- Collect official tax/real-estate/finance policy changes: `npm run policy:radar`; preview without persistence or Telegram using `npm run policy:radar -- --dry-run`
+- Collect official tax/real-estate/finance policy changes: `npm run policy:radar`; preview without persistence or Discord delivery using `npm run policy:radar -- --dry-run`
 - Evaluate stored market anomalies after 1/5 trading sessions: `npm run anomaly:evaluate`
 - Build weekly/monthly performance reviews: `npm run review:weekly`, `npm run review:monthly`
 - Check model/prompt performance sample readiness: `npm run model:performance` after `npm run db:pull`
@@ -53,17 +59,17 @@ RSS feeds
 - Check dependency vulnerabilities: `npm run security:audit`
 - Test: `npm test`
 
-Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.env` flag, so GitHub Actions can rely on injected secrets without a checked-in `.env`. `npm start` remains the local one-shot collector entrypoint with `--env-file=.env`. Networked commands such as `npm run digest`, `npm run report`, `npm run evaluate`, `npm run db:push`, `npm run db:import-local`, `npm run db:pull`, and `npm run security:audit` may call RSS/API/Telegram/AI/Supabase/npm registry services. Use them intentionally.
+Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.env` flag, so GitHub Actions can rely on injected secrets without a checked-in `.env`. `npm start` remains the local one-shot collector entrypoint with `--env-file=.env`. Networked commands such as `npm run digest`, `npm run report`, `npm run evaluate`, `npm run db:push`, `npm run db:import-local`, `npm run db:pull`, and `npm run security:audit` may call RSS/API/Discord/AI/Supabase/npm registry services. Use them intentionally.
 
 ## Environment
-- Required for Telegram delivery: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`
+- Discord report delivery requires `DISCORD_REPORTS_ENABLED=true` and a valid channel Webhook map. Interactive access also requires `DISCORD_GUILD_ID` and a non-empty `DISCORD_ALLOWED_USER_IDS`; an empty user list denies everyone.
 - AI digest/report provider: `AI_PROVIDER`, optional `AI_MODEL`, task overrides `AI_DIGEST_MODEL`/`AI_STOCK_MODEL`, `AI_DIGEST_REASONING_EFFORT`/`AI_STOCK_REASONING_EFFORT`, `AI_DIGEST_VERBOSITY`/`AI_STOCK_VERBOSITY`, Qwen/DeepSeek `AI_DIGEST_THINKING_MODE`/`AI_STOCK_THINKING_MODE`, optional `AI_TEMPERATURE`, privacy-safe `OPENAI_SAFETY_IDENTIFIER`, `AI_BASE_URL`, and provider key such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GROQ_API_KEY`, `DASHSCOPE_API_KEY`, `DEEPSEEK_API_KEY`, or generic fallback `AI_API_KEY`. The Anthropic fallback default is `claude-sonnet-5`.
 - Optional indicators/data: `BOK_API_KEY`, `FRED_API_KEY`, `DART_API_KEY`
 - Optional history store: `SUPABASE_PROJECT_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_DB_PASSWORD` or `SUPABASE_DB_URL` for schema pushes
 - Optional deploy freshness check: `AGENT_SERVER_URL` or `CLOUD_RUN_SERVICE_URL`, with `EXPECTED_DEPLOY_SHA` when running outside GitHub Actions
 - Optional Supabase resilience tuning: `SUPABASE_REQUEST_TIMEOUT_MS`, `SUPABASE_RETRY_COUNT`, `SUPABASE_RETRY_DELAY_MS`, `SUPABASE_RETRY_MAX_DELAY_MS`, `SUPABASE_CIRCUIT_BREAKER_MS`
-- Optional Telegram network timeout: `TELEGRAM_REQUEST_TIMEOUT_MS`
-- Optional Discord provisioning: `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`; report delivery opt-in: `DISCORD_REPORTS_ENABLED=true`, `DISCORD_WEBHOOKS_JSON_BASE64` or `DISCORD_WEBHOOKS_JSON`, per-channel `DISCORD_WEBHOOK_<CHANNEL_KEY>`, and `DISCORD_REQUEST_TIMEOUT_MS`. Discord uses channel-themed embeds by default; `DISCORD_USE_EMBEDS=false` enables the plain-text fallback. Bot tokens and Webhook URLs are secrets and must not be logged or committed.
+- Optional Discord network timeout: `DISCORD_REQUEST_TIMEOUT_MS`
+- Optional Discord provisioning, interactions, and mention worker: `DISCORD_BOT_TOKEN`, `DISCORD_APPLICATION_ID`, `DISCORD_GUILD_ID`, `DISCORD_PUBLIC_KEY`, required query allowlist `DISCORD_ALLOWED_USER_IDS`, optional Slash but required mention-worker `DISCORD_ALLOWED_CHANNEL_IDS`, default-off `DISCORD_MENTION_ACTIONS_ENABLED`, default-off `DISCORD_EXPERT_RESPONSES_ENABLED`, bounded `DISCORD_EXPERT_MAX_REVIEWERS`, `DISCORD_EXPERT_CONTEXT_MAX_CHARS`, `DISCORD_EXPERT_TIMEOUT_MS`, `AI_EXPERT_MAX_TOKENS`, `AI_EXPERT_REVIEW_MAX_TOKENS`, `DISCORD_SIGNATURE_MAX_AGE_SECONDS`, and `DISCORD_INTERACTION_ACK_TIMEOUT_MS`; report delivery opt-in: `DISCORD_REPORTS_ENABLED=true`, `DISCORD_WEBHOOKS_JSON_BASE64` or `DISCORD_WEBHOOKS_JSON`, per-channel `DISCORD_WEBHOOK_<CHANNEL_KEY>`, and `DISCORD_REQUEST_TIMEOUT_MS`. Discord uses channel-themed embeds by default; `DISCORD_USE_EMBEDS=false` enables the plain-text fallback. Bot tokens and Webhook URLs are secrets and must not be logged or committed.
 - Optional public EOD timeouts: `KRX_REQUEST_TIMEOUT_MS`, `KRX_CIRCUIT_BREAKER_MS`, `DATA_GO_KR_REQUEST_TIMEOUT_MS`
 - Optional private portfolio file: `PORTFOLIO_FILE`, defaulting to ignored `data/portfolio.json`
 - Optional private portfolio env for GitHub Actions: `PORTFOLIO_JSON_BASE64` or `PORTFOLIO_JSON`
@@ -72,17 +78,17 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - Optional anomaly/news timing validation: `PRE_NEWS_EVIDENCE_LOOKBACK_HOURS` (default 12), `PRE_NEWS_FOLLOW_UP_HOURS` (default 24)
 - Optional evidence gates: `STRATEGY_MIN_EVALUATED`, `STRATEGY_MIN_LINKED_TRADES`; `EVALUATION_ALLOW_CURRENT_FALLBACK` should remain false in normal operation.
 - Optional local research worker: `LOCAL_RESEARCH_WORKER_ENABLED=true` enables the monthly review sidecar that calls `scripts/local-backtest-worker.py`; `LOCAL_RESEARCH_WORKER_PROVIDER` and `LOCAL_RESEARCH_MAX_TICKERS` tune provider and ticker count.
-- Optional policy radar tuning: `POLICY_RADAR_BOOTSTRAP_HOURS` controls first-run history suppression and `POLICY_RADAR_MAX_EVENTS` caps one Telegram report.
+- Optional policy radar tuning: `POLICY_RADAR_BOOTSTRAP_HOURS` controls first-run history suppression and `POLICY_RADAR_MAX_EVENTS` caps one Discord report.
 - `.env` is private and must not be committed.
 
 ## File Map
 - `src/check-news.js`: news collection, filtering, urgent alert, buffer write
-- `src/digest.js`: buffer read, AI digest generation, Telegram delivery, buffer clear after success
+- `src/digest.js`: buffer read, AI digest generation, enabled notification-channel delivery, buffer clear after success
 - `src/stock-report.js`: market close stock/sector analysis from the daily scored article archive
 - `src/evaluate-recommendations.js`: evaluates logged stock signals after 1/5/20 days
 - `scripts/record-trade.js`: records a manual buy/sell execution separately from AI recommendations
-- `src/agent/trades-view.js`: formats recent approved trade executions and recorded-trade-only realized/unrealized performance for Telegram `/trades` and `/trade_performance`
-- `scripts/trade-performance.js`: evaluates actual trade executions with current quotes and sends a Telegram report when trades exist
+- `src/agent/trades-view.js`: formats recent approved trade executions and recorded-trade-only realized/unrealized performance for Discord `/trades` and `/trade-performance`
+- `scripts/trade-performance.js`: evaluates actual trade executions with current quotes and sends a Discord report when trades exist
 - `scripts/performance-review.js`: writes weekly/monthly recommendation-vs-trade performance reviews
 - `scripts/model-performance-readiness.js`: reads Supabase mirrors and reports model/prompt sample readiness for recommendation performance
 - `scripts/dashboard.js`: generates ignored local HTML dashboard from `data/supabase/*.json`
@@ -99,16 +105,21 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - `src/filters/sentiment-dictionary.js`: weighted Korean/disclosure sentiment dictionary
 - `src/filters/relevance-matcher.js`: personal relevance matching
 - `src/analysis/`: AI prompt builders for digest/report
-- `src/notify/telegram.js`: Telegram formatting and sending
-- `src/notify/discord.js`, `src/notify/multi-channel.js`, `src/config/discord-channels.js`: read-only Discord webhook transport, opt-in Telegram parallel delivery with failure isolation, safe channel routing, message conversion/splitting, and configuration inspection
+- `src/notify/reports.js`: shared HTML report formatting and required Discord delivery coordination
+- `src/notify/discord-reports.js`: Discord report enablement and channel delivery wrapper
+- `src/notify/discord.js`, `src/notify/multi-channel.js`, `src/config/discord-channels.js`: primary Discord webhook transport, safe channel routing, message conversion/splitting, and configuration inspection
+- `src/server/discord-interactions.js`, `src/config/discord-commands.js`: Ed25519-verified Discord Interaction endpoint, private user/channel allowlists, deferred ephemeral responses, and read-only Slash command definitions
+- `src/agent/natural-action-parser.js`, `src/agent/discord-mention-router.js`, `scripts/discord-agent-worker.js`: fail-closed Korean natural-language trade/cash draft parser, requester-scoped Discord approval buttons, and Windows/macOS/Linux portable always-on minimal-intent Gateway mention worker
+- `src/config/expert-roles.js`, `src/agent/expert-context.js`, `src/agent/expert-team.js`: deterministic economic specialist `to/cc` routing, role-scoped SSoT context budgets, separate primary/reviewer AI calls, and inspectable per-role conversation namespaces
 - `scripts/provision-discord.js`: dry-run-by-default Discord category/channel/Webhook provisioner; aligns channels under purpose-specific categories, never deletes them, and writes secrets only to ignored local data
+- `scripts/sync-discord-commands.js`: bulk-overwrites the configured guild's read-only Slash commands; never registers portfolio mutation commands
 - `src/utils/`: config, AI client, buffers, seen-article cache, indicators, daily summaries
 - `src/utils/ai-budget.js`: trims AI prompt inputs to control token use
 - `src/utils/urgent-alert-policy.js`: allows immediate alerts only for systemic events or fatal disclosures tied to holdings/`watchlist.criticalAlerts`
 - `src/utils/urgent-alert-state.js`: local fallback for 24-hour event deduplication and KST daily immediate-alert caps when shared persistence is unavailable
 - `src/utils/market-stress-monitor.js`: KST regular-session KOSPI/KOSDAQ -3/-5/-8% staged alerts, deduplicated locally and in Supabase
 - `src/utils/capital-flow-radar.js`: daily 19-ETF price/volume relative-strength proxy; never describe it as actual ETF creations/redemptions
-- `src/utils/capital-flow-report.js`: deterministic Telegram snapshot that separates KOSPI investor net-buy data from the global ETF price/volume proxy and preserves unavailable data as unavailable
+- `src/utils/capital-flow-report.js`: deterministic Discord snapshot that separates KOSPI investor net-buy data from the global ETF price/volume proxy and preserves unavailable data as unavailable
 - `src/utils/article-archive.js`: daily scored article archive used by stock reports and later performance review
 - `src/utils/article-identity.js`: normalized article identity keys for duplicate suppression across RSS/DART, URLs, and titles
 - `src/utils/recommendation-log.js`: stores stock signals and evaluates returns against KOSPI benchmark when available
@@ -156,9 +167,10 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - `scripts/push-supabase.js`, `scripts/pull-supabase.js`: Supabase CLI push and local history mirror scripts
 - `scripts/import-local-history.js`: uploads existing ignored `data/*.json` history into Supabase after schema creation
 - `cloudbuild.yaml`: builds and deploys the Cloud Run service while keeping the image tag, revision label, and runtime `COMMIT_SHA` aligned
-- `.github/workflows/`: collector, five scheduled digest workflows, stock report, timing alert, pre-news signal, policy radar, portfolio snapshot, recommendation evaluation, collector/price ops checks, trade performance schedules, and a manual Discord infrastructure smoke. Policy radar runs at 10:10 and 18:10 KST on weekdays; collector ops runs at 12:05 and 23:50 KST to catch daytime collection gaps.
+- `.github/workflows/`: collector, five scheduled digest workflows, stock report, timing alert, pre-news signal, policy radar, portfolio snapshot, recommendation evaluation, collector/price ops checks, trade performance schedules, and Discord infrastructure smoke. Discord smoke runs at 08:10 KST on weekdays before the first digest and also supports manual channel selection. Policy radar runs at 10:10 and 18:10 KST on weekdays; collector ops runs at 12:05 and 23:50 KST to catch daytime collection gaps.
 - `docs/README.md`: docs index and folder roles
 - `docs/AGENT_HARNESS.md`: Codex/sub-agent long-running task contract, verification loop, and documentation cleanup rules
+- `docs/future/AI_AGENT_TEAM_BLUEPRINT.md`: future personal AI organization, multi-agent routing, memory, permissions, and staged implementation blueprint; outside the current economic-domain scope
 - `docs/DISCORD_SETUP.md`: private Discord report channels, Webhook secret setup, local check, and Actions smoke procedure
 - `docs/PROGRESS.md`: human-readable development progress and current operating context
 - `docs/portfolio.example.json`: private `data/portfolio.json` template
@@ -168,7 +180,7 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 ## Data And Generated Files
 - `data/` stores runtime state such as seen articles, article buffer, and daily summaries. It is ignored by Git.
 - `data/daily-articles/YYYY-MM-DD.json` stores scored articles for the day. Use this for daily stock reports instead of relying only on currently new RSS items.
-- `data/article-buffer.json` must only be cleared after digest generation and Telegram delivery both succeed.
+- `data/article-buffer.json` must only be cleared after digest generation and at least one explicitly enabled notification channel successfully delivers; current production delivery is Discord.
 - `data/recommendations/recommendations.json` is a local mirror/fallback for stock signals and evaluations. Supabase is the primary recommendation history store when configured.
 - `data/trades/trade-executions.json` is a local mirror for actual manual trade executions. Keep it separate from recommendations.
 - `data/portfolio-snapshots/YYYY-MM-DD.json` stores current-price portfolio valuation snapshots.

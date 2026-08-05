@@ -3,7 +3,7 @@ const { runPolicyRadar } = require('../src/jobs/run-policy-radar');
 function parseArgs(argv = process.argv.slice(2)) {
   return {
     dryRun: argv.includes('--dry-run') || argv.includes('--dryRun'),
-    noTelegram: argv.includes('--no-telegram') || argv.includes('--noTelegram'),
+    noReport: argv.includes('--no-report'),
     includeEmpty: argv.includes('--include-empty'),
   };
 }

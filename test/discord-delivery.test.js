@@ -7,7 +7,7 @@ const {
   parseWebhookMap,
   isDiscordWebhookUrl,
   resolveDiscordWebhook,
-  telegramHtmlToDiscordMarkdown,
+  reportHtmlToDiscordMarkdown,
   buildDiscordEmbed,
   buildDiscordPayload,
   splitDiscordMessage,
@@ -55,13 +55,13 @@ test('Discord webhook validation rejects non-Discord and insecure URLs', () => {
   );
 });
 
-test('Telegram HTML is converted to Discord Markdown and safe links', () => {
+test('report HTML is converted to Discord Markdown and safe links', () => {
   assert.equal(
-    telegramHtmlToDiscordMarkdown('<b>정책</b> <a href="https://example.com/?a=1&amp;b=2">원문</a> <i>주의</i>'),
+    reportHtmlToDiscordMarkdown('<b>정책</b> <a href="https://example.com/?a=1&amp;b=2">원문</a> <i>주의</i>'),
     '**정책** [원문](https://example.com/?a=1&b=2) *주의*',
   );
   assert.equal(
-    telegramHtmlToDiscordMarkdown('<strong>제목</strong><br><br><br><u>강조</u> <code>005930</code>&nbsp;'),
+    reportHtmlToDiscordMarkdown('<strong>제목</strong><br><br><br><u>강조</u> <code>005930</code>&nbsp;'),
     '**제목**\n\n__강조__ `005930`',
   );
 });
@@ -104,7 +104,7 @@ test('Discord sender disables mentions, waits for delivery, and splits long mess
   const result = await sendDiscordMessage(`@everyone ${'보고서 '.repeat(20)}`, {
     channel: 'ops',
     webhookUrl: OPS_WEBHOOK,
-    telegramHtml: false,
+    reportHtml: false,
     maxLength: 45,
     fetcher: async (url, options) => {
       calls.push({ url, options, body: JSON.parse(options.body) });

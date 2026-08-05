@@ -91,7 +91,7 @@ function decodeHtmlEntities(value = '') {
     .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)));
 }
 
-function telegramHtmlToDiscordMarkdown(value = '') {
+function reportHtmlToDiscordMarkdown(value = '') {
   const markdown = decodeHtmlEntities(String(value)
     .replace(/<a\s+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, (_, href, label) => `[${label}](${href})`)
     .replace(/<\/?(?:b|strong)>/gi, '**')
@@ -227,9 +227,9 @@ async function sendDiscordMessage(text, options = {}) {
     return { delivered: false, channel, messageCount: 0 };
   }
 
-  const markdown = options.telegramHtml === false
+  const markdown = options.reportHtml === false
     ? String(text)
-    : telegramHtmlToDiscordMarkdown(text);
+    : reportHtmlToDiscordMarkdown(text);
   const chunks = splitDiscordMessage(markdown, options.maxLength || DEFAULT_MESSAGE_LIMIT);
   if (chunks.length === 0) return { delivered: false, channel, messageCount: 0 };
 
@@ -287,7 +287,7 @@ module.exports = {
   parseWebhookMap,
   isDiscordWebhookUrl,
   resolveDiscordWebhook,
-  telegramHtmlToDiscordMarkdown,
+  reportHtmlToDiscordMarkdown,
   discordChannelTheme,
   buildDiscordEmbed,
   shouldUseEmbeds,

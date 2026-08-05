@@ -1,5 +1,5 @@
 const { buildTradePerformanceReport } = require('../src/utils/trade-performance');
-const { sendTradePerformanceReport } = require('../src/notify/telegram');
+const { sendTradePerformanceReport } = require('../src/notify/reports');
 
 function formatKRW(value) {
   if (typeof value !== 'number') return '';

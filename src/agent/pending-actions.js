@@ -157,7 +157,7 @@ async function formatPendingActions(chatId) {
   ].join('\n');
 }
 
-function buildTradeDraft({ side, parts }) {
+function buildTradeDraft({ side, parts, source = 'discord-agent' }) {
   const ticker = parts[1] || '';
   const quantity = parseNumber(parts[2]);
   const price = parseNumber(parts[3]);
@@ -177,7 +177,7 @@ function buildTradeDraft({ side, parts }) {
     taxes: metadata.taxes,
     fxRate: metadata.fxRate,
     currency: metadata.currency,
-    notes: metadata.notes ? `telegram-agent · ${metadata.notes}` : 'telegram-agent',
+    notes: metadata.notes ? `${source} · ${metadata.notes}` : source,
   });
   return {
     type: side,
@@ -297,12 +297,12 @@ async function buildCashDraftAsync(parts) {
   };
 }
 
-async function createPendingAction({ chatId, text }) {
+async function createPendingAction({ chatId, text, source = 'discord-agent' }) {
   const parts = getActionCommandParts(text);
   const command = (parts[0] || '').replace(/@[\w_]+$/, '').toLowerCase();
   let draft;
-  if (command === '/buy') draft = await enrichTradeDraft(buildTradeDraft({ side: 'buy', parts }));
-  else if (command === '/sell') draft = await enrichTradeDraft(buildTradeDraft({ side: 'sell', parts }));
+  if (command === '/buy') draft = await enrichTradeDraft(buildTradeDraft({ side: 'buy', parts, source }));
+  else if (command === '/sell') draft = await enrichTradeDraft(buildTradeDraft({ side: 'sell', parts, source }));
   else if (command === '/cash') draft = await buildCashDraftAsync(parts);
   else throw new Error('unsupported pending action');
 
@@ -318,7 +318,7 @@ async function createPendingAction({ chatId, text }) {
     },
     confirmationToken: token,
     expiresAt: expiresAt(),
-    payload: { text },
+    payload: { text, source },
   };
   const persistResult = await persistPendingAction(action);
   if (persistResult.error || persistResult.saved < 1) {
@@ -332,12 +332,6 @@ async function createPendingAction({ chatId, text }) {
       '',
       '이 작업을 기록할까요?',
     ].join('\n'),
-    replyMarkup: {
-      inline_keyboard: [[
-        { text: '기록하기', callback_data: `confirm:${action.id}:${token}` },
-        { text: '취소', callback_data: `cancel:${action.id}:${token}` },
-      ]],
-    },
   };
 }
 
