@@ -8,6 +8,7 @@ const {
 const {
   extractSummaryPoints,
   formatLegislativeStatus,
+  formatStatuteStatus,
   formatPolicyRadarReport,
   splitPolicyRadarReports,
   sendPolicyRadarReport,
@@ -128,6 +129,26 @@ test('assembly policy report exposes bill number, committee and legal stage', ()
   assert.match(message, /의안 추적: 제22대 · 의안 2200001/);
 });
 
+test('statute policy report exposes promulgation and effective dates', () => {
+  const statute = event({
+    stage: 'promulgated',
+    stageLabel: '공포',
+    authority: '법제처 국가법령정보센터',
+    statute: {
+      promulgationDate: '2026-08-07', promulgationNo: '22001',
+      effectiveDate: '2026-09-01', revisionKind: '일부개정',
+    },
+  });
+  assert.equal(
+    formatStatuteStatus(statute),
+    '공포 2026-08-07 · 제22001호 · 시행 2026-09-01 · 일부개정'
+  );
+  const message = formatPolicyRadarReport({
+    events: [statute], successfulSourceCount: 1, sourceResults: [{ ok: true }],
+  });
+  assert.match(message, /현행 법령: 공포 2026-08-07/);
+});
+
 test('clarification summary prioritizes the official correction over the quoted press claim', () => {
   const points = extractSummaryPoints(event({
     stage: 'official_clarification',
@@ -228,6 +249,7 @@ test('runPolicyRadar merges configured National Assembly bill status with offici
       }],
       sourceResults: [{ id: 'open-assembly-bills', ok: true, count: 1 }],
     }),
+    fetchLawDocuments: async () => ({ documents: [], sourceResults: [] }),
     enrichEvents: async events => events,
   });
   assert.equal(result.events.length, 1);

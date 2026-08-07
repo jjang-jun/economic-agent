@@ -80,11 +80,18 @@ function assemblyBillStage(row = {}) {
 
 function assemblyBillDocument(row = {}) {
   const stage = assemblyBillStage(row);
+  const title = row.BILL_NAME || '';
+  const policyGroupTitle = title
+    .replace(/(?:일부|전부)개정법률안$/u, '')
+    .replace(/폐지법률안$/u, '')
+    .replace(/법률안$/u, '')
+    .trim();
   const latestDate = row.PROM_DT || row.PROC_DT || row.LAW_PROC_DT
     || row.CMT_PROC_DT || row.COMMITTEE_PROC_DT || row.PROPOSE_DT || null;
   return {
     externalId: row.BILL_ID || row.BILL_NO || '',
-    title: row.BILL_NAME || '',
+    title,
+    policyGroupTitle,
     summary: compactParts([
       ['의안번호', row.BILL_NO],
       ['제안자', row.PROPOSER || row.RST_PROPOSER],

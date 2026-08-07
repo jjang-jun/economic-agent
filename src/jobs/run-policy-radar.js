@@ -1,5 +1,6 @@
 const { fetchPolicyDocuments, enrichPolicyEventDetails } = require('../sources/policy-fetcher');
 const { fetchAssemblyPolicyDocuments } = require('../sources/assembly-bills');
+const { fetchLawPolicyDocuments } = require('../sources/law-open-data');
 const { classifyPolicyDocuments } = require('../utils/policy-classifier');
 const {
   loadPolicyEventState,
@@ -68,9 +69,20 @@ async function runPolicyRadar(options = {}) {
     const assemblyFetched = await (
       options.fetchAssemblyDocuments || fetchAssemblyPolicyDocuments
     )(options.assemblyOptions || {});
+    const lawFetched = await (
+      options.fetchLawDocuments || fetchLawPolicyDocuments
+    )(options.lawOptions || {});
     const fetched = {
-      documents: [...rssFetched.documents, ...(assemblyFetched.documents || [])],
-      sourceResults: [...rssFetched.sourceResults, ...(assemblyFetched.sourceResults || [])],
+      documents: [
+        ...rssFetched.documents,
+        ...(assemblyFetched.documents || []),
+        ...(lawFetched.documents || []),
+      ],
+      sourceResults: [
+        ...rssFetched.sourceResults,
+        ...(assemblyFetched.sourceResults || []),
+        ...(lawFetched.sourceResults || []),
+      ],
     };
     const successfulSourceCount = fetched.sourceResults.filter(source => source.ok).length;
     fetched.sourceResults

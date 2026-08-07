@@ -105,7 +105,8 @@ function classifyPolicyDocument(document) {
   const normalizedTitle = normalizePolicyTitle(document.title);
   const identity = document.externalId || document.link || `${document.authority}:${normalizedTitle}`;
   const id = `policy:${sha256(`${document.sourceId}|${identity}`).slice(0, 24)}`;
-  const eventKey = `policy-event:${sha256(`${primary.domain}|${normalizedTitle}`).slice(0, 24)}`;
+  const policyGroupTitle = normalizePolicyTitle(document.policyGroupTitle || document.title);
+  const eventKey = `policy-event:${sha256(`${primary.domain}|${policyGroupTitle}`).slice(0, 24)}`;
   const contentHash = sha256(`${document.title}|${document.summary}|${document.link}`);
 
   return {
@@ -120,6 +121,7 @@ function classifyPolicyDocument(document) {
     sourceId: document.sourceId || '',
     sourceKind: document.sourceKind || '',
     legislative: document.legislative || null,
+    statute: document.statute || null,
     domain: primary.domain,
     domains: domainMatches.map(match => match.domain),
     matchedKeywords: [...new Set(domainMatches.flatMap(match => match.keywords))].slice(0, 12),

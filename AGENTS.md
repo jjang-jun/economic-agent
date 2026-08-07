@@ -87,6 +87,7 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - Optional evidence gates: `STRATEGY_MIN_EVALUATED`, `STRATEGY_MIN_LINKED_TRADES`; `EVALUATION_ALLOW_CURRENT_FALLBACK` should remain false in normal operation.
 - Optional local research worker: `LOCAL_RESEARCH_WORKER_ENABLED=true` enables the monthly review sidecar that calls `scripts/local-backtest-worker.py`; `LOCAL_RESEARCH_WORKER_PROVIDER` and `LOCAL_RESEARCH_MAX_TICKERS` tune provider and ticker count.
 - Optional policy radar tuning: `POLICY_RADAR_BOOTSTRAP_HOURS` controls first-run history suppression and `POLICY_RADAR_MAX_EVENTS` caps one Discord report.
+- Optional legislative sources: `OPEN_ASSEMBLY_API_KEY` enables National Assembly bill-stage tracking; separately approved `LAW_OPEN_DATA_OC` enables current-law promulgation/effective-date cross-checks. Each source skips cleanly when its credential is absent.
 - `.env` is private and must not be committed.
 
 ## File Map
@@ -104,6 +105,7 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - `src/sources/`: RSS, DART, BOK, FRED integrations
 - `src/sources/dart-api.js`: OpenDART disclosure fetcher, optional `DART_API_KEY`
 - `src/sources/policy-fetcher.js`, `src/utils/policy-classifier.js`: official policy collector and deterministic tax/real-estate/loan/pension/capital-market stage classifier
+- `src/sources/assembly-bills.js`, `src/sources/law-open-data.js`: optional National Assembly bill stages and Ministry of Government Legislation promulgation/effective-date metadata
 - `src/jobs/run-policy-radar.js`: isolated policy radar job with first-run baseline suppression and delivery retry state
 - `src/sources/yahoo-finance.js`: Yahoo chart quote fetcher for recommendation performance tracking and 5/20 day trend fields
 - `src/sources/naver-investor.js`: Naver Finance KOSPI investor net-buy flow parser

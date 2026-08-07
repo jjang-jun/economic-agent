@@ -121,6 +121,17 @@ function formatLegislativeStatus(event = {}) {
   return parts.join(' · ');
 }
 
+function formatStatuteStatus(event = {}) {
+  const statute = event.statute;
+  if (!statute) return '';
+  return [
+    statute.promulgationDate ? `공포 ${statute.promulgationDate}` : '',
+    statute.promulgationNo ? `제${statute.promulgationNo}호` : '',
+    statute.effectiveDate ? `시행 ${statute.effectiveDate}` : '',
+    statute.revisionKind || '',
+  ].filter(Boolean).join(' · ');
+}
+
 function formatPolicyItem(event, index) {
   const domains = [event.domain, ...(event.domains || [])].filter(Boolean);
   const label = [...new Set(domains)]
@@ -131,6 +142,7 @@ function formatPolicyItem(event, index) {
     : '원문에서 별도 날짜를 추출하지 못함';
   const publishedAt = formatPublishedAt(event.publishedAt);
   const legislativeStatus = formatLegislativeStatus(event);
+  const statuteStatus = formatStatuteStatus(event);
   const summaryPoints = extractSummaryPoints(event);
   const summary = summaryPoints.length > 0
     ? summaryPoints.map(point => `  • ${escapeHtml(point)}`).join('\n')
@@ -143,6 +155,7 @@ function formatPolicyItem(event, index) {
     `▸ 확정도: <b>${escapeHtml(event.stageLabel || event.stage || '공식 발표')}</b>`,
     `▸ 발표기관/시각: ${escapeHtml(event.authority || '공식기관')}${publishedAt ? ` · ${escapeHtml(publishedAt)} KST` : ''}`,
     ...(legislativeStatus ? [`▸ 의안 추적: ${escapeHtml(legislativeStatus)}`] : []),
+    ...(statuteStatus ? [`▸ 현행 법령: ${escapeHtml(statuteStatus)}`] : []),
     `▸ 상세 요약:\n${summary}`,
     `▸ 나에게 미치는 영향(조건부): ${escapeHtml(policyImpact(event))}`,
     `▸ 지금 할 일: ${escapeHtml(event.action || '세부 조건과 후속 문서 확인')}`,
@@ -236,6 +249,7 @@ module.exports = {
   verificationForStage,
   formatPublishedAt,
   formatLegislativeStatus,
+  formatStatuteStatus,
   formatPolicyItem,
   formatPolicyRadarReport,
   splitPolicyRadarReports,

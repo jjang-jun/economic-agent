@@ -62,7 +62,7 @@ Codex가 새 세션에서 전체 개발 이력을 다시 읽지 않고 작업을
 ## 바로 이어서 할 일
 
 1. 2026-08-06 11:50 KST부터 shadow 72시간 동안 heartbeat, 중복 실행, catch-up, 실패 알림 관찰
-2. 승인 대기 중인 법제처 공동활용 `OC`가 발급되면 공포 법령·시행일 교차검증을 연결
+2. 승인 대기 중인 법제처 공동활용 `OC`가 발급되면 `LAW_OPEN_DATA_OC` 로컬·GitHub Secret 등록 후 공포 법령·시행일 실데이터 smoke 수행
 3. shadow 통과 후 최종 Supabase 증분 동기화와 active 전환을 별도 승인 단계로 수행
 4. active 전환 때 macOS 서비스를 다시 설치해 새 백업 키·외부 경로·예약 백업 설정을 LaunchAgent 환경에 반영
 
