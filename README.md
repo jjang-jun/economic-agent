@@ -183,7 +183,7 @@ Cloud Run 자동 배포는 루트의 `cloudbuild.yaml`을 사용합니다. 배�
 
 ## Codex 작업 지침
 
-Codex에서 작업할 때는 저장소 루트의 `AGENTS.md`를 기준으로 프로젝트 구조, 실행 명령, 환경 변수, 변경 기록 규칙을 따릅니다.
+Codex에서 작업할 때는 자동 적재되는 저장소 루트 `AGENTS.md`를 12KiB 미만의 얇은 실행 규칙으로 유지하고, 현재 상태는 `docs/CURRENT_STATE.md`에서 이어받습니다. 긴 `README.md`와 `docs/PROGRESS.md`는 전체를 기본 컨텍스트에 넣지 않고 필요한 항목만 `rg`로 조회합니다.
 
 장시간 이어지는 작업, 여러 파일을 건드리는 변경, sub-agent를 쓰는 작업은 `docs/AGENT_HARNESS.md`의 작업 계약과 검증 루프를 따릅니다. 문서 맵을 바꾼 뒤에는 아래 점검을 실행합니다.
 
@@ -201,7 +201,7 @@ npm run agent:harness-check
 
 홈 PC worker의 72시간 전환 판정은 `npm run worker:shadow-audit`으로 기대 스케줄, 실제 shadow 기록, 누락·지연과 Gateway heartbeat를 함께 확인합니다.
 
-대화형 Agent 실행 플랫폼은 `docs/AGENT_PLATFORM.md`에 정리되어 있습니다. Discord가 분야별 리포트·비공개 Slash 조회·멘션 초안과 승인·경제 도메인 전문가 `to/cc`를 담당합니다. 목표 운영은 항상 켜진 Node.js PC worker가 즉시 요청과 정기 작업을 맡고, 홈 서버 PostgreSQL을 기준 저장소로 쓰는 구조입니다. 구축·전환·백업은 `docs/HOME_SERVER.md`를 따릅니다.
+대화형 Agent 실행 플랫폼은 `docs/AGENT_PLATFORM.md`에 정리되어 있습니다. Discord가 분야별 리포트·비공개 Slash 조회·멘션 초안과 승인·경제 도메인 전문가 `to/cc`를 담당합니다. 목표 운영은 항상 켜진 Node.js PC worker가 즉시 요청과 정기 작업을 맡고, 홈 서버 PostgreSQL을 기준 저장소로 쓰는 구조입니다. 현재 worker는 Codex 세션을 실행하지 않으며 전문가 응답을 활성화할 때만 설정된 AI API를 호출합니다. 향후 선택형 Codex 연동은 독립 작업별 새 세션, 동일 작업만 resume, 12KiB 이하 SSoT 발췌를 원칙으로 합니다. 구축·전환·백업은 `docs/HOME_SERVER.md`를 따릅니다.
 
 PC scheduler는 기본 `shadow` 모드에서 예정 작업과 heartbeat만 기록하며 실제 정기 작업을 실행하지 않습니다. 72시간 비교 검증 후에만 `PC_WORKER_SCHEDULER_MODE=active`로 전환합니다. 평일 08:05 KST에는 최근 24시간 worker 상태를 Discord 운영 채널에 보고합니다.
 

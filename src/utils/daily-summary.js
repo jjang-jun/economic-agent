@@ -38,6 +38,17 @@ function mergeDigestAudits(current, existing = []) {
   }).slice(0, 5);
 }
 
+function compactSummaryIndicators(indicators = {}) {
+  const {
+    recentDailySummaries: _recentDailySummaries,
+    recentStockReports: _recentStockReports,
+    recent_daily_summaries: _recentDailySummariesSnake,
+    recent_stock_reports: _recentStockReportsSnake,
+    ...currentIndicators
+  } = indicators || {};
+  return currentIndicators;
+}
+
 function saveDailySummary({ articles, indicators, stockReport, digest }) {
   fs.mkdirSync(SUMMARY_DIR, { recursive: true });
 
@@ -56,7 +67,7 @@ function saveDailySummary({ articles, indicators, stockReport, digest }) {
       bearish: bearish.length,
       neutral: neutral.length,
     },
-    indicators,
+    indicators: compactSummaryIndicators(indicators),
     topNews: [...articles]
       .sort((a, b) => b.score - a.score)
       .slice(0, 10)
@@ -99,6 +110,7 @@ function saveDailySummary({ articles, indicators, stockReport, digest }) {
 
 module.exports = {
   buildDigestAudit,
+  compactSummaryIndicators,
   mergeDigestAudits,
   saveDailySummary,
 };

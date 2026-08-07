@@ -11,6 +11,7 @@ const {
 } = require('../src/utils/digest-market');
 const {
   buildDigestAudit,
+  compactSummaryIndicators,
   mergeDigestAudits,
 } = require('../src/utils/daily-summary');
 const {
@@ -286,4 +287,20 @@ test('daily summary audit preserves final and original AI mood by session', () =
   assert.equal(current.capitalFlow.investorFlow.date, '2026-08-03');
   assert.equal(merged.length, 2);
   assert.equal(merged[0].marketMood, 'bullish');
+});
+
+test('daily summary indicators never persist prior prompt context recursively', () => {
+  const compacted = compactSummaryIndicators({
+    baseRate: 2.5,
+    marketSnapshot: [{ symbol: '^KS11' }],
+    recentDailySummaries: [{ payload: 'very large previous context' }],
+    recentStockReports: [{ report: 'previous report context' }],
+    recent_daily_summaries: [{ payload: 'legacy context' }],
+    recent_stock_reports: [{ report: 'legacy report context' }],
+  });
+
+  assert.deepEqual(compacted, {
+    baseRate: 2.5,
+    marketSnapshot: [{ symbol: '^KS11' }],
+  });
 });

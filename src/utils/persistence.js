@@ -411,7 +411,9 @@ async function persistDailySummary(summary) {
 
 async function loadPersistedDailySummaries(options = {}) {
   const params = {
-    select: 'date,payload,stats,top_news,stock_report,updated_at',
+    // AI continuity only needs this compact projection. Reading payload would
+    // rehydrate archived indicators/digests and can recursively amplify context.
+    select: 'date,stats,top_news,stock_report_market_summary:stock_report->>market_summary,updated_at',
     order: options.order || 'date.desc,updated_at.desc',
     limit: String(options.limit || 5),
   };
@@ -422,12 +424,15 @@ async function loadPersistedDailySummaries(options = {}) {
 
   return {
     rows: result.rows
-      .map(row => row.payload || {
+      .map(row => ({
         date: row.date,
         stats: row.stats || {},
         topNews: row.top_news || [],
-        stockReport: row.stock_report || null,
-      })
+        stockReport: row.stock_report_market_summary
+          ? { market_summary: row.stock_report_market_summary }
+          : null,
+        updatedAt: row.updated_at || '',
+      }))
       .filter(Boolean),
   };
 }

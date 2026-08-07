@@ -27,6 +27,28 @@ create table if not exists daily_summaries (
   updated_at timestamptz not null default now()
 );
 
+-- Prompt continuity fields are read-time context and must never be nested back
+-- into persisted summaries. This also compacts rows created by older workers.
+update daily_summaries
+set indicators = coalesce(indicators, '{}'::jsonb)
+      - 'recentDailySummaries' - 'recentStockReports'
+      - 'recent_daily_summaries' - 'recent_stock_reports',
+    payload = jsonb_set(
+      coalesce(payload, '{}'::jsonb),
+      '{indicators}',
+      coalesce(payload->'indicators', '{}'::jsonb)
+        - 'recentDailySummaries' - 'recentStockReports'
+        - 'recent_daily_summaries' - 'recent_stock_reports',
+      true
+    )
+where coalesce(indicators, '{}'::jsonb) ?| array[
+  'recentDailySummaries', 'recentStockReports',
+  'recent_daily_summaries', 'recent_stock_reports'
+] or coalesce(payload->'indicators', '{}'::jsonb) ?| array[
+  'recentDailySummaries', 'recentStockReports',
+  'recent_daily_summaries', 'recent_stock_reports'
+];
+
 create table if not exists stock_reports (
   id text primary key,
   date date not null,

@@ -380,6 +380,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 2026-08-07 12:56 KST 정책 레이더 실패는 재정경제부·금융위원회·국토교통부 RSS와 열린국회정보까지 모든 외부 요청이 같은 실행에서 `fetch failed`가 된 GitHub 러너 전면 외부망 장애였다. 특정 기관이나 인증키 문제가 아니며, 모든 공식 소스가 동시에 실패할 때만 15초 후 전체 배치를 한 번 더 재시도하도록 복원력을 보강했다. 중첩된 `ENOTFOUND`·`ETIMEDOUT` 등 네트워크 원인도 이후 로그에 보존한다.
 - `475243d`와 등록한 `LAW_OPEN_DATA_OC`로 원격 정책 레이더를 재실행해 workflow 자체는 47초 만에 성공했고 기존 6개 소스 143건, 관련 87건을 수집했다. 과거 국회 법안 33건은 기준선 처리하고 신규 정책 3건을 Discord에 전송했다. 법제처 8개 요청만 GitHub-hosted runner에서 `www.law.go.kr:443 UND_ERR_CONNECT_TIMEOUT`이 재현됐다. 공식 공공데이터포털도 같은 LINK API를 가리키므로 법제처 소스는 PC worker가 담당하고 Actions에서는 자격값을 주입하지 않아 반복적인 부분 실패 메시지를 제거한다.
 - PC worker의 로컬 네트워크 경로에서 정책 레이더 7/7 소스, 총 151건, 관련 96건과 법제처 현행법령 8건 수집을 확인했다. 새 PC/DB 전환 때 shadow 기간의 미통지 이벤트가 첫 active 실행에서 몰리지 않도록 `--baseline-only`를 추가했다. 현재 Mac DB에서 대기 중이던 11건을 포함한 스냅샷 96건을 무발송 기준선 처리했고, 즉시 `--no-report` 재실행이 신규/변경 0건으로 끝났다. 기준선 모드는 상세 본문 보강과 Discord 전송을 수행하지 않으며 `--dry-run`과의 동시 사용도 거부한다.
+- Codex/worker 컨텍스트 감사를 수행했다. 자동 적재되는 루트 `AGENTS.md`가 기본 32KiB 한도에 가까운 29,073바이트라 상세 명령·파일 목록을 전문 문서 라우팅으로 옮겨 7,050바이트로 축소하고, harness가 12KiB 상한을 검사하도록 했다. 현재 Node PC worker는 Codex 세션을 실행하지 않고 선택형 AI API만 사용한다는 경계를 문서화했다. 향후 Codex 연동은 작업별 새 `codex exec`, 동일 작업만 resume, 12KiB 이하 SSoT 발췌를 원칙으로 한다. 함께 발견된 일일 요약의 이전 요약/리포트 재귀 저장을 차단했다. 원격 미러 9행이 111MB까지 재귀 팽창해 있었고 로컬 DB의 영향 행 4개를 정리한 뒤 전체 payload는 142KB가 됐다. AI 연속성 조회는 전체 payload/stock report 대신 필요한 투영만 읽어 최근 2행 기준 4,020바이트로 제한했다.
 
 ## 다음 작업
 

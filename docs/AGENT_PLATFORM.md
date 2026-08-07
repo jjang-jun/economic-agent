@@ -165,4 +165,4 @@ x-trigger-source: cloud_scheduler | fly_cron | render_cron
 3. worker heartbeat와 마지막 응답 시각을 `#시스템-점검`에 보고한다.
 4. 로컬 PostgreSQL 이관 결과와 암호화 백업 복원을 검증한다.
 5. 72시간 shadow 후 scheduler를 active로 전환하고 cloud 스케줄을 내린다.
-6. Codex 구독 인증 기반 worker는 개인 신뢰 장비에서만 사용하고, 공유 서버 전환 시 별도 API 비용·키 정책을 검토한다.
+6. 현재 Node worker는 Codex를 호출하지 않는다. 향후 구독 인증 기반 `codex exec` 작업은 개인 신뢰 장비에서 작업별 격리 세션으로만 사용하고, 공유 서버 전환 시 별도 API 비용·키 정책을 검토한다.

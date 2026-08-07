@@ -10,7 +10,7 @@ Discord
 Node.js 22 PC worker
   ├─ 멘션, Slash, 승인 버튼
   ├─ 뉴스 수집과 정기 리포트 스케줄
-  ├─ Codex/AI 작업
+  ├─ 결정론적 작업 + 선택형 AI API 분석
   └─ http://127.0.0.1:3210
        PostgREST (내부 호환 API)
          └─ PostgreSQL 17 (기준 DBMS)
@@ -20,7 +20,7 @@ Node.js 22 PC worker
 - PostgREST는 기존 REST 저장 코드를 연결하는 내부 어댑터일 뿐이며 DBMS가 아니다.
 - PostgREST는 PostgreSQL superuser가 아니라 localhost API 전용 `economic_agent_api` 역할로 접속한다. 이 역할은 RLS가 활성화된 기존 서버용 테이블을 다루기 위해 `BYPASSRLS`를 갖지만 외부 네트워크에서는 접근할 수 없다.
 - PostgreSQL 5432와 PostgREST 3210은 모두 `127.0.0.1`에만 바인딩한다. 공유기 포트포워딩이나 공인 인터넷 공개를 금지한다. 컨테이너 내부 PostgREST 포트는 3000이지만 호스트에서는 사용하지 않는다.
-- Docker에는 DB 계층만 둔다. Codex 구독 인증과 로컬 파일을 쓰는 worker는 호스트 OS에서 실행한다.
+- Docker에는 DB 계층만 둔다. 현재 worker는 Codex를 실행하지 않으며 Node 작업과 선택형 AI API 분석만 호스트 OS에서 실행한다.
 - 운영체제별 차이는 재부팅 자동 시작 방식뿐이며 앱 코드는 동일하다.
 
 ## 준비물
@@ -143,7 +143,19 @@ Gateway가 close code `4014`로 종료되면 Developer Portal의 해당 intent�
 - macOS: `launchd`
 - Linux: `systemd`
 
-서비스는 저장소 루트에서 `npm run discord:agent-worker`를 실행하고, 실패 시 재시작하며, `.env`와 Codex 인증 파일을 읽을 수 있는 전용 사용자 권한으로 구동한다.
+서비스는 저장소 루트에서 `npm run discord:agent-worker`를 실행하고, 실패 시 재시작하며, 비공개 `.env`를 읽을 수 있는 전용 사용자 권한으로 구동한다. 현재 서비스에는 Codex 인증 파일 접근 권한이 필요 없다.
+
+## 선택형 Codex 작업 원칙
+
+현재 PC worker와 Discord 전문가 응답은 Codex 세션을 사용하지 않는다. 향후 신뢰된 개인 장비에서 Codex 구독 인증 기반 작업을 연결할 경우에도 다음 계약을 지킨다.
+
+- Discord 전체 대화를 하나의 장기 세션에 누적하지 않는다.
+- 독립 작업은 새 `codex exec`로 시작하고, 동일 작업의 검증·수정 단계에서만 해당 session ID를 `resume`한다.
+- 입력은 `목표 + 허용 범위 + 완료 조건 + 관련 SSoT 발췌 + 변경분`으로 제한한다. 전체 README, PROGRESS, DB row, 채널 history를 전달하지 않는다.
+- 작업별 입력 아티팩트는 기본 12KiB 이하로 만들고 초과 시 원문 링크/ID와 결정에 필요한 요약만 남긴다.
+- 단순 조회·계산·라우팅·리포트 포맷은 Node 코드가 처리하고, 설계·코드 변경·복합 분석처럼 Codex가 필요한 작업만 호출한다.
+- 인증은 개인 신뢰 계정과 OS credential store를 우선하며 `~/.codex/auth.json`을 저장소·로그·Discord에 노출하지 않는다.
+- Codex가 만든 변경은 자동 배포·자동 push하지 않고 diff, 테스트, 승인 단계를 거친다.
 
 ## 백업
 
@@ -163,8 +175,8 @@ npm run home:db:backup:verify -- data/backups/economic-agent-....dump.gz.aes
 
 ## 보안과 운영 원칙
 
-- `.env`, `infra/home-server/.env`, Codex 인증 파일, DB 백업은 Git에 커밋하지 않는다.
-- `~/.codex/auth.json`은 비밀번호처럼 취급한다.
+- `.env`, `infra/home-server/.env`, 선택형 Codex 인증 파일, DB 백업은 Git에 커밋하지 않는다.
+- 향후 Codex 연동 시 `~/.codex/auth.json`은 비밀번호처럼 취급한다.
 - 공유기에서 3000/5432 포트를 열지 않는다.
 - Discord는 guild/user/channel allowlist를 모두 통과한 요청만 처리한다.
 - 매매 입력은 초안 후 사용자 버튼 승인을 유지하고 증권사 자동 주문은 연결하지 않는다.

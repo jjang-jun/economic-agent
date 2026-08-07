@@ -15,6 +15,11 @@ function includes(file, pattern) {
 
 const checks = [
   {
+    file: 'AGENTS.md',
+    maxBytes: 12 * 1024,
+    message: 'AGENTS.md must stay below 12 KiB so durable instructions do not crowd out task context',
+  },
+  {
     file: 'docs/AGENT_HARNESS.md',
     pattern: '# Agent Harness',
     message: 'docs/AGENT_HARNESS.md must exist as the long-running task harness entry point',
@@ -102,7 +107,11 @@ const checks = [
 ];
 
 function main() {
-  const failures = checks.filter(check => !includes(check.file, check.pattern));
+  const failures = checks.filter(check => (
+    check.maxBytes
+      ? Buffer.byteLength(read(check.file), 'utf8') > check.maxBytes
+      : !includes(check.file, check.pattern)
+  ));
   if (failures.length > 0) {
     console.error('[agent-harness-check] failed');
     for (const failure of failures) {

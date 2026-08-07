@@ -14,6 +14,7 @@ Codex가 새 세션에서 전체 개발 이력을 다시 읽지 않고 작업을
 - 상시 실행 목표: Windows/macOS/Linux 공통 Node.js PC worker
 - 현재 검증 장비: macOS ARM64, LaunchAgent `com.economic-agent.worker`
 - worker 모드: `shadow`; Gateway 재귀 오류 방지·AC 절전 방지·외부 백업 설정을 반영한 관찰은 2026-08-06 11:50 KST부터 72시간이며 종료 전에는 정기 작업을 실제 실행하지 않음
+- 현재 worker는 Codex 세션을 실행하지 않음. Node 예약 작업과 Gateway가 중심이며, 전문가 답변을 켤 때만 별도 AI API를 사용함
 - 목표 DB: 같은 장비의 PostgreSQL 17 + localhost 전용 PostgREST
 - 로컬 포트: PostgreSQL `127.0.0.1:5432`, PostgREST `127.0.0.1:3210`
 - Supabase와 GitHub Actions: 최종 증분 동기화와 shadow 검증이 끝날 때까지 안전망으로 유지
@@ -52,12 +53,13 @@ Codex가 새 세션에서 전체 개발 이력을 다시 읽지 않고 작업을
 
 ## Codex 컨텍스트 원칙
 
-- 새 세션은 `AGENTS.md`와 이 문서부터 읽습니다.
+- 자동 적재되는 루트 `AGENTS.md`는 12KiB 미만의 얇은 실행 지침으로 유지하고 새 세션은 이 문서를 다음 SSoT로 읽습니다.
 - `docs/PROGRESS.md` 362줄 전체는 역사나 근거가 필요할 때만 부분 검색합니다.
 - `README.md` 전체를 기본 컨텍스트로 적재하지 말고 필요한 명령·환경변수만 `rg`로 찾습니다.
 - 한 작업의 commentary는 결과·현재 장애·다음 검증만 짧게 남깁니다.
 - 긴 웹 자료와 미래 AI 조직 설계는 현재 경제 Agent 구현에 필요할 때만 `docs/future/AI_AGENT_TEAM_BLUEPRINT.md`에서 조회합니다.
 - 대화에만 남은 운영 판단은 이 문서 또는 해당 전문 문서에 압축하고 다음 세션으로 넘깁니다.
+- 향후 PC worker의 선택형 Codex 작업은 독립 작업마다 새 세션을 사용하고 같은 작업을 이어갈 때만 resume하며, 전체 Discord history 대신 12KiB 이하 작업 아티팩트를 전달합니다.
 
 ## 바로 이어서 할 일
 
