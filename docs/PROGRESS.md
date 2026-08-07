@@ -379,6 +379,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 법제처 국가법령정보 공동활용 `lawSearch.do?target=law` 선택형 소스를 추가했다. `LAW_OPEN_DATA_OC`가 설정되면 추적 법률의 공포일·공포번호·시행일·제개정 구분을 정규화하고, 미래 시행일은 `공포`, 도래한 시행일은 `시행`으로 구분한다. 국회 개정안과 현행 법령은 별도 출처 ID를 유지하면서 기본 법률명 기반 동일 사건 키로 연결한다. 승인된 로컬 `OC`로 추적 대상 8개 법률 실데이터 조회를 완료했다.
 - 2026-08-07 12:56 KST 정책 레이더 실패는 재정경제부·금융위원회·국토교통부 RSS와 열린국회정보까지 모든 외부 요청이 같은 실행에서 `fetch failed`가 된 GitHub 러너 전면 외부망 장애였다. 특정 기관이나 인증키 문제가 아니며, 모든 공식 소스가 동시에 실패할 때만 15초 후 전체 배치를 한 번 더 재시도하도록 복원력을 보강했다. 중첩된 `ENOTFOUND`·`ETIMEDOUT` 등 네트워크 원인도 이후 로그에 보존한다.
 - `475243d`와 등록한 `LAW_OPEN_DATA_OC`로 원격 정책 레이더를 재실행해 workflow 자체는 47초 만에 성공했고 기존 6개 소스 143건, 관련 87건을 수집했다. 과거 국회 법안 33건은 기준선 처리하고 신규 정책 3건을 Discord에 전송했다. 법제처 8개 요청만 GitHub-hosted runner에서 `www.law.go.kr:443 UND_ERR_CONNECT_TIMEOUT`이 재현됐다. 공식 공공데이터포털도 같은 LINK API를 가리키므로 법제처 소스는 PC worker가 담당하고 Actions에서는 자격값을 주입하지 않아 반복적인 부분 실패 메시지를 제거한다.
+- PC worker의 로컬 네트워크 경로에서 정책 레이더 7/7 소스, 총 151건, 관련 96건과 법제처 현행법령 8건 수집을 확인했다. 새 PC/DB 전환 때 shadow 기간의 미통지 이벤트가 첫 active 실행에서 몰리지 않도록 `--baseline-only`를 추가했다. 현재 Mac DB에서 대기 중이던 11건을 포함한 스냅샷 96건을 무발송 기준선 처리했고, 즉시 `--no-report` 재실행이 신규/변경 0건으로 끝났다. 기준선 모드는 상세 본문 보강과 Discord 전송을 수행하지 않으며 `--dry-run`과의 동시 사용도 거부한다.
 
 ## 다음 작업
 
@@ -391,6 +392,6 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 7. `/dashboard` 실제 사용 빈도에 따라 탭 분리와 상세 차트 추가 여부 결정
 8. 월간 리서치 worker 결과를 다음 월간 리뷰에서 실제 의사결정에 도움이 되는지 확인
 9. 다음 실제 매매에서 Discord 자연어 매수/매도 초안의 추천·계획 연결, 원화 반영액, 실현손익을 확인하고 주간 리뷰의 연결률·매도 사유 기록률을 검증
-10. `policy-radar.yml` 배포 후 첫 예약 실행의 공식 소스별 건수와 국토교통부 RSS 복구 여부를 확인한다. 다음 단계는 국가법령정보와 국회 의안 상태를 연결해 정부안부터 시행까지 동일 사건으로 추적하는 것이다.
+10. Windows PC worker 전환 직전 정책 기준선을 생성하고 즉시 `--no-report` 재실행에서 신규/변경 0건을 확인한 뒤, 첫 10:10/18:10 active 실행에서 법제처 포함 7개 소스와 실제 신규 정책만 전송되는지 확인한다.
 11. Discord 단독 전송을 관찰해 긴급·브리핑·행동·정책·성과·운영 채널의 누락과 모바일 가독성을 확인한다.
 12. Agent Server에 Discord 환경변수를 넣고 배포한 뒤 Developer Portal의 Interaction URL을 연결하고 `npm run discord:sync-commands`를 실행한다. 선택한 Windows/macOS/Linux 상시 호스트에서 `npm run discord:agent-worker:check` 후 `npm run discord:agent-worker`를 배치한다. 개인 `#포트폴리오` 채널에서 여섯 Slash 조회와 멘션 자연어 초안, 기록/취소 버튼, 요청자·채널 경계, 미허용 사용자 차단을 smoke 검증한다.

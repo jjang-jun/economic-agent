@@ -50,7 +50,7 @@ RSS feeds
 - Preview the persisted PC worker heartbeat/job report without Discord delivery: `npm run worker:status-report -- --dry-run`
 - Discord economic expert responses remain disabled unless `DISCORD_EXPERT_RESPONSES_ENABLED=true`; `DISCORD_EXPERT_MAX_REVIEWERS` is capped at 2, each AI call is bounded by `DISCORD_EXPERT_TIMEOUT_MS`, and primary/reviewer token budgets use `AI_EXPERT_MAX_TOKENS`/`AI_EXPERT_REVIEW_MAX_TOKENS`
 - Detect low-cost pre-news signals: `npm run pre-news:signal`
-- Collect official tax/real-estate/finance policy changes: `npm run policy:radar`; preview without persistence or Discord delivery using `npm run policy:radar -- --dry-run`
+- Collect official tax/real-estate/finance policy changes: `npm run policy:radar`; preview without persistence or Discord delivery using `npm run policy:radar -- --dry-run`; seed a new worker DB without backlog delivery using `npm run policy:radar -- --baseline-only`
 - Evaluate stored market anomalies after 1/5 trading sessions: `npm run anomaly:evaluate`
 - Build weekly/monthly performance reviews: `npm run review:weekly`, `npm run review:monthly`
 - Check model/prompt performance sample readiness: `npm run model:performance` after `npm run db:pull`

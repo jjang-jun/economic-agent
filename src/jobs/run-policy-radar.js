@@ -104,6 +104,9 @@ function selectPolicyNotifications(events, existingById, options = {}) {
 }
 
 async function runPolicyRadar(options = {}) {
+  if (options.dryRun && options.baselineOnly) {
+    throw new Error('--dry-run과 --baseline-only는 함께 사용할 수 없습니다');
+  }
   const now = options.now || new Date();
   const jobName = 'policy-radar';
   const shouldSkipLock = options.skipLock || options.dryRun;
@@ -128,20 +131,19 @@ async function runPolicyRadar(options = {}) {
     }
 
     const events = uniqueEvents(classifyPolicyDocuments(fetched.documents));
+    const loadState = options.loadState || loadPolicyEventState;
+    const saveEvents = options.saveEvents || savePolicyEvents;
+    const markNotified = options.markNotified || markPolicyEventsNotified;
     const stored = options.dryRun
       ? { byId: new Map(), source: 'dry_run' }
-      : await loadPolicyEventState(events);
+      : await loadState(events);
     const selection = selectPolicyNotifications(events, stored.byId, {
       now,
       bootstrapHours: options.bootstrapHours || process.env.POLICY_RADAR_BOOTSTRAP_HOURS || 72,
       maxEvents: options.maxEvents || process.env.POLICY_RADAR_MAX_EVENTS || 10,
     });
-    const enrichedNotifications = await (
-      options.enrichEvents || enrichPolicyEventDetails
-    )(selection.notify, options.detailOptions || {});
-    const report = {
+    const reportBase = {
       generatedAt: now.toISOString(),
-      events: enrichedNotifications,
       sourceResults: fetched.sourceResults,
       successfulSourceCount,
       fetchedCount: fetched.documents.length,
@@ -154,14 +156,36 @@ async function runPolicyRadar(options = {}) {
       `[정책레이더] 소스 ${successfulSourceCount}/${fetched.sourceResults.length} · 수집 ${fetched.documents.length}건 · 관련 ${events.length}건 · 신규/변경 ${selection.pending.length}건`
     );
 
+    if (options.baselineOnly) {
+      await saveEvents(events, stored.byId, { now: now.toISOString() });
+      await markNotified(events, stored.byId, { now: now.toISOString() });
+      console.log(`[정책레이더] 현재 스냅샷 ${events.length}건 기준선 처리 · Discord 전송 없음`);
+      return {
+        ok: true,
+        sent: false,
+        baselineOnly: true,
+        events: [],
+        ...reportBase,
+        baselineCount: events.length,
+      };
+    }
+
+    const enrichedNotifications = await (
+      options.enrichEvents || enrichPolicyEventDetails
+    )(selection.notify, options.detailOptions || {});
+    const report = {
+      ...reportBase,
+      events: enrichedNotifications,
+    };
+
     if (options.dryRun) {
       if (report.events.length > 0 || options.includeEmpty) console.log(formatPolicyRadarReport(report));
       return { ok: true, dryRun: true, ...report };
     }
 
-    await savePolicyEvents(events, stored.byId, { now: now.toISOString() });
+    await saveEvents(events, stored.byId, { now: now.toISOString() });
     if (selection.baseline.length > 0) {
-      await markPolicyEventsNotified(selection.baseline, stored.byId, { now: now.toISOString() });
+      await markNotified(selection.baseline, stored.byId, { now: now.toISOString() });
       console.log(`[정책레이더] 첫 실행 과거 문서 ${selection.baseline.length}건 기준선 처리`);
     }
 
@@ -176,7 +200,7 @@ async function runPolicyRadar(options = {}) {
     }
 
     await (options.sendReport || sendPolicyRadarReport)(report);
-    await markPolicyEventsNotified(report.events, stored.byId, { now: now.toISOString() });
+    await markNotified(report.events, stored.byId, { now: now.toISOString() });
     console.log(`[정책레이더] Discord ${report.events.length}건 전송 완료`);
     return { ok: true, sent: true, ...report };
   } finally {

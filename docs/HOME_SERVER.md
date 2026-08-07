@@ -78,8 +78,9 @@ PC_WORKER_SCHEDULER_MODE=shadow
 2. 빈 로컬 DB에 데이터를 이관하고 테이블별 행 수와 핵심 포트폴리오 합계를 대조한다.
 3. `PC_WORKER_SCHEDULER_MODE=shadow`로 72시간 실행해 예정 작업, heartbeat, Discord 연결을 기록한다. 이 모드에서는 정기 작업을 실제 실행하지 않는다.
 4. 멘션, Slash, 승인/취소 버튼을 개인 채널에서 smoke 검증한다.
-5. `active`로 바꾸고 GitHub Actions 스케줄은 수동 실행 안전망만 남긴다.
-6. 한 주간 백업 복원 시험까지 통과한 뒤 Cloud Run과 Supabase를 제거한다.
+5. 새 PC가 사용하는 DB에서 `npm run policy:radar -- --baseline-only`를 한 번 실행하고, 이어서 `--no-report` 실행이 `신규/변경 0건`인지 확인한다.
+6. `active`로 바꾸고 GitHub Actions 스케줄은 수동 실행 안전망만 남긴다.
+7. 한 주간 백업 복원 시험까지 통과한 뒤 Cloud Run과 Supabase를 제거한다.
 
 전환 기간에는 두 스케줄러를 동시에 active로 두지 않는다. `worker_job_runs`와 `job_locks`가 중복 실행을 방어하지만, 운영 설정 자체도 단일 실행 주체를 유지해야 한다.
 

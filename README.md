@@ -285,6 +285,7 @@ npm run review:monthly
 npm run agent:harness-check
 npm run security:audit
 npm run policy:radar -- --dry-run
+npm run policy:radar -- --baseline-only
 ```
 
 `action:report`의 신규/관찰 후보는 추천 당시 기준가와 최신 현재가를 함께 표시합니다. 현재가는 리포트 생성 시점에 다시 조회하되, 조회 실패 시에도 추천 당시 기준가와 손절 기준으로 리포트 생성을 계속합니다. 최근 뉴스 기반 추천이 없더라도 `watchlist.domesticMomentum`/`watchlist.globalMomentum` 대표주에서 20일 고점 근접, 거래량 증가, 상대강도 개선, 당일 급등이 포착되면 `가격 모멘텀 관찰` 섹션에 별도 표시합니다. 이미 보유 중인 급등 종목은 신규 추천에서 숨기지 않고 `추가매수/수익보호 점검`으로 분리해 눌림 대기, 추가매수 한도, 일부 이익 잠금 여부를 보여줍니다.
@@ -305,7 +306,7 @@ npm run policy:radar -- --dry-run
 
 ETF 레이더의 `inflow_proxy`/`outflow_proxy`는 실제 ETF 순설정·순환매 금액이 아닙니다. 가격 5일·20일 상대강도와 20일 평균 대비 거래량으로 “어디가 강하고 약한지”를 추정하며, Discord에서도 `가격·거래량 프록시`라고 고정 표기합니다. 실제 자금 유입은 발행주식수·AUM·creation/redemption 데이터가 확보된 경우에만 별도 수치로 해석해야 합니다.
 
-리뷰 명령을 운영 저장 없이 점검하려면 `--dry-run`을 붙입니다. `--no-report`는 Discord 전송만 생략하고 로컬/Supabase 저장은 수행합니다.
+리뷰 명령을 운영 저장 없이 점검하려면 `--dry-run`을 붙입니다. `--no-report`는 Discord 전송만 생략하고 로컬/Supabase 저장은 수행합니다. 정책 레이더 실행 주체를 새 PC/DB로 옮길 때는 최초 한 번 `--baseline-only`를 사용하면 현재 정책 스냅샷 전체를 알림 완료 기준선으로 저장하며 Discord에는 전송하지 않습니다. `--dry-run`과 `--baseline-only`는 함께 사용할 수 없습니다.
 
 ```bash
 npm run review:weekly -- --dry-run
@@ -574,6 +575,9 @@ npm run policy:radar
 # 저장·전송 없이 공식 정책 수집/분류 결과 미리보기
 npm run policy:radar -- --dry-run
 
+# 새 PC/DB 전환 전 현재 정책 스냅샷을 무발송 기준선으로 저장
+npm run policy:radar -- --baseline-only
+
 # Discord 채널 설정 확인 / #시스템-점검 실제 smoke
 npm run discord:check
 npm run discord:smoke -- --channel=ops
@@ -605,6 +609,8 @@ npm run db:pull
 법제처 승인 후 `LAW_OPEN_DATA_OC`를 설정하면 같은 8개 법률의 현행 법령 메타데이터를 추가 조회해 공포일·공포번호·시행일·제개정 구분을 교차검증합니다. 국회 개정안과 법제처 현행법령은 출처별 기록 ID를 유지하면서 기본 법률명 기준의 동일 `eventKey`로 묶입니다. 시행일이 현재보다 미래이면 `공포`, 도래했으면 `시행`으로 표시하며, 승인값이 없으면 이 소스만 조용히 건너뜁니다.
 
 현재 `law.go.kr`은 GitHub-hosted Actions 러너에서 연결 타임아웃이 확인되어 `LAW_OPEN_DATA_OC`를 정책 Actions 워크플로에는 주입하지 않습니다. 이 소스는 승인값이 들어 있는 PC worker의 10:10/18:10 KST 정책 레이더가 담당하고, GitHub Actions는 재정경제부·금융위원회·국토교통부·열린국회정보 백업 수집을 유지합니다. GitHub Secret은 향후 네트워크 정책 변경에 대비해 보관하되 현재 워크플로에서는 사용하지 않습니다.
+
+PC worker를 `active`로 전환하기 전에는 해당 PC가 사용하는 DB에서 `npm run policy:radar -- --baseline-only`를 한 번 실행합니다. 이 명령은 현재 수집된 모든 관련 정책·법령의 콘텐츠 해시를 저장하고 알림 완료로 표시하므로, shadow 기간에 누적된 문서가 첫 active 실행에서 한꺼번에 발송되는 것을 막습니다. 이후 `--no-report` 재실행에서 `신규/변경 0건`인지 확인합니다.
 
 ## AI 제공자 지원
 

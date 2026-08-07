@@ -6,6 +6,7 @@ const {
   selectPolicyNotifications,
   runPolicyRadar,
 } = require('../src/jobs/run-policy-radar');
+const { parseArgs } = require('../scripts/policy-radar');
 const {
   extractSummaryPoints,
   formatLegislativeStatus,
@@ -35,6 +36,15 @@ function event(overrides = {}) {
     ...overrides,
   };
 }
+
+test('policy radar args expose an explicit stateful baseline mode', () => {
+  assert.deepEqual(parseArgs(['--baseline-only']), {
+    dryRun: false,
+    baselineOnly: true,
+    noReport: false,
+    includeEmpty: false,
+  });
+});
 
 test('policy sources retry the whole batch only when every configured source fails', async () => {
   let rssAttempts = 0;
@@ -248,6 +258,58 @@ test('runPolicyRadar dry run classifies official documents without writing or se
   assert.equal(result.events[0].domain, 'tax');
   assert.equal(result.events[0].detailSource, 'official_page');
   assert.match(result.events[0].summary, /공식 상세 페이지/);
+});
+
+test('runPolicyRadar baseline-only marks the full current snapshot without enrichment or delivery', async () => {
+  const saved = [];
+  const marked = [];
+  let enriched = false;
+  let sent = false;
+  const result = await runPolicyRadar({
+    now: new Date('2026-08-07T03:00:00.000Z'),
+    baselineOnly: true,
+    skipLock: true,
+    fetchDocuments: async () => ({
+      documents: [{
+        externalId: '1',
+        title: 'ISA 세제개편안 발표',
+        summary: '비과세 혜택을 확대한다.',
+        link: 'https://mofe.go.kr/1',
+        pubDate: '2026-08-07T09:00:00+09:00',
+        sourceId: 'mofe-press',
+        authority: '재정경제부',
+        sourceKind: 'official_press',
+      }],
+      sourceResults: [{ id: 'mofe-press', ok: true, count: 1 }],
+    }),
+    fetchAssemblyDocuments: async () => ({ documents: [], sourceResults: [] }),
+    fetchLawDocuments: async () => ({ documents: [], sourceResults: [] }),
+    loadState: async () => ({ byId: new Map(), source: 'test' }),
+    saveEvents: async events => saved.push(...events),
+    markNotified: async events => marked.push(...events),
+    enrichEvents: async events => {
+      enriched = true;
+      return events;
+    },
+    sendReport: async () => {
+      sent = true;
+    },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.baselineOnly, true);
+  assert.equal(result.sent, false);
+  assert.equal(result.baselineCount, 1);
+  assert.equal(saved.length, 1);
+  assert.equal(marked.length, 1);
+  assert.equal(enriched, false);
+  assert.equal(sent, false);
+});
+
+test('runPolicyRadar rejects conflicting dry-run and baseline-only modes', async () => {
+  await assert.rejects(
+    runPolicyRadar({ dryRun: true, baselineOnly: true }),
+    /함께 사용할 수 없습니다/
+  );
 });
 
 test('runPolicyRadar merges configured National Assembly bill status with official RSS', async () => {
