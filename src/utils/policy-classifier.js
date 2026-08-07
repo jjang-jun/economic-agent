@@ -63,6 +63,7 @@ function matchDomains(text) {
 }
 
 function classifyStage(document, text) {
+  if (document.stage && STAGE_LABELS[document.stage]) return document.stage;
   if (document.sourceKind === 'official_clarification' || /결정된 바 없|사실과 다르|보도에 신중|설명드립니다|바로잡/.test(text)) {
     return 'official_clarification';
   }
@@ -118,6 +119,7 @@ function classifyPolicyDocument(document) {
     authority: document.authority || '',
     sourceId: document.sourceId || '',
     sourceKind: document.sourceKind || '',
+    legislative: document.legislative || null,
     domain: primary.domain,
     domains: domainMatches.map(match => match.domain),
     matchedKeywords: [...new Set(domainMatches.flatMap(match => match.keywords))].slice(0, 12),

@@ -7,6 +7,7 @@ const {
 } = require('../src/jobs/run-policy-radar');
 const {
   extractSummaryPoints,
+  formatLegislativeStatus,
   formatPolicyRadarReport,
   splitPolicyRadarReports,
   sendPolicyRadarReport,
@@ -89,6 +90,13 @@ test('policy summary extracts several official facts without repeating the title
   ]);
 });
 
+test('policy summary does not mistake a long bill number for a numbered list marker', () => {
+  assert.deepEqual(extractSummaryPoints(event({
+    title: '조세특례제한법 일부개정법률안',
+    summary: '의안번호: 2200001. 본회의 결과: 수정가결.',
+  })), ['의안번호: 2200001.', '본회의 결과: 수정가결.']);
+});
+
 test('policy report clearly labels missing official detail instead of inventing a summary', () => {
   const message = formatPolicyRadarReport({
     events: [event({ summary: '' })],
@@ -97,6 +105,27 @@ test('policy report clearly labels missing official detail instead of inventing 
   });
   assert.match(message, /공식 RSS에 상세 요약이 없어/);
   assert.doesNotMatch(message, /혜택을 확대/);
+});
+
+test('assembly policy report exposes bill number, committee and legal stage', () => {
+  const assembly = event({
+    stage: 'passed',
+    stageLabel: '국회 통과',
+    authority: '대한민국 국회',
+    legislative: {
+      age: '22', billNo: '2200001', committee: '기획재정위원회',
+      plenaryResult: '수정가결', promulgationDate: '',
+    },
+  });
+  assert.equal(
+    formatLegislativeStatus(assembly),
+    '제22대 · 의안 2200001 · 기획재정위원회 · 본회의 수정가결'
+  );
+  const message = formatPolicyRadarReport({
+    events: [assembly], successfulSourceCount: 1, sourceResults: [{ ok: true }],
+  });
+  assert.match(message, /국회 통과/);
+  assert.match(message, /의안 추적: 제22대 · 의안 2200001/);
 });
 
 test('clarification summary prioritizes the official correction over the quoted press claim', () => {
@@ -176,4 +205,34 @@ test('runPolicyRadar dry run classifies official documents without writing or se
   assert.equal(result.events[0].domain, 'tax');
   assert.equal(result.events[0].detailSource, 'official_page');
   assert.match(result.events[0].summary, /공식 상세 페이지/);
+});
+
+test('runPolicyRadar merges configured National Assembly bill status with official RSS', async () => {
+  const result = await runPolicyRadar({
+    now: new Date('2026-08-07T03:00:00.000Z'),
+    dryRun: true,
+    skipLock: true,
+    fetchDocuments: async () => ({ documents: [], sourceResults: [{ id: 'rss', ok: true, count: 0 }] }),
+    fetchAssemblyDocuments: async () => ({
+      documents: [{
+        externalId: 'PRC_TEST',
+        title: '조세특례제한법 일부개정법률안',
+        summary: '의안번호: 2200001. 본회의 결과: 수정가결',
+        link: 'https://likms.assembly.go.kr/bill/1',
+        pubDate: '2026-08-07',
+        sourceId: 'open-assembly-bills',
+        authority: '대한민국 국회',
+        sourceKind: 'assembly_bill',
+        stage: 'passed',
+        legislative: { age: '22', billNo: '2200001', plenaryResult: '수정가결' },
+      }],
+      sourceResults: [{ id: 'open-assembly-bills', ok: true, count: 1 }],
+    }),
+    enrichEvents: async events => events,
+  });
+  assert.equal(result.events.length, 1);
+  assert.equal(result.events[0].stage, 'passed');
+  assert.equal(result.events[0].stageLabel, '국회 통과');
+  assert.equal(result.events[0].legislative.billNo, '2200001');
+  assert.equal(result.successfulSourceCount, 2);
 });
