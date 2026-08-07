@@ -28,13 +28,37 @@
 - 장 마감 종목 리포트: 당일 기사 아카이브 기반
 - 추천 성과 평가: 1일/5일/20일, KOSPI 벤치마크 대비 평가
 - 시장 레짐/행동 가드레일: 초안 적용
-- Supabase/Postgres 히스토리 저장: 스키마와 런타임 저장 코드 추가
+- 홈 서버 PostgreSQL/PostgREST 히스토리 저장: macOS ARM64 Docker에서 기동, 초기 Supabase 시점 복원과 29개 테이블 REST pull 완료; 최종 cutover 증분 동기화 대기
 - 로컬 파일시스템 미러: `npm run db:pull`로 JSON/SQLite 생성
 - AI 토큰 절약: 상위 기사/핵심 스냅샷만 프롬프트에 사용
 
 ## 최근 변경
 
 > 2026-08-05 이전 항목은 당시 운영 상태를 보존한 역사 기록입니다. 그 안의 이전 메시징 플랫폼 명령·환경변수·배포 경로는 현재 실행 지침이 아니며, 현재 운영은 Discord 단독 기준입니다.
+
+### 2026-08-06 부동산 저점 매수 레이더 1차
+
+- 최종 주택 목표를 서울·경기 아파트의 정확한 바닥 예측이 아니라, 2~3년 안에 저점에 가까운 `매수 검토 구간`에서 합리적으로 매수하는 것으로 명시했다. 관찰 가격대는 5.8억~9.5억원, 우선 목표는 8.5억~9.5억원이다.
+- 국토교통부 아파트 매매·전월세 API 수집기와 매일 03:20 KST PC worker 작업을 추가했다. 신고 지연·정정·해제를 반영하도록 최근 2개월을 반복 조회한다.
+- 지역·월별 거래량, 중위가격, ㎡당 가격, 전월 대비 가격·거래량, 전세가율, 계약해제 비율을 저장하고 `하락 지속/안정화/거래 회복 관찰/추격 위험/표본 부족`으로 분류한다.
+- 생애최초 70% LTV·6억원 가격구간 한도·DSR 40%를 현재 시점의 **검증 필요 가정**으로 둔 가격대별 대출/현금/월상환 시나리오를 추가했다. 실제 매수 시점 규정과 부부소득·기존부채 없이는 확정 한도로 표현하지 않는다.
+- 호가는 실거래와 분리한 `real_estate_listing_snapshots`에 저장한다. 공식 공개 API가 없는 플랫폼의 무단 크롤링은 넣지 않았고, 허가받은 JSON feed가 있을 때만 03:50 작업을 활성화하도록 fail-closed 처리했다.
+- 부동산 전문가 컨텍스트에 주택 목표·대출 시나리오·최근 지역 지표·정책을 추가했다. 상세 운영 기준은 `docs/REAL_ESTATE_STRATEGY.md`다.
+- 24개월 실거래 백필을 지역별로 실행하고 완료 지역을 ignored 체크포인트에 기록해 네트워크 중단 후 재개할 수 있게 했다. 백필 지표에는 1·3·12개월 가격 변화, 12개월 거래량 변화, 24개월 중위가격 고점 대비 낙폭을 포함한다.
+- 한국부동산원 R-ONE 공식 월간 아파트 매매가격지수 표 `A_2024_00045` 수집기를 추가했다. 월요일 04:10 KST에 24개월 서울·경기 지수를 재조회하되 `REB_OPEN_API_KEY`와 활성화 플래그가 없으면 실행하지 않는다.
+- 2026-08-07 공공데이터포털 활용신청 반영 후 서울·경기 69개 지역의 24개월 초기 백필을 완료했다. 로컬 PostgREST 기준 목표 가격대 매매 118,247건, 전월세 1,126,303건, 지역월 지표 1,431건과 R-ONE 지수 1,982건을 저장했다.
+- 2026-08-05/06 정책 레이더의 정부 공식 RSS 동시 timeout 재발에 대응해 소스별 25초 timeout과 2회 재시도를 Workflow에 적용했다. 가격 Provider 감사 로그의 저장 실패는 부가 관측 장애로 격리해 핵심 종목 리포트 저장 회로차단기를 열지 않도록 수정했다.
+
+### 2026-08-05 홈 서버 전환
+
+- 목표 운영 구조를 항상 켜진 Windows/macOS/Linux 공통 Node.js PC worker와 같은 장비의 오픈소스 PostgreSQL DBMS로 변경했다. PostgREST는 기존 저장 코드 호환을 위한 localhost 전용 내부 API로만 사용한다.
+- PC scheduler에 KST 기준 수집·다이제스트·리포트·평가·리뷰 일정, catch-up, 동시 실행 제한, retry, job lock, 실행 이력, heartbeat를 추가했다. 기본값은 실제 작업을 실행하지 않는 `shadow`이며 72시간 검증 후에만 `active`로 전환한다.
+- Discord Gateway worker가 일반 멘션뿐 아니라 `INTERACTION_CREATE`의 Slash와 승인 버튼도 처리하도록 확장했다. 자연어 본문 수신을 위해 Message Content Intent를 명시하며 guild/user/channel allowlist는 그대로 유지한다.
+- `infra/home-server/docker-compose.yml`에 PostgreSQL 17과 PostgREST를 추가하고 두 포트를 `127.0.0.1`에만 바인딩했다. 스키마 적용·상태 점검·AES-256-GCM 선택형 백업 명령과 `docs/HOME_SERVER.md`를 추가했다.
+- 현재 macOS ARM64 장비의 Docker Desktop에서 PostgreSQL 17과 PostgREST를 기동했다. PostgREST 호스트 포트는 일반 개발 서버와 충돌하지 않도록 `127.0.0.1:3210`으로 정했고 PostgreSQL 5432도 loopback에만 바인딩했다. Supabase data-only dump 약 14.8MB를 로컬에 복원하고 29개 테이블 REST pull/SQLite mirror 생성을 완료했다. 핵심 22개 테이블은 원본과 건수가 일치했고, 기사·가격·수집 로그 7개는 백업 이후 원본 workflow가 계속 기록해 원본이 더 많다. 최종 cutover 때 스케줄을 잠시 정지하고 마지막 동기화·정확 대조·백업 복원 시험을 수행한다.
+- Discord Developer Portal에서 Message Content Intent를 활성화한 뒤 Gateway READY와 로컬 PostgreSQL heartbeat `gateway_connected=true`를 확인했다. Gateway가 네트워크 `error`만 내고 `close` 이벤트를 내지 않는 경우에도 다음 재연결을 예약하도록 보강했다. Discord 자동완성에서 봇 계정 대신 같은 이름의 관리 역할이 선택되는 실제 사례를 반영해, guild/user/channel allowlist를 모두 통과한 경우에만 `DISCORD_AGENT_ROLE_IDS`의 역할 멘션도 처리한다.
+- Codex 장기 대화의 컨텍스트 지연을 줄이기 위해 `docs/CURRENT_STATE.md`를 새 세션용 압축 SSoT로 추가했다. 새 세션은 `AGENTS.md`와 이 문서를 먼저 읽고, 362줄 이상의 `docs/PROGRESS.md`와 800줄 이상의 `README.md`는 필요한 부분만 검색한다.
+- PC worker shadow 판정을 자동화하는 `npm run worker:shadow-audit`을 추가했다. 설정된 관찰 시작부터 기대되는 27개 작업 스케줄과 DB 기록을 대조하고 누락, 잘못된 상태, 10분 초과 지연, heartbeat/Gateway, 72시간 진행률을 함께 판정한다. 초기 설정·재시작 구간은 준비 관찰로 남기고 최종 수정본 기준 2026-08-05 18:07 KST부터 깨끗한 72시간을 다시 측정한다.
 
 ### 2026-05-06
 
@@ -54,7 +78,7 @@
 
 ## 데이터 저장 전략
 
-Supabase/Postgres를 장기 기준 저장소로 사용합니다. 로컬 `data/`는 실행 중 상태와 분석 미러입니다.
+항상 켜진 PC의 PostgreSQL을 장기 기준 저장소로 사용하고 PostgREST는 localhost 전용 호환 API로 둡니다. 로컬 `data/`는 실행 중 fallback과 분석 미러입니다. Supabase는 이관 대조와 72시간 shadow가 끝날 때까지만 안전망으로 유지합니다.
 
 - `articles`: 기사/RSS/DART 공시
 - `daily_summaries`: 일일 요약
@@ -321,7 +345,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 2026-08-04 Telegram에 `/trades`와 `/trade_performance`를 추가했다. 최근 승인 체결은 원화 반영액, 추천·계획 연결, 매도 실현손익·사유를 표시하고, 실제 거래 성과는 매수·매도 원장을 평균원가로 상계해 열린 수량의 미실현 성과와 매도 실현손익을 분리한다. 승인 완료 응답에는 반영 후 현금·잔여 수량·기록 시각을 포함한다. 이는 증권사 계좌 전체가 아니라 에이전트에 기록한 체결 범위이며 저장소 장애는 0건으로 표시하지 않는다. 정기 Telegram smoke도 변경 초안 3건의 취소뿐 아니라 두 읽기 명령의 운영 Supabase 응답을 검증한다.
 - 2026-08-04 `telegram:sync-commands`를 추가해 포트폴리오·추천·거래 입력·최근 체결·실제 거래 성과 명령을 Telegram 입력창 메뉴와 동기화한다. webhook이나 거래 데이터는 건드리지 않는다.
 - 2026-08-04 정책·자산 레이더 1단계 MVP를 추가했다. 재정경제부·금융위원회·국토교통부 공식 RSS를 별도 수집하고 세금·부동산·대출·연금·자본시장, 정부안·설명정정·입법예고·국회단계·공포·시행으로 결정론적으로 분류한다. 소스별 장애는 격리해 미확인 상태와 재시도를 표시하고, 첫 실행의 72시간 이전 문서는 기준선 처리하며 Telegram 성공 후에만 통지 해시를 갱신한다. Supabase `policy_events`/`policy_event_versions`가 기준 저장소이며 미설정 환경은 ignored 로컬 state로 fallback한다. 평일 10:10·18:10 KST workflow는 private 채널로 신규·변경만 전송한다.
-- 운영 Supabase에 정책 레이더 스키마를 적용하고 첫 실데이터 실행을 검증했다. 공식 문서 46건 중 72시간 이전 41건은 기준선 처리하고 최근 5건만 private Telegram으로 전송했으며, 직후 재실행은 신규/변경 0건으로 확인됐다. 국토교통부 공식 RSS는 현재 동일 URL 307 반복을 반환하므로 10초 내 소스 장애로 격리하고 `미확인·다음 실행 재시도`로 표시한다.
+- 운영 Supabase에 정책 레이더 스키마를 적용하고 첫 실데이터 실행을 검증했다. 공식 문서 46건 중 72시간 이전 41건은 기준선 처리하고 최근 5건만 Discord로 전송했으며, 직후 재실행은 신규/변경 0건으로 확인됐다. 2026-08-05 13:20 KST 실행에서 금융위원회·국토교통부가 10초 timeout으로 부분 실패한 원인을 재현했다. 금융위원회는 일시 지연, 국토교통부는 동일 URL 307과 세션 쿠키를 요구하는 WAF 절차였다. 소스별 20초/2회 재시도와 국토부 쿠키 재사용을 추가했고 실공식 dry-run에서 5/5 소스·110건 수집을 확인했다. 알림 문구도 정책 자체의 미확정이 아닌 `이번 실행 수집 공백`임을 명시한다.
 - 2026-08-04 Discord 전환 1단계 인프라를 추가했다. 긴급·일일행동·시장브리핑·포트폴리오·세금정책·부동산정책·선행신호·성과·시스템점검 9개 채널을 하나의 base64 Webhook map 또는 채널별 환경변수로 라우팅한다. Webhook URL은 형식만 검사하고 로그에 출력하지 않으며, `allowed_mentions` 차단, Telegram HTML의 Discord Markdown 변환, 긴 메시지 분할, 10초 요청 timeout을 적용했다.
 - Discord Bot API 자동 프로비저너를 실제 서버에 적용했다. `01 핵심 신호`(긴급·일일행동·시장브리핑·선행신호), `02 자산 관리`(포트폴리오·성과), `03 정책 인텔리전스`(세금·부동산), `04 운영`(시스템점검)의 4개 카테고리로 정렬했다. 기존 리소스는 재사용하고 삭제하지 않으며 Webhook map은 ignored 파일에 `0600`으로 저장한다. 9개 채널 모두 실제 Webhook 수신을 확인했다.
 - Discord 병행 전송 마이그레이션을 시작했다. `DISCORD_REPORTS_ENABLED=true`인 24개 GitHub Actions Workflow에서 긴급뉴스→긴급, 다이제스트→시장브리핑, 종목·행동·타이밍→일일행동, 경제적 자유→포트폴리오, 정책 도메인→세금/부동산, 이상징후→선행신호, 추천·거래 성과→성과, 수집·가격·배포·Workflow 실패→시스템점검으로 분기한다. Discord 실패는 Telegram 성공과 버퍼·저장을 되돌리지 않으며 GitHub Secret에는 9개 Webhook 지도를 동기화했다.
@@ -333,6 +357,24 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 - 2026-08-05 Discord Gateway worker의 실행 계약을 Windows·macOS·Linux 공통 Node.js 22+ 런타임으로 명시했다. worker와 npm 명령에는 OS 전용 셸·절대 경로를 사용하지 않으며 `discord:agent-worker:check`가 네트워크 없이 현재 플랫폼, Node 버전, fetch/WebSocket/timeout 지원을 검사한다. `Discord Worker Portability` Workflow도 Windows·macOS·Ubuntu 실제 runner에서 동일 검사와 멘션 테스트를 실행한다. Gateway 재연결은 공통 코드가 담당하고 재부팅 자동 시작만 Windows 서비스 관리자·macOS `launchd`·Linux `systemd` 같은 호스트 계층이 담당한다. 대화·승인 SSoT는 Supabase에 유지해 실행 OS가 바뀌어도 동일 상태를 사용한다.
 - 2026-08-05 하나의 `@Economic Agent` 뒤에 경제 도메인 전문가 팀을 추가했다. 결정론적 router가 투자·부동산·세금/연금·포트폴리오·리스크·데이터 검증 중 주 담당 1명과 의사결정 질문의 검토자 최대 2명을 선택한다. 각 역할은 필요한 SSoT 범위만 로딩하고 별도 AI 호출·출력 토큰 상한·호출 제한 시간·`expert:<role_id>` 대화 namespace를 사용한다. 검토 실패는 주 답변을 폐기하지 않고, 정책 단계·기준 시점·데이터 공백·자동 실행 금지 규율을 공통 적용한다. 기능은 provider 개인정보 처리 확인 전까지 `DISCORD_EXPERT_RESPONSES_ENABLED=false`가 기본이다.
 - 2026-08-05 메시징 플랫폼을 Discord로 완전히 통합했다. 이전 전송 모듈, webhook endpoint, 명령 동기화, 승인 smoke 스크립트·workflow, 환경변수와 배포 문서를 제거했다. 공용 리포트 포맷은 `src/notify/reports.js`, 정책 리포트는 `policy-report.js`, Discord 필수 전달 계약은 `discord-reports.js`로 분리했다. 기존 Supabase 알림 이력과 마이그레이션 열은 데이터 보존을 위해 삭제하지 않았다. `DISCORD_ALLOWED_USER_IDS`는 봇 사용 허용 목록이며 비어 있으면 모두 거부한다.
+- 2026-08-05 진단 출력에 노출 가능성이 있었던 `#정책-세금`, `#정책-부동산` Webhook을 새로 생성하고 로컬 9채널 map과 GitHub Actions Secret을 갱신했다. 두 채널 smoke 성공 후 기존 Webhook 2개를 폐기했다. 이후 회전은 새 URL 준비 → Secret 동기화 → smoke → 기존 URL 폐기의 2단계 명령으로 수행한다.
+- 2026-08-05 16:26 KST macOS LaunchAgent `com.economic-agent.worker`로 `macos-home-01` shadow worker를 시작했다. Message Content Intent의 limited flag, Gateway READY, 로컬 PostgreSQL heartbeat `gateway_connected=true`, 최근 예정 작업 기록을 확인했다. 72시간 최소 관찰 종료 기준은 2026-08-08 16:26 KST다. 4014 같은 재연결 불가 close에서는 scheduler도 종료해 supervisor가 단일 프로세스로 재시작하도록 보강했다.
+- 2026-08-05 홈 PostgreSQL 첫 AES-256-GCM 암호화 백업 약 14.5MB를 생성했다. 복호화/TOC 146개 구조 검증에 이어 격리 임시 DB에 32개 테이블과 기사 31,505건을 실제 복원하고 임시 DB를 제거해 복원 가능성을 확인했다. 키는 비공개 `.env`에만 두며 값은 로그에 출력하지 않는다. 장비 장애 대비용 외부 암호화 백업 위치는 최종 active 전환 전에 별도로 정한다.
+- 2026-08-06 shadow 감사에서 Mac 절전·네트워크 단절 구간의 예정 작업 누락과 Gateway 최초 조회 실패에 따른 LaunchAgent 반복 재기동을 확인했다. 네트워크 일시 장애는 scheduler를 종료하지 않고 Gateway만 지수 백오프로 재연결하며, 같은 WebSocket의 반복 오류 로그를 억제한다. `worker:status-report -- --no-report`가 실제 Discord를 전송하던 옵션 버그도 수정하고 shadow 감사에 현재 연속 실행 시간과 관찰 시작 후 재기동 여부를 추가했다. 이후 연결 전 WebSocket error 재귀 방지와 외부 백업 설정을 적용해 LaunchAgent를 마지막 재시작했으며, 최종 72시간 관찰은 2026-08-06 11:50 KST부터 시작한다.
+- 같은 점검에서 macOS의 AC 전원 설정도 유휴 1분 뒤 시스템 절전으로 확인됐다. 전역 `pmset`은 변경하지 않고 `PC_WORKER_PREVENT_SLEEP_ON_AC=true`일 때 LaunchAgent가 `/usr/bin/caffeinate -s`로 worker를 실행하도록 선택 옵션을 추가했다. 전원 어댑터가 연결된 동안만 절전을 막고 배터리에서는 기존 절전 정책을 유지한다.
+- Discord 자연어 거래의 실제 local SSoT smoke로 `삼성전자 1주 매도` 문장을 `draft_sell` 초안으로 만든 뒤 취소 버튼 callback을 실행했다. `pending_actions.status=cancelled`와 취소 시각이 저장됐고 포트폴리오 수량·현금 및 `trade_executions` 건수는 전후 동일했다. 실제 증권사 주문이나 매매 기록은 생성하지 않았다.
+- 사용자가 실제 Discord에서 `현금 잔액은 0원` 자연어 메시지를 보내고 취소 버튼을 눌렀다. Gateway 대화는 `draft_cash`, pending action은 `cancelled`와 취소 시각으로 저장됐으며 confirmed 시각은 비어 있다. 포트폴리오는 현금 0원·14종목·삼성전자 73주 그대로이고 거래 원장은 0건이다.
+- 홈 PostgreSQL 백업에 OS 공통 외부 복제 경로 `HOME_DB_OFFSITE_BACKUP_DIR`를 추가했다. 로컬 백업과 동일한 AES-256-GCM `.aes` 파일만 별도 디스크나 동기화 폴더에 기록하며, 외부 경로가 설정됐는데 암호화 키가 없거나 로컬 경로와 같으면 백업을 거부한다. 암호화 키와 평문 dump는 외부 경로에 복제하지 않는다.
+- 백업 키가 로그나 화면에 노출된 사고에 대응할 수 있도록 `home:db:backup-key:rotate`를 추가했다. 새 키 값은 출력하지 않으며 `.env`의 기존 키 한 줄만 교체한다. 키 교체 후에는 새 로컬·외부 백업을 만들고 복원 검증을 통과시킨 뒤 과거 키로 암호화된 파일의 보존 여부를 결정한다.
+- 2026-08-06 11:45 KST 노출된 기존 백업 키를 즉시 교체하고 새 키로 약 14.5MB 암호화 백업을 만들었다. iCloud Drive `EconomicAgentBackups` 외부 사본에서 PostgreSQL TOC 146개를 읽고 격리 임시 DB에 테이블 32개·기사 31,505건을 실제 복원한 뒤 임시 DB를 제거했다. 기존 키로 만든 과거 백업은 자동 삭제하지 않았으며 새 키로는 열리지 않는 교체 전 세대로 취급한다.
+- 외부 복원 검증 통과 후 `.env`의 매일 02:30 KST DB 백업을 활성화 준비했다. 72시간 shadow 연속 실행 시간을 보존하기 위해 현재 LaunchAgent는 재설치하지 않았고, active 전환 때 새 키·외부 경로·예약 플래그를 함께 주입한다.
+- 2026-08-06 11:47 KST Discord Gateway가 새 WebSocket을 OPEN하기 전에 닫힐 때 Node WebSocket의 `close()`가 error를 동기 재발행해 같은 오류가 재귀적으로 로그에 쌓이는 문제를 확인했다. error 처리에서 socket을 먼저 종료 처리·재연결 예약한 뒤 `close()`하도록 순서를 바꾸고, 재진입형 가짜 WebSocket 회귀 테스트로 disconnect·재연결이 정확히 한 번만 발생함을 고정했다.
+- 최종 cutover의 데이터 병합 공백을 보완했다. 초기 dump 복원 뒤 Supabase 예약 작업과 로컬 Discord worker가 양쪽에 서로 다른 행을 추가하므로 빈 DB 재복원을 반복하지 않고 `home:db:sync:dry-run`/`home:db:sync:apply`로 원격 신규·갱신 행만 로컬에 upsert한다. 로컬 전용 행은 삭제하지 않고, 포트폴리오·리스크·대화·pending action은 최신 `updated_at` 우선, 가격 이력은 serial ID가 아닌 자연키 우선으로 충돌을 막는다. apply는 72시간 shadow 통과와 원격 writer 정지 후에만 수행한다.
+- 증분 dry-run에서 기사 신규 건수가 비정상적으로 부풀어 페이지 중복을 발견했다. PostgREST offset 페이지 조회가 기본키 정렬 없이 실행되어 원격 writer가 동작하는 동안 페이지 경계가 흔들릴 수 있었던 문제로, `db:pull`과 증분 동기화가 모든 테이블을 실제 기본키(`id`, `date`, `source_name`, `job_name`) 오름차순으로 읽도록 고정했다.
+- 기본키 정렬과 타임스탬프·JSON 정규화 후 실제 읽기 전용 cutover dry-run을 재검증했다. 포트폴리오 계정과 14개 포지션은 실질 내용이 일치했고, 로컬에만 있는 대화 7건과 pending action 2건은 삭제 없이 유지된다. 원격 기사 증분은 신규 780건·내용 갱신 100건, 가격 이력은 자연키 기준 신규 399건·갱신 1건이었다. `--apply`는 실행하지 않았다.
+- 2026-08-06 13:22 KST `Policy & Asset Radar` 실패는 원격 이전 커밋의 공식 소스별 10초 단발 제한 때문에 재정경제부·금융위원회·국토교통부 5개 RSS가 모두 timeout 난 것으로 확인했다. 실패 알림 Discord 전송은 정상 완료됐다. 현재 소스별 retry/WAF 보완에 더해 workflow에 25초·2회 재시도·1초 backoff를 명시했고, 실공식 `--dry-run`에서 5/5 소스·110건 수집을 재확인했다.
+- Discord 공통 렌더러를 고도화해 정기 리포트 전 채널과 멘션/Interaction 응답에 heading, bullet, blockquote, inline code, link 문법을 일관 적용한다. Embed는 리포트 자체 제목, 채널별 색상, 운영 메타데이터 fields, 생성 시각, 페이지 번호와 안전 안내 footer를 사용하며 `allowed_mentions` 차단과 일반 텍스트 fallback은 유지한다. Workflow 실패 메시지도 상태·작업·브랜치·커밋·실행자와 로그 링크가 분리되어 보이도록 개편했다.
+- 정책·세금 알림을 제목 중심에서 `상세 요약 → 개인 영향 → 지금 할 일 → 반드시 확인할 조건 → 공식 근거` 구조로 개편했다. 알림 후보의 금융위원회 공식 상세 페이지 본문을 추가 조회하고 보도설명은 언론 주장보다 정부의 확정/미확정 설명을 우선 표시한다. 재정경제부 첨부문서형 페이지와 국토교통부 WAF처럼 안정적으로 본문을 읽을 수 없는 경우에는 내용을 추정하지 않고 원문 확인 필요를 명시한다. 실제 dry-run에서 공식 소스 5/5, 110건 수집, 관련 54건을 확인했다.
 
 ## 다음 작업
 
@@ -341,7 +383,7 @@ sqlite3 data/economic-agent.db "select count(*) from articles;"
 3. 실제 입출금이 발생할 때 `cashflow:record`로 기록하고, 다음 월간 리뷰에서 TWR/MWR와 KOSPI 비교가 생성되는지 확인한다.
 4. Qwen 메타데이터가 붙고 리스크 승인을 받은 추천의 20거래일 평가가 30건 이상 쌓이면 `npm run db:pull && npm run model:performance`로 모델 효과를 평가한다. 그 전에는 지연·JSON 준수율·비용만 canary 지표로 본다.
 5. 가격 provider의 `해외/글로벌 가격 API 보강 검토` 판단이 주간/월간 리뷰에서 반복되는지 모니터링하되, 최근 1일 점검은 정상이라 Massive 과금은 필요성이 명확해질 때까지 보류
-6. 다음 실제 workflow 실패 시 Discord `#시스템-점검` 알림 도착 여부 재확인
+6. 새 공통 Embed 렌더러 배포 후 첫 정기 리포트와 다음 실제 workflow 실패에서 제목·필드·링크·모바일 줄바꿈을 확인한다.
 7. `/dashboard` 실제 사용 빈도에 따라 탭 분리와 상세 차트 추가 여부 결정
 8. 월간 리서치 worker 결과를 다음 월간 리뷰에서 실제 의사결정에 도움이 되는지 확인
 9. 다음 실제 매매에서 Discord 자연어 매수/매도 초안의 추천·계획 연결, 원화 반영액, 실현손익을 확인하고 주간 리뷰의 연결률·매도 사유 기록률을 검증

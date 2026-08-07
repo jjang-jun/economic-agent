@@ -40,6 +40,31 @@ const checks = [
     message: 'docs/README.md must index AGENT_HARNESS.md',
   },
   {
+    file: 'docs/CURRENT_STATE.md',
+    pattern: '# Current State',
+    message: 'docs/CURRENT_STATE.md must exist as the compact Codex handoff SSoT',
+  },
+  {
+    file: 'docs/README.md',
+    pattern: 'CURRENT_STATE.md',
+    message: 'docs/README.md must index CURRENT_STATE.md',
+  },
+  {
+    file: 'AGENTS.md',
+    pattern: 'docs/CURRENT_STATE.md',
+    message: 'AGENTS.md must point new Codex sessions to the compact current state',
+  },
+  {
+    file: 'docs/HOME_SERVER.md',
+    pattern: '# Home Server Operations',
+    message: 'docs/HOME_SERVER.md must define home server operations',
+  },
+  {
+    file: 'docs/README.md',
+    pattern: 'HOME_SERVER.md',
+    message: 'docs/README.md must index HOME_SERVER.md',
+  },
+  {
     file: 'docs/future/AI_AGENT_TEAM_BLUEPRINT.md',
     pattern: '# Personal AI Organization Blueprint',
     message: 'future personal AI organization blueprint must exist',

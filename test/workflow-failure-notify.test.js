@@ -17,11 +17,12 @@ test('formatWorkflowFailureMessage renders actionable private alert', () => {
     runUrl: 'https://github.com/jjang-jun/economic-agent/actions/runs/1',
   });
 
-  assert.match(message, /Workflow 실패 알림/);
+  assert.match(message, /Workflow 실패/);
+  assert.match(message, /<b>상태<\/b>  자동 작업이 완료되지 않았습니다/);
   assert.match(message, /Discord 승인 흐름 점검/);
   assert.match(message, /Smoke pending action flow/);
   assert.match(message, /9646e1f/);
-  assert.match(message, /GitHub Actions 로그 보기/);
+  assert.match(message, /실패 로그에서 원인 확인/);
 });
 
 test('githubRunUrl builds actions run URL from GitHub environment', () => {

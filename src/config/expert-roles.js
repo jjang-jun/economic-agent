@@ -13,10 +13,10 @@ const EXPERT_ROLES = Object.freeze({
     id: 'real_estate',
     name: '부동산 전문가',
     shortName: '부동산',
-    mission: '주택·청약·대출·임대와 부동산 정책을 전체 자산 목표와 함께 분석한다.',
+    mission: '서울·경기 아파트의 가격·거래량·전세·호가·대출여력을 교차검증해 저점에 가까운 매수 검토 구간과 추격 위험을 분석한다.',
     aliases: ['부동산 전문가', '주택 전문가', '부동산 담당'],
     keywords: ['부동산', '아파트', '주택', '내집마련', '내 집 마련', '청약', '전세', '월세', '주택담보대출', '주담대'],
-    contextScopes: ['portfolio', 'freedom_goal', 'real_estate_policy'],
+    contextScopes: ['portfolio', 'real_estate_goal', 'real_estate_market', 'real_estate_indices', 'real_estate_policy'],
     reviewerCandidates: ['portfolio_manager', 'tax_pension'],
   }),
   tax_pension: Object.freeze({

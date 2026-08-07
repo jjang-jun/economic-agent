@@ -2,13 +2,23 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.SUPABASE_PROJECT_URL;
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
-  || process.env.SUPABASE_PUBLISHABLE_KEY
-  || process.env.SUPABASE_ANON_KEY;
+const USE_DIRECT_DATABASE_REST = Boolean(process.env.DATABASE_REST_URL);
+const DATABASE_REST_URL = process.env.DATABASE_REST_URL
+  || process.env.SUPABASE_URL
+  || process.env.SUPABASE_PROJECT_URL;
+const DATABASE_REST_KEY = USE_DIRECT_DATABASE_REST
+  ? process.env.DATABASE_REST_KEY
+  : process.env.SUPABASE_SERVICE_ROLE_KEY
+    || process.env.SUPABASE_PUBLISHABLE_KEY
+    || process.env.SUPABASE_ANON_KEY;
 const OUT_DIR = path.join(__dirname, '..', 'data', 'supabase');
 const DB_FILE = path.join(__dirname, '..', 'data', 'economic-agent.db');
 const DEFAULT_PAGE_SIZE = 1000;
+const TABLE_ORDER_COLUMNS = Object.freeze({
+  daily_summaries: 'date',
+  source_cursors: 'source_name',
+  job_locks: 'job_name',
+});
 
 const TABLES = [
   'articles',
@@ -28,17 +38,30 @@ const TABLES = [
   'price_provider_attempts',
   'investor_flows',
   'decision_contexts',
+  'financial_freedom_goals',
+  'portfolio_accounts',
+  'positions',
+  'risk_policy',
+  'conversation_messages',
+  'pending_actions',
   'collector_runs',
   'source_cursors',
   'alert_events',
   'job_locks',
   'policy_events',
   'policy_event_versions',
+  'real_estate_goals',
+  'real_estate_transactions',
+  'real_estate_rent_transactions',
+  'real_estate_listing_snapshots',
+  'real_estate_area_metrics',
+  'housing_finance_snapshots',
+  'real_estate_market_indices',
 ];
 
 function assertConfig() {
-  if (!SUPABASE_URL || !SUPABASE_KEY) {
-    console.error('SUPABASE_PROJECT_URL/SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY/SUPABASE_PUBLISHABLE_KEY are required.');
+  if (!DATABASE_REST_URL || (!process.env.DATABASE_REST_URL && !DATABASE_REST_KEY)) {
+    console.error('DATABASE_REST_URL or Supabase REST URL/key compatibility settings are required.');
     process.exit(1);
   }
 }
@@ -66,8 +89,14 @@ async function buildHttpError(table, res) {
 }
 
 async function fetchJsonWithRetry(table, url, options = {}) {
-  const retries = parseNonNegativeInt(process.env.SUPABASE_RETRY_COUNT, 3);
-  const baseDelayMs = parseNonNegativeInt(process.env.SUPABASE_RETRY_DELAY_MS, 1000);
+  const retries = parseNonNegativeInt(
+    process.env.DATABASE_REST_RETRY_COUNT ?? process.env.SUPABASE_RETRY_COUNT,
+    3,
+  );
+  const baseDelayMs = parseNonNegativeInt(
+    process.env.DATABASE_REST_RETRY_DELAY_MS ?? process.env.SUPABASE_RETRY_DELAY_MS,
+    1000,
+  );
   const fetchFn = options.fetchFn || fetch;
   let lastError = null;
 
@@ -95,27 +124,37 @@ async function fetchJsonWithRetry(table, url, options = {}) {
 }
 
 async function fetchTable(table, options = {}) {
-  const pageSize = parseNonNegativeInt(options.pageSize ?? process.env.SUPABASE_PULL_PAGE_SIZE, DEFAULT_PAGE_SIZE);
-  const baseUrl = options.supabaseUrl || SUPABASE_URL;
-  const key = options.supabaseKey || SUPABASE_KEY;
+  const pageSize = parseNonNegativeInt(
+    options.pageSize ?? process.env.DATABASE_REST_PULL_PAGE_SIZE ?? process.env.SUPABASE_PULL_PAGE_SIZE,
+    DEFAULT_PAGE_SIZE,
+  );
+  const baseUrl = options.databaseRestUrl || options.supabaseUrl || DATABASE_REST_URL;
+  const directDatabaseRest = options.databaseRestUrl
+    ? true
+    : options.supabaseUrl
+      ? false
+      : USE_DIRECT_DATABASE_REST;
+  const key = directDatabaseRest
+    ? options.databaseRestKey ?? DATABASE_REST_KEY
+    : options.supabaseKey || DATABASE_REST_KEY;
   const rows = [];
   let offset = 0;
 
-  if (!pageSize) throw new Error('SUPABASE_PULL_PAGE_SIZE must be greater than 0');
+  if (!pageSize) throw new Error('DATABASE_REST_PULL_PAGE_SIZE must be greater than 0');
 
   while (true) {
-    const url = new URL(`/rest/v1/${table}`, baseUrl);
+    const url = directDatabaseRest
+      ? new URL(`${new URL(baseUrl).pathname.replace(/\/$/, '')}/${table}`.replace(/\/+/g, '/'), baseUrl)
+      : new URL(`/rest/v1/${table}`, baseUrl);
     url.searchParams.set('select', '*');
+    url.searchParams.set('order', `${TABLE_ORDER_COLUMNS[table] || 'id'}.asc`);
     url.searchParams.set('limit', String(pageSize));
     url.searchParams.set('offset', String(offset));
 
     const page = await fetchJsonWithRetry(table, url, {
       fetchFn: options.fetchFn,
       requestOptions: {
-        headers: {
-          apikey: key,
-          Authorization: `Bearer ${key}`,
-        },
+        headers: key ? { apikey: key, Authorization: `Bearer ${key}` } : {},
       },
     });
     if (!Array.isArray(page)) {
@@ -184,6 +223,7 @@ if (require.main === module) {
 
 module.exports = {
   TABLES,
+  TABLE_ORDER_COLUMNS,
   buildHttpError,
   fetchJsonWithRetry,
   fetchTable,

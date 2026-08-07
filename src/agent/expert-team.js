@@ -2,9 +2,9 @@ const { chatDetailed } = require('../utils/ai-client');
 const { buildExpertContext } = require('./expert-context');
 const { classifyExpertRequest, clampReviewerCount } = require('../config/expert-roles');
 
-const DEFAULT_PRIMARY_MAX_TOKENS = 700;
-const DEFAULT_REVIEW_MAX_TOKENS = 300;
-const DEFAULT_EXPERT_TIMEOUT_MS = 45_000;
+const DEFAULT_PRIMARY_MAX_TOKENS = 550;
+const DEFAULT_REVIEW_MAX_TOKENS = 220;
+const DEFAULT_EXPERT_TIMEOUT_MS = 30_000;
 
 function enabledFlag(value) {
   return ['1', 'true', 'yes', 'on'].includes(String(value || '').toLowerCase());

@@ -1,6 +1,6 @@
 # Agent Platform Direction
 
-이 문서는 개인 AI 경제 사무실의 대화·조회·승인 실행 구조를 정의한다. 정기 리포트, 긴급 알림, 자연어 입력과 승인은 Discord로 통합한다. 대화형 Agent는 항상 요청을 받을 수 있는 Node.js 런타임과 Supabase를 사용한다.
+이 문서는 개인 AI 경제 사무실의 대화·조회·승인 실행 구조를 정의한다. 정기 리포트, 긴급 알림, 자연어 입력과 승인은 Discord로 통합한다. 목표 런타임은 항상 켜진 개인 PC의 Node.js worker와 로컬 PostgreSQL이다.
 
 현재 저장소는 경제·투자·자산관리 도메인에 한정한다. 투자·부동산·세금/연금·포트폴리오·리스크·데이터 검증 담당을 하나의 Discord 봇 뒤에서 제한적으로 `to/cc` 협업시킨다. 범용 개발·법무 조직, 독립 봇 다수의 자유 대화, 여러 프로젝트/PC 세션 오케스트레이션, 이메일 Draft 비서는 [`future/AI_AGENT_TEAM_BLUEPRINT.md`](future/AI_AGENT_TEAM_BLUEPRINT.md)의 미래 별도 프로젝트 범위다.
 
@@ -12,36 +12,32 @@
   -> Discord Interaction: 포트폴리오·목표·리스크·추천·거래 성과 비공개 조회
   -> Discord Gateway 멘션: 자연어 조회·전문가 to/cc·거래 기록 초안
   -> Discord 버튼: 기록/취소 승인
-  -> Agent API Server + Gateway worker -> Supabase/Postgres
+  -> PC Gateway worker + scheduler -> local PostgreSQL/PostgREST
   -> 뉴스, 공시, 시장 데이터, 포트폴리오, 추천, 실제 거래 기록
 ```
 
 ```text
-GitHub Actions
-  - 뉴스 수집 백업
-  - 다이제스트와 장마감 리포트
-  - 추천 성과 평가와 포트폴리오 스냅샷
-  - 주간/월간 리뷰
-  - Discord 채널별 Webhook 전달
-
-Agent API Server
-  - Discord Interaction 서명 검증
+PC worker
+  - Discord Interaction과 Gateway event 수신
   - 읽기 전용 Slash 조회
   - 거래 초안 버튼 승인/취소
-  - 뉴스 수집 job endpoint
-
-Gateway worker
-  - Discord WebSocket 연결 상시 유지
   - 허용된 멘션만 라우팅
   - 자연어 거래 초안과 경제 전문가 응답
+  - 뉴스 수집, 다이제스트, 평가, 리뷰 스케줄
+  - Discord 채널별 Webhook 전달
+
+PostgreSQL + PostgREST
+  - 포트폴리오·거래·추천·대화·작업 상태의 기준 저장소
+  - localhost 전용 내부 REST 호환 계층
 ```
 
-GitHub Actions 단독으로는 사용자의 즉시 질문을 받을 수 없다. 배치형 루틴은 Actions가 맡고, Slash·버튼은 Agent Server, 일반 멘션은 항상 켜진 Gateway worker가 맡는다.
+GitHub Actions 단독으로는 사용자의 즉시 질문을 받을 수 없다. 목표 구조에서는 하나의 상시 PC worker가 Slash·버튼·멘션과 배치 루틴을 함께 담당하고, scheduler의 중복 방지와 heartbeat를 PostgreSQL에 기록한다.
 
 ## 실행 플랫폼
 
-- Agent Server: Cloud Run, Fly.io, Render 또는 개인 서버
-- Gateway worker: 인터넷에 연결된 개인 PC·미니PC·NAS·VM
+- PC worker: 인터넷에 연결된 개인 PC·미니PC·NAS·VM
+- DBMS: 같은 장비의 PostgreSQL 17 Docker 컨테이너
+- 내부 호환 API: 같은 장비의 PostgREST, loopback 전용
 - 공통 런타임: Node.js 22+
 - 지원 OS: Windows, macOS, Linux
 
@@ -56,7 +52,7 @@ GitHub Actions 단독으로는 사용자의 즉시 질문을 받을 수 없다. 
 - 허용된 개인 채널에서 `@Economic Agent ...` 자연어 조회·기록 초안
 - 투자·부동산·세금/연금·포트폴리오·리스크·데이터 검증 전문가의 내부 `to/cc`
 
-정기 리포트는 Incoming Webhook으로 전달한다. 개인 조회는 `POST /discord/interactions`에서 Ed25519 서명과 guild/user/channel allowlist를 검증한 뒤 ephemeral 응답으로 처리한다. Gateway worker는 정확한 봇 멘션만 받고 같은 사용자·서버·채널 정책을 적용한다.
+정기 리포트는 Incoming Webhook으로 전달한다. 개인 조회와 버튼은 Gateway의 `INTERACTION_CREATE`를 받아 ephemeral 응답으로 처리하고, 일반 메시지는 정확한 봇 멘션만 받는다. 두 경로 모두 같은 guild/user/channel allowlist를 적용한다. Cloud HTTP endpoint는 전환 기간의 안전망이며 Gateway 방식이 검증되면 제거한다.
 
 ## 권한과 사용자 추가
 
@@ -120,15 +116,14 @@ src/
     └── expert-roles.js
 ```
 
-## Supabase 원본화
+## 로컬 PostgreSQL 원본화
 
 ```text
-Supabase = 포트폴리오·거래·승인·대화의 원본
+PostgreSQL = 포트폴리오·거래·승인·대화·작업 상태의 원본
+PostgREST = localhost 전용 저장 API 호환 계층
 data/portfolio.json = 로컬 bootstrap/fallback
 Discord = 리포트·긴급 알림·입력·승인 UI
-Agent Server = 계산·검증·Interaction
-Gateway worker = 상시 멘션 수신
-GitHub Actions = 정기 리포트
+PC worker = 계산·검증·Interaction·멘션·정기 리포트
 ```
 
 주요 테이블은 `financial_freedom_goals`, `portfolio_accounts`, `positions`, `risk_policy`, `conversation_messages`, `pending_actions`, `collector_runs`, `source_cursors`, `alert_events`, `job_locks`다. 과거 알림 데이터와 기존 스키마 열은 마이그레이션 이력 보존을 위해 삭제하지 않는다.
@@ -136,10 +131,9 @@ GitHub Actions = 정기 리포트
 ## 수집 런타임
 
 ```text
-Agent Server + Scheduler = 5분 메인 수집
-GitHub Actions = 15분 백업 수집
-GitHub Actions = 브리핑·리포트·평가
-Supabase = 수집 상태와 중복 방지 기준 저장소
+PC worker scheduler = 5분 수집 + 브리핑·리포트·평가
+PostgreSQL = 수집 상태, job lock, 중복 방지, heartbeat 기준 저장소
+GitHub Actions = 72시간 shadow 동안 안전망, 이후 수동 복구와 품질 점검만 유지
 ```
 
 ```text
@@ -162,9 +156,13 @@ x-trigger-source: cloud_scheduler | fly_cron | render_cron
 - `conversation_messages`, `pending_actions` 저장
 - Discord Webhook 리포트와 실패 알림
 
+구체적인 구축·백업·전환 절차는 [`HOME_SERVER.md`](HOME_SERVER.md)를 따른다.
+
 ## 다음 운영 단계
 
 1. 24시간 worker 장비에 재부팅 자동 시작과 로그 회전을 설정한다.
 2. `DISCORD_ALLOWED_USER_IDS`와 개인 채널 allowlist를 최소 권한으로 유지한다.
 3. worker heartbeat와 마지막 응답 시각을 `#시스템-점검`에 보고한다.
-4. Codex 구독 인증 기반 worker는 개인 신뢰 장비에서만 사용하고, 공유 서버 전환 시 별도 API 비용·키 정책을 검토한다.
+4. 로컬 PostgreSQL 이관 결과와 암호화 백업 복원을 검증한다.
+5. 72시간 shadow 후 scheduler를 active로 전환하고 cloud 스케줄을 내린다.
+6. Codex 구독 인증 기반 worker는 개인 신뢰 장비에서만 사용하고, 공유 서버 전환 시 별도 API 비용·키 정책을 검토한다.

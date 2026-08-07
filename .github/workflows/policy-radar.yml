@@ -38,6 +38,10 @@ jobs:
       - name: Collect and send official policy changes
         run: npm run policy:radar
         env:
+          # 정부 사이트의 일시적 지연/WAF 응답을 소스별로 재시도한다.
+          POLICY_SOURCE_TIMEOUT_MS: "25000"
+          POLICY_SOURCE_RETRY_COUNT: "2"
+          POLICY_SOURCE_RETRY_DELAY_MS: "1000"
           SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

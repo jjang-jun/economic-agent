@@ -32,6 +32,7 @@ test('fetchTable paginates past the Supabase default row window', async () => {
     calls.push({
       limit: parsed.searchParams.get('limit'),
       offset: parsed.searchParams.get('offset'),
+      order: parsed.searchParams.get('order'),
     });
     const offset = Number(parsed.searchParams.get('offset') || 0);
     const rows = offset === 0
@@ -53,9 +54,30 @@ test('fetchTable paginates past the Supabase default row window', async () => {
 
     assert.deepEqual(rows.map(row => row.id), ['a', 'b', 'c']);
     assert.deepEqual(calls, [
-      { limit: '2', offset: '0' },
-      { limit: '2', offset: '2' },
+      { limit: '2', offset: '0', order: 'id.asc' },
+      { limit: '2', offset: '2', order: 'id.asc' },
     ]);
+  } finally {
+    restore();
+  }
+});
+
+test('fetchTable orders non-id primary keys deterministically', async () => {
+  let requestUrl = '';
+  const fetchFn = async url => {
+    requestUrl = String(url);
+    return new Response(JSON.stringify([]), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+  const { script, restore } = loadFreshPullScript({
+    SUPABASE_PROJECT_URL: 'https://example.supabase.co',
+    SUPABASE_PUBLISHABLE_KEY: 'publishable-key',
+  });
+  try {
+    await script.fetchTable('daily_summaries', { pageSize: 2, fetchFn });
+    assert.equal(new URL(requestUrl).searchParams.get('order'), 'date.asc');
   } finally {
     restore();
   }
@@ -97,5 +119,62 @@ test('fetchTable retries transient Supabase pull failures', async () => {
   } finally {
     restore();
     console.warn = previousWarn;
+  }
+});
+
+test('fetchTable supports keyless localhost PostgREST without Supabase path prefix', async () => {
+  let requestUrl = '';
+  let requestHeaders;
+  const fetchFn = async (url, options = {}) => {
+    requestUrl = String(url);
+    requestHeaders = options.headers;
+    return new Response(JSON.stringify([]), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+  const { script, restore } = loadFreshPullScript({
+    DATABASE_REST_URL: 'http://127.0.0.1:3000',
+    SUPABASE_PROJECT_URL: 'https://legacy.supabase.co',
+    SUPABASE_PUBLISHABLE_KEY: 'legacy-key-must-not-leak',
+  });
+
+  try {
+    await script.fetchTable('articles', { pageSize: 2, fetchFn });
+    assert.match(requestUrl, /^http:\/\/127\.0\.0\.1:3000\/articles\?/);
+    assert.deepEqual(requestHeaders, {});
+  } finally {
+    restore();
+  }
+});
+
+test('explicit Supabase source stays remote when a local DATABASE_REST_URL is configured', async () => {
+  let requestUrl = '';
+  let requestHeaders;
+  const fetchFn = async (url, options = {}) => {
+    requestUrl = String(url);
+    requestHeaders = options.headers;
+    return new Response(JSON.stringify([]), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+  const { script, restore } = loadFreshPullScript({
+    DATABASE_REST_URL: 'http://127.0.0.1:3210',
+    SUPABASE_PROJECT_URL: 'https://legacy.supabase.co',
+    SUPABASE_SERVICE_ROLE_KEY: 'remote-service-key',
+  });
+
+  try {
+    await script.fetchTable('articles', {
+      supabaseUrl: 'https://legacy.supabase.co',
+      supabaseKey: 'remote-service-key',
+      pageSize: 2,
+      fetchFn,
+    });
+    assert.match(requestUrl, /^https:\/\/legacy\.supabase\.co\/rest\/v1\/articles\?/);
+    assert.equal(requestHeaders.apikey, 'remote-service-key');
+  } finally {
+    restore();
   }
 });

@@ -10,6 +10,7 @@ const CASH_STATE_PATTERN = /현금[\s\S]*(?:잔액|보유|현재|지금|있어|�
 function stripDiscordMentions(text = '') {
   return String(text || '')
     .replace(/<@!?\d+>/g, ' ')
+    .replace(/<@&\d+>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }

@@ -190,6 +190,9 @@ async function enrichPortfolio(portfolio = loadPortfolio(), options = {}) {
     USDKRW: typeof usdKrw?.price === 'number' ? usdKrw.price : null,
   };
   const valuedPositions = await Promise.all((portfolio.positions || []).map(async position => {
+    if (position.valuationLocked === true) {
+      return valuePosition(position, null, fxRates);
+    }
     const quote = position.symbol || position.ticker
       ? await fetcher(position.symbol || position.ticker)
       : null;

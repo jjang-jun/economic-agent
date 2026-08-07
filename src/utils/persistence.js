@@ -1,15 +1,20 @@
 const { getKSTDate } = require('./article-archive');
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.SUPABASE_PROJECT_URL;
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
-  || process.env.SUPABASE_PUBLISHABLE_KEY
-  || process.env.SUPABASE_ANON_KEY;
+const USE_DIRECT_DATABASE_REST = Boolean(process.env.DATABASE_REST_URL);
+const DATABASE_REST_URL = process.env.DATABASE_REST_URL
+  || process.env.SUPABASE_URL
+  || process.env.SUPABASE_PROJECT_URL;
+const DATABASE_REST_KEY = USE_DIRECT_DATABASE_REST
+  ? process.env.DATABASE_REST_KEY
+  : process.env.SUPABASE_SERVICE_ROLE_KEY
+    || process.env.SUPABASE_PUBLISHABLE_KEY
+    || process.env.SUPABASE_ANON_KEY;
 
 let supabaseCircuitOpenUntil = 0;
 let supabaseCircuitReason = '';
 
 function isPersistenceEnabled() {
-  return Boolean(SUPABASE_URL && SUPABASE_KEY);
+  return Boolean(DATABASE_REST_URL && (USE_DIRECT_DATABASE_REST || DATABASE_REST_KEY));
 }
 
 function parseNonNegativeInt(value, fallback) {
@@ -20,12 +25,24 @@ function parseNonNegativeInt(value, fallback) {
 
 function getHeaders(prefer = 'resolution=merge-duplicates') {
   const headers = {
-    apikey: SUPABASE_KEY,
-    Authorization: `Bearer ${SUPABASE_KEY}`,
     'Content-Type': 'application/json',
   };
+  if (DATABASE_REST_KEY) {
+    headers.apikey = DATABASE_REST_KEY;
+    headers.Authorization = `Bearer ${DATABASE_REST_KEY}`;
+  }
   if (prefer) headers.Prefer = prefer;
   return headers;
+}
+
+function getTableUrl(table) {
+  if (USE_DIRECT_DATABASE_REST) {
+    const base = new URL(DATABASE_REST_URL);
+    const prefix = base.pathname.replace(/\/$/, '');
+    base.pathname = `${prefix}/${table}`.replace(/\/+/g, '/');
+    return base;
+  }
+  return new URL(`/rest/v1/${table}`, DATABASE_REST_URL);
 }
 
 function sleep(ms) {
@@ -33,20 +50,29 @@ function sleep(ms) {
 }
 
 function getCircuitBreakerMs() {
-  return parseNonNegativeInt(process.env.SUPABASE_CIRCUIT_BREAKER_MS, 60_000);
+  return parseNonNegativeInt(
+    process.env.DATABASE_REST_CIRCUIT_BREAKER_MS ?? process.env.SUPABASE_CIRCUIT_BREAKER_MS,
+    60_000,
+  );
 }
 
 function getRequestTimeoutMs() {
-  return parseNonNegativeInt(process.env.SUPABASE_REQUEST_TIMEOUT_MS, 10_000);
+  return parseNonNegativeInt(
+    process.env.DATABASE_REST_REQUEST_TIMEOUT_MS ?? process.env.SUPABASE_REQUEST_TIMEOUT_MS,
+    10_000,
+  );
 }
 
 function getRetryMaxDelayMs() {
-  return parseNonNegativeInt(process.env.SUPABASE_RETRY_MAX_DELAY_MS, 5_000);
+  return parseNonNegativeInt(
+    process.env.DATABASE_REST_RETRY_MAX_DELAY_MS ?? process.env.SUPABASE_RETRY_MAX_DELAY_MS,
+    5_000,
+  );
 }
 
-function getSupabaseCircuitError() {
+function getPersistenceCircuitError() {
   if (Date.now() >= supabaseCircuitOpenUntil) return null;
-  const err = new Error(`Supabase persistence temporarily disabled: ${supabaseCircuitReason || 'recent transient failure'}`);
+  const err = new Error(`Database persistence temporarily disabled: ${supabaseCircuitReason || 'recent transient failure'}`);
   err.status = 503;
   err.circuitOpen = true;
   return err;
@@ -58,7 +84,7 @@ function recordSupabaseFailure(err) {
   if (breakerMs <= 0) return;
   supabaseCircuitOpenUntil = Date.now() + breakerMs;
   supabaseCircuitReason = err?.message || String(err || 'unknown error');
-  console.warn(`[DB] Supabase persistence ${Math.round(breakerMs / 1000)}초간 일시 중지: ${supabaseCircuitReason}`);
+  console.warn(`[DB] 원격 저장 ${Math.round(breakerMs / 1000)}초간 일시 중지: ${supabaseCircuitReason}`);
 }
 
 async function buildHttpError(res) {
@@ -115,9 +141,15 @@ function withRequestTimeout(options = {}) {
   };
 }
 
-async function fetchSupabaseWithRetry(url, options = {}) {
-  const retries = parseNonNegativeInt(process.env.SUPABASE_RETRY_COUNT, 1);
-  const baseDelayMs = parseNonNegativeInt(process.env.SUPABASE_RETRY_DELAY_MS, 300);
+async function fetchDatabaseWithRetry(url, options = {}) {
+  const retries = parseNonNegativeInt(
+    process.env.DATABASE_REST_RETRY_COUNT ?? process.env.SUPABASE_RETRY_COUNT,
+    1,
+  );
+  const baseDelayMs = parseNonNegativeInt(
+    process.env.DATABASE_REST_RETRY_DELAY_MS ?? process.env.SUPABASE_RETRY_DELAY_MS,
+    300,
+  );
   const timeoutMs = getRequestTimeoutMs();
   let lastError = null;
 
@@ -131,7 +163,7 @@ async function fetchSupabaseWithRetry(url, options = {}) {
       lastError = err;
     } catch (err) {
       if (err?.name === 'TimeoutError') {
-        const timeoutError = new Error(`Supabase request timed out after ${timeoutMs}ms`, { cause: err });
+        const timeoutError = new Error(`Database REST request timed out after ${timeoutMs}ms`, { cause: err });
         timeoutError.name = 'TimeoutError';
         timeoutError.timeout = true;
         err = timeoutError;
@@ -141,7 +173,7 @@ async function fetchSupabaseWithRetry(url, options = {}) {
     }
 
     const delay = getRetryDelayMs(lastError, attempt, baseDelayMs);
-    console.warn(`[DB] Supabase 일시 오류 재시도 ${attempt + 1}/${retries} (${delay}ms 후): ${lastError.message}`);
+    console.warn(`[DB] 저장 API 일시 오류 재시도 ${attempt + 1}/${retries} (${delay}ms 후): ${lastError.message}`);
     if (delay > 0) await sleep(delay);
   }
 
@@ -173,16 +205,16 @@ function summarizeHttpError(status, body = '', contentType = '') {
   return `${status} ${raw.replace(/\s+/g, ' ').slice(0, 240)}`;
 }
 
-async function upsert(table, rows, onConflict) {
+async function upsert(table, rows, onConflict, options = {}) {
   if (!isPersistenceEnabled() || !rows || rows.length === 0) return { saved: 0 };
-  const circuitError = getSupabaseCircuitError();
+  const circuitError = getPersistenceCircuitError();
   if (circuitError) return { saved: 0, error: circuitError, skipped: true };
 
-  const url = new URL(`/rest/v1/${table}`, SUPABASE_URL);
+  const url = getTableUrl(table);
   if (onConflict) url.searchParams.set('on_conflict', onConflict);
 
   try {
-    const res = await fetchSupabaseWithRetry(url, {
+    const res = await fetchDatabaseWithRetry(url, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(rows),
@@ -190,19 +222,19 @@ async function upsert(table, rows, onConflict) {
     return { saved: rows.length };
   } catch (err) {
     console.warn(`[DB] ${table} 저장 실패: ${err.message}`);
-    recordSupabaseFailure(err);
+    if (options.openCircuit !== false) recordSupabaseFailure(err);
     return { saved: 0, error: err };
   }
 }
 
 async function insertRowsIgnoreDuplicates(table, rows, onConflict) {
   if (!isPersistenceEnabled() || !rows || rows.length === 0) return { saved: 0 };
-  const circuitError = getSupabaseCircuitError();
+  const circuitError = getPersistenceCircuitError();
   if (circuitError) return { saved: 0, error: circuitError, skipped: true };
-  const url = new URL(`/rest/v1/${table}`, SUPABASE_URL);
+  const url = getTableUrl(table);
   if (onConflict) url.searchParams.set('on_conflict', onConflict);
   try {
-    await fetchSupabaseWithRetry(url, {
+    await fetchDatabaseWithRetry(url, {
       method: 'POST',
       headers: getHeaders('resolution=ignore-duplicates'),
       body: JSON.stringify(rows),
@@ -217,9 +249,9 @@ async function insertRowsIgnoreDuplicates(table, rows, onConflict) {
 
 async function deleteRows(table, filterParams = {}) {
   if (!isPersistenceEnabled()) return { deleted: 0, disabled: true };
-  const circuitError = getSupabaseCircuitError();
+  const circuitError = getPersistenceCircuitError();
   if (circuitError) return { deleted: 0, error: circuitError, skipped: true };
-  const url = new URL(`/rest/v1/${table}`, SUPABASE_URL);
+  const url = getTableUrl(table);
   for (const [key, value] of Object.entries(filterParams || {})) {
     if (value !== undefined && value !== null) {
       url.searchParams.set(key, value);
@@ -227,7 +259,7 @@ async function deleteRows(table, filterParams = {}) {
   }
 
   try {
-    await fetchSupabaseWithRetry(url, {
+    await fetchDatabaseWithRetry(url, {
       method: 'DELETE',
       headers: getHeaders('return=minimal'),
     });
@@ -241,9 +273,9 @@ async function deleteRows(table, filterParams = {}) {
 
 async function patchRows(table, filterParams, payload) {
   if (!isPersistenceEnabled()) return { saved: 0, disabled: true };
-  const circuitError = getSupabaseCircuitError();
+  const circuitError = getPersistenceCircuitError();
   if (circuitError) return { saved: 0, error: circuitError, skipped: true };
-  const url = new URL(`/rest/v1/${table}`, SUPABASE_URL);
+  const url = getTableUrl(table);
   for (const [key, value] of Object.entries(filterParams || {})) {
     if (value !== undefined && value !== null) {
       url.searchParams.set(key, value);
@@ -251,7 +283,7 @@ async function patchRows(table, filterParams, payload) {
   }
 
   try {
-    await fetchSupabaseWithRetry(url, {
+    await fetchDatabaseWithRetry(url, {
       method: 'PATCH',
       headers: getHeaders('return=minimal'),
       body: JSON.stringify(payload),
@@ -266,10 +298,10 @@ async function patchRows(table, filterParams, payload) {
 
 async function selectRows(table, params = {}) {
   if (!isPersistenceEnabled()) return { rows: null, disabled: true };
-  const circuitError = getSupabaseCircuitError();
+  const circuitError = getPersistenceCircuitError();
   if (circuitError) return { rows: null, error: circuitError, skipped: true };
 
-  const url = new URL(`/rest/v1/${table}`, SUPABASE_URL);
+  const url = getTableUrl(table);
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== null) {
       url.searchParams.set(key, value);
@@ -277,7 +309,7 @@ async function selectRows(table, params = {}) {
   }
 
   try {
-    const res = await fetchSupabaseWithRetry(url, {
+    const res = await fetchDatabaseWithRetry(url, {
       headers: getHeaders(''),
     });
     return { rows: await res.json() };
@@ -825,7 +857,11 @@ async function persistPriceProviderAttempt(attempt) {
     latency_ms: attempt.latencyMs ?? null,
     error_message: attempt.errorMessage || null,
     payload: attempt.payload || {},
-  }], 'id');
+  }], 'id', {
+    // Provider 시도 이력은 관측용 부가 데이터다. 이 저장 실패가 종목 리포트,
+    // 추천 로그 같은 핵심 산출물의 공유 회로차단기를 열어서는 안 된다.
+    openCircuit: false,
+  });
 }
 
 async function persistInvestorFlow(flow) {
@@ -1020,18 +1056,20 @@ async function tryAcquireJobLock(jobName, options = {}) {
     job_name: `eq.${jobName}`,
     limit: '1',
   });
+  if (result.error) throw result.error;
   const existing = result.rows?.[0];
   if (existing?.locked_until && new Date(existing.locked_until) > now) {
     return { acquired: false, lockedUntil: existing.locked_until };
   }
 
   const lockedUntil = new Date(now.getTime() + (options.ttlSeconds || 600) * 1000).toISOString();
-  await upsert('job_locks', [{
+  const saved = await upsert('job_locks', [{
     job_name: jobName,
     locked_until: lockedUntil,
     locked_by: options.lockedBy || '',
     updated_at: now.toISOString(),
   }], 'job_name');
+  if (saved.error) throw saved.error;
   return { acquired: true, lockedUntil };
 }
 
@@ -1043,6 +1081,56 @@ async function releaseJobLock(jobName) {
     locked_by: '',
     updated_at: new Date().toISOString(),
   }], 'job_name');
+}
+
+async function loadWorkerJobRun(id) {
+  if (!id) return { rows: [] };
+  return selectRows('worker_job_runs', {
+    select: '*',
+    id: `eq.${String(id)}`,
+    limit: '1',
+  });
+}
+
+async function persistWorkerJobRun(run = {}) {
+  if (!run.id || !run.jobName || !run.scheduledFor) {
+    throw new Error('worker job run requires id, jobName, and scheduledFor');
+  }
+  const now = new Date().toISOString();
+  return upsert('worker_job_runs', [{
+    id: String(run.id),
+    worker_id: String(run.workerId || ''),
+    job_name: String(run.jobName),
+    scheduled_for: run.scheduledFor,
+    mode: String(run.mode || 'shadow'),
+    status: String(run.status || 'scheduled'),
+    attempt: Number(run.attempt || 0),
+    started_at: run.startedAt || null,
+    finished_at: run.finishedAt || null,
+    exit_code: Number.isInteger(run.exitCode) ? run.exitCode : null,
+    error_message: run.errorMessage || null,
+    payload: run.payload || {},
+    updated_at: now,
+  }], 'id');
+}
+
+async function persistWorkerHeartbeat(heartbeat = {}) {
+  if (!heartbeat.workerId) throw new Error('worker heartbeat requires workerId');
+  const now = new Date().toISOString();
+  return upsert('worker_heartbeats', [{
+    worker_id: String(heartbeat.workerId),
+    hostname: String(heartbeat.hostname || ''),
+    platform: String(heartbeat.platform || process.platform),
+    mode: String(heartbeat.mode || 'shadow'),
+    version: heartbeat.version || null,
+    started_at: heartbeat.startedAt || now,
+    last_seen_at: heartbeat.lastSeenAt || now,
+    gateway_connected: heartbeat.gatewayConnected === true,
+    running_jobs: Number(heartbeat.runningJobs || 0),
+    queued_jobs: Number(heartbeat.queuedJobs || 0),
+    payload: heartbeat.payload || {},
+    updated_at: now,
+  }], 'worker_id');
 }
 
 async function persistAlertEvents(events) {
@@ -1156,6 +1244,9 @@ module.exports = {
   upsertSourceCursor,
   tryAcquireJobLock,
   releaseJobLock,
+  loadWorkerJobRun,
+  persistWorkerJobRun,
+  persistWorkerHeartbeat,
   persistAlertEvents,
   loadBufferedDigestArticles,
   loadAlertEventsForArticles,

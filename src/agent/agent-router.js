@@ -28,11 +28,17 @@ function isPendingActionCommand(command) {
   return ['/buy', '/sell', '/cash'].includes(command);
 }
 
+function hasMissingMarketValue(portfolio = {}) {
+  return (portfolio.positions || []).some(position => (
+    typeof position.marketValue !== 'number' || !Number.isFinite(position.marketValue)
+  ));
+}
+
 async function getEnrichedPortfolio() {
   const storedPortfolio = await loadStoredPortfolio();
   if (storedPortfolio?.cashAmount !== null || (storedPortfolio?.positions || []).length > 0) {
     const portfolio = await enrichPortfolio(storedPortfolio);
-    const missingMarketValues = (portfolio.positions || []).some(position => !position.marketValue);
+    const missingMarketValues = hasMissingMarketValue(portfolio);
     if (!missingMarketValues) return portfolio;
 
     const latest = loadLatestPortfolioSnapshot();
@@ -51,7 +57,7 @@ async function getEnrichedPortfolio() {
   }
 
   const portfolio = await enrichPortfolio(rawPortfolio);
-  const missingMarketValues = (portfolio.positions || []).some(position => !position.marketValue);
+  const missingMarketValues = hasMissingMarketValue(portfolio);
   if (missingMarketValues) {
     const latest = loadLatestPortfolioSnapshot();
     if (latest?.totalAssetValue) return latest;

@@ -16,10 +16,12 @@
 `AGENTS.md`는 진입점이고, 세부 지식은 아래 문서에 둔다.
 
 - `ROADMAP.md`: 장기 제품 방향, phase, 다음 우선순위
-- `docs/PROGRESS.md`: 현재 운영 상태, 최근 변경, 다음 점검 항목
+- `docs/CURRENT_STATE.md`: 새 세션이 먼저 읽는 압축 현재 상태와 즉시 다음 작업
+- `docs/PROGRESS.md`: 상세 운영 이력과 판단 근거; 필요한 부분만 검색
 - `docs/future/AI_AGENT_TEAM_BLUEPRINT.md`: 현재 범위 밖의 미래 개인 AI 조직 운영체제 설계
 - `docs/AGENT_PLATFORM.md`: Discord Agent Server·Gateway worker와 배포 구조
 - `docs/DISCORD_SETUP.md`: Discord 리포트·Slash 조회·Gateway 멘션·경제 전문가 `to/cc` 설정 절차
+- `docs/HOME_SERVER.md`: 홈 서버 PostgreSQL, PC worker, 백업과 cloud 안전망 종료 절차
 - `docs/AGENT_HARNESS.md`: 장기 작업 계약, 검증 루프, handoff 규칙
 
 새로운 장기 지식은 대화에만 남기지 말고 위 문서 중 하나에 연결한다.

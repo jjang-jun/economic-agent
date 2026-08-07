@@ -6,6 +6,7 @@ const { requestHandler } = require('../src/server');
 const {
   authorizeDiscordInteraction,
   clipDiscordContent,
+  handleGatewayDiscordInteraction,
   handleDiscordInteraction,
   verifyDiscordSignature,
 } = require('../src/server/discord-interactions');
@@ -277,4 +278,52 @@ test('Discord content is clipped below the platform message limit', () => {
   const content = clipDiscordContent('가'.repeat(2_500));
   assert.ok(content.length <= 2_000);
   assert.match(content, /전체 내용/);
+});
+
+test('Gateway Interaction is deferred, routed, and edited without a public HTTP endpoint', async () => {
+  const interaction = buildCommand();
+  const calls = [];
+  const result = await handleGatewayDiscordInteraction(interaction, {
+    env: {
+      DISCORD_GUILD_ID: interaction.guild_id,
+      DISCORD_ALLOWED_USER_IDS: interaction.member.user.id,
+    },
+    apiBase: 'https://discord.test/api/v10',
+    fetcher: async (url, options) => {
+      calls.push({ url, options });
+      return fetchResponse(url.endsWith('/callback') ? 204 : 200);
+    },
+    router: async () => ({ intent: 'portfolio_status', response: '<b>Gateway 결과</b>' }),
+  });
+
+  assert.deepEqual(result, { handled: true, intent: 'portfolio_status' });
+  assert.equal(calls.length, 2);
+  assert.deepEqual(JSON.parse(calls[0].options.body), { type: 5, data: { flags: 64 } });
+  assert.equal(JSON.parse(calls[1].options.body).content, '## Gateway 결과');
+});
+
+test('Gateway Interaction rejects a non-allowlisted user before routing', async () => {
+  const interaction = buildCommand();
+  const calls = [];
+  let routed = false;
+  const result = await handleGatewayDiscordInteraction(interaction, {
+    env: {
+      DISCORD_GUILD_ID: interaction.guild_id,
+      DISCORD_ALLOWED_USER_IDS: '999999999999999999',
+    },
+    apiBase: 'https://discord.test/api/v10',
+    fetcher: async (url, options) => {
+      calls.push({ url, options });
+      return fetchResponse(204);
+    },
+    router: async () => {
+      routed = true;
+      return { response: 'should not run' };
+    },
+  });
+
+  assert.equal(result.handled, false);
+  assert.equal(routed, false);
+  assert.equal(calls.length, 1);
+  assert.match(JSON.parse(calls[0].options.body).data.content, /허용되지 않은 Discord 사용자/);
 });

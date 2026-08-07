@@ -15,6 +15,8 @@ Economic Agent의 최종 목적은 오늘 살 종목을 찍는 것이 아니라,
   -> 매주 복기, 매월 목표 달성률 갱신
 ```
 
+실거주 주택 목표의 North Star는 **서울·경기 아파트를 저점에 가까운 매수 검토 구간에서 감당 가능한 합리적 가격으로 매수하는 것**이다. 정확한 바닥을 예언하지 않고 실거래·거래량·전세·호가·대출여력·입지를 별도 근거로 검증한다. 상세 기준은 `docs/REAL_ESTATE_STRATEGY.md`를 따른다.
+
 ## 현재 범위와 미래 범위
 
 현재 저장소는 경제·투자·자산관리 도메인에 집중한다.
@@ -46,17 +48,17 @@ Economic Agent의 최종 목적은 오늘 살 종목을 찍는 것이 아니라,
 
 ## 런타임 언어 원칙
 
-Node.js를 운영 런타임의 중심으로 둔다. Discord Interaction/Gateway, Cloud Run HTTP 서버, GitHub Actions CLI, Supabase REST, 뉴스/공시/가격 API 호출은 대부분 I/O 중심이므로 Node.js가 적합하다.
+Node.js를 운영 런타임의 중심으로 둔다. Discord Interaction/Gateway, PC scheduler, PostgreSQL REST 어댑터, 뉴스/공시/가격 API 호출은 대부분 I/O 중심이므로 Node.js가 적합하다.
 
 Python은 별도 서버가 아니라 데이터 분석 worker로 둔다. pykrx/FinanceDataReader, 백테스트, 대량 OHLCV 처리, 통계/퀀트 리서치처럼 Python 생태계가 유리한 작업만 Python 스크립트로 분리하고, Node.js가 필요 시 호출하거나 로컬/배치에서 실행한다.
 
 서버 분리 기준:
-- 기본 운영: Cloud Run Node.js Agent Server 1대
+- 기본 운영: 항상 켜진 개인 PC의 Node.js worker 1대 + 로컬 PostgreSQL/PostgREST
 - Python worker: 로컬/배치/수동 리서치용. 상시 서버 불필요
 - 별도 Python 서비스: 백테스트가 장시간 실행되거나, 대량 데이터 분석을 API로 자주 호출해야 할 때만 검토
 - 자동매매/실시간 WebSocket: 검증 전까지 별도 상시 서비스로 분리하지 않음
 
-즉 현재 목표 구조는 `Node.js 운영 서버 1대 + 선택형 Python worker`다.
+즉 현재 목표 구조는 `OS 공통 Node.js PC worker 1대 + PostgreSQL DBMS + 선택형 Python worker`다.
 
 ### 1. Information Engine
 뉴스, 공시, 가격, 금리, 환율, 수급, 시장 스냅샷을 수집한다.
@@ -146,16 +148,17 @@ freedomGoal: {
 리포트, 긴급 알림, 매매 기록 초안과 승인은 Discord로 통합한다. Discord 자연어 초안·승인은 `pending_actions` 엔진을 사용한다. 실시간 질의응답과 포트폴리오 변경 승인은 GitHub Actions가 아니라 항상 요청을 받을 수 있는 Node.js Agent Server와 Gateway worker가 담당한다.
 
 ```text
-Discord report channels <- GitHub Actions / Agent Server
-Discord mention + approval -> Node.js Agent API Server -> Supabase/Postgres
+Discord report channels <- PC worker scheduler
+Discord mention + Slash + approval -> PC Gateway worker -> local PostgreSQL
 ```
 
 역할 분리:
-- GitHub Actions: 뉴스 수집, 다이제스트, 장마감 리포트, 성과평가, 주간/월간 리뷰
-- Agent Server: Discord Interaction, 포트폴리오 조회, 매수/매도 기록 초안, 승인 버튼, 리스크 질의
+- PC worker scheduler: 뉴스 수집, 다이제스트, 장마감 리포트, 성과평가, 주간/월간 리뷰
+- PC Gateway worker: Discord Interaction, 포트폴리오 조회, 매수/매도 기록 초안, 승인 버튼, 리스크 질의
 - Discord Webhooks: 긴급·정책·행동·포트폴리오·선행신호·성과·운영 리포트의 채널별 전달
 - Python worker: 로컬 백테스트, pykrx/FinanceDataReader 기반 OHLCV 조회, 대량 데이터 분석
-- Supabase: 기사, 추천, 실제 거래, 포트폴리오, 경제적 자유 목표, 대화 로그, pending action 기준 저장소
+- PostgreSQL: 기사, 추천, 실제 거래, 포트폴리오, 경제적 자유 목표, 대화 로그, pending action, worker 상태의 기준 저장소
+- PostgREST: loopback 전용 내부 호환 API
 - 로컬 JSON/SQLite: 분석 캐시와 백업
 
 Codex 작업 위임 원칙:
@@ -164,9 +167,9 @@ Codex 작업 위임 원칙:
 - 장시간 또는 다중 파일 작업은 `docs/AGENT_HARNESS.md`의 작업 계약과 검증 루프를 따른다. 문서 맵을 바꾸면 `npm run agent:harness-check`로 드리프트를 점검한다.
 
 권장 배포:
-1. Cloud Run
-2. Fly.io 또는 Render
-3. 개인 미니PC/NAS + Docker
+1. 개인 PC·미니PC·NAS + Node.js 22 + Docker PostgreSQL
+2. 장애 복구용 암호화 외부 백업
+3. Cloud Run/Supabase는 전환 검증 기간의 임시 안전망
 
 상세 설계는 `docs/AGENT_PLATFORM.md`를 기준으로 한다.
 
@@ -188,7 +191,13 @@ Codex 작업 위임 원칙:
 - [x] 가격·거래량 이상징후의 공식 EOD 1·5거래일 지속성, 기사 선후 시차, 요인 조합을 연구 전용으로 평가. 5일 표본 30건 전에는 추천 규칙 반영 보류
 - [x] 재정경제부·금융위원회·국토교통부 공식 문서를 투자 뉴스와 분리한 정책·자산 레이더 MVP. 세금·부동산·대출·연금·자본시장 분류와 정부안/정정/입법예고/시행 상태를 기록
 - [ ] 국가법령정보·국회 의안정보를 연결해 정부안 → 국회 제출 → 통과 → 공포 → 시행을 동일 정책 사건으로 추적
-- [ ] 관심 지역 실거래가·R-ONE 가격/거래 통계를 정책 레이더와 결합하고 개인 주택·대출 조건 기반 영향 계산 추가
+- [x] 서울·경기 5.8억~9.5억원 국토교통부 아파트 매매·전월세 일일 수집, 최근월 재조회, 계약해제·지역월 거래량·중위가격·전세가율 저장 골격
+- [x] 8.5억~9.5억원 목표와 6억원 희망대출을 분리한 LTV·DSR 시나리오 및 부동산 전문가 컨텍스트 추가
+- [x] 지역별 체크포인트로 중단 후 재개 가능한 24개월 실거래 초기 백필 명령과 1·3·12개월 변화·24개월 고점 대비 낙폭 계산
+- [x] R-ONE 월간 아파트 매매가격지수 24개월 수집기와 서울·경기 장기 기준선 저장 골격
+- [ ] 실제 인증키로 실거래 백필·R-ONE smoke를 수행하고 거래 통계까지 결합해 회복 신뢰도 계산
+- [ ] 허가받은 호가 feed 또는 Discord 수동 입력을 연결해 유효 최저호가·실거래 괴리·매물 소진 속도 계산
+- [ ] 교통·공급·학군·생활권·정비사업을 포함한 후보 단지 shortlist와 현장 조사 워크플로우
 
 ## Phase 2: 히스토리 저장소
 - [x] Supabase/Postgres 도입
@@ -325,17 +334,23 @@ Codex 작업 위임 원칙:
 - [x] Gateway worker를 Node.js 22 기반 Windows/macOS/Linux 공통 런타임으로 고정하고 네트워크 없는 호환성 검사 및 3-OS Actions matrix 추가
 - [x] 하나의 Discord 봇 뒤에 투자·부동산·세금/연금·포트폴리오·리스크·데이터 검증 역할을 분리하고 결정론적 `to/cc`, 역할별 SSoT·AI 호출·대화 namespace·토큰 상한 구현
 - [ ] 항상 켜진 PC/VM에 Gateway worker를 배치하고 개인 채널 실사용 smoke 수행
+- [x] OS 공통 PC scheduler, catch-up, 중복 방지 job run, worker heartbeat 기반 추가
+- [x] PostgreSQL 17 + localhost PostgREST Compose와 암호화 백업 명령 추가
+- [ ] Supabase 데이터를 로컬 PostgreSQL로 이관하고 테이블 행 수·포트폴리오 합계 대조
+- [ ] 72시간 shadow 후 PC scheduler active 전환
+- [ ] Cloud Run과 scheduled GitHub Actions를 내리고 Supabase 프로젝트 종료
 
 ## 현재 가장 중요한 다음 작업
-1. 2026-07-29 `Restart project`로 복구한 Supabase가 안정적으로 유지되는지 확인한다. `PGRST000/PGRST002`와 내부 `localhost:5432 connection refused`가 같이 재발하면 SQL/Data API 설정을 바꾸지 말고, 비정상 `System` disk 사용량과 함께 티켓 `SU-419701`로 managed compute/disk 복구를 요청한다. 복구 후 Discord 개인 채널 승인 흐름과 `npm run db:pull`을 다시 실행한다.
-2. 이번 운영 안정성 변경을 원격 main과 Cloud Run에 반영한 뒤 `npm run deploy:freshness`, 다음 `Discord Infrastructure Smoke`, `Price Provider Ops Report`, `Quality Gate` 성공 여부를 재확인한다.
+1. [완료] macOS ARM64 장비에 Docker Desktop을 설치하고 PostgreSQL 17/PostgREST를 loopback 포트 5432/3210으로 시작했다.
+2. Supabase를 최종 백업한 뒤 빈 로컬 PostgreSQL에 이관하고 테이블 행 수·핵심 포트폴리오 합계를 대조한다.
+   - 초기 이관 뒤 양쪽에 데이터가 추가되는 전환 구간을 위해 로컬 전용 행과 최신 포트폴리오를 보존하는 기본 dry-run 증분 동기화 명령을 준비했다. 실제 apply는 72시간 shadow 통과와 원격 writer 정지 후에만 실행한다.
 3. Alibaba Cloud 국제 리전 키를 준비해 `AI_PROVIDER=qwen`, `AI_MODEL=qwen3.7-flash`, thinking disabled로 다이제스트 canary를 먼저 실행한다. 공개 뉴스만 넣은 DeepSeek V4 Flash를 최저비용 비교군으로 두고, 정확한 포트폴리오/거래 데이터는 데이터 처리 정책을 승인하기 전 제외한다.
 4. 최신 미러 생성 후 `npm run model:performance`로 `stock-analysis-v2.3`의 Qwen/DeepSeek/GPT-5.6 메타데이터를 수집한다. 운영 전환 판단은 승인 후보의 고정 20거래일 평가가 최소 30건 쌓인 뒤 하며, 한국어 고유명사·숫자·JSON 준수율·지연·실제 추천 성과가 확인되기 전에는 전체 workflow를 한 번에 전환하지 않는다.
 5. `price_provider_attempts`에서 provider별 빈 응답률을 본다. Alpha Vantage/FMP/Tiingo가 계속 100% empty면 API key/endpoint/rate-limit 설정을 고치거나, 유효하지 않은 provider 호출을 줄여 Yahoo fallback 전에 불필요한 지연과 로그 소음을 낮춘다.
 6. 실제 거래 기록과 추천 연결률을 주간 리뷰에서 확인한다. 추천을 보고도 실행하지 않은 후보의 성과가 반복적으로 좋으면 action report의 진입 타이밍/분할 매수 기준을 재조정한다.
 7. 월간 로컬 리서치 worker 결과가 실제 월간 리뷰 의사결정에 도움이 되는지 확인한다. 도움이 없으면 기본 비활성 유지, 도움이 있으면 리서치 대상 선정 기준을 보유/추천/워치리스트별로 분리한다.
 8. 인증 `/dashboard`의 실제 사용 빈도를 보고 탭 분리, 가격 provider 차트, 추천 성과 모델별 차트 추가 여부를 결정한다.
-9. Discord Interaction 환경변수와 endpoint를 Cloud Run에 반영하고 guild 명령을 동기화한다. Windows/macOS/Linux 중 선택한 항상 켜진 PC/VM에서 `discord:agent-worker:check`를 통과시킨 뒤 Gateway worker를 배치해 개인 채널에서 멘션 자연어 초안→기록/취소 버튼→Supabase 반영과 미허용 사용자 차단을 smoke 검증한다. 실제 증권사 주문은 연결하지 않는다.
+9. Windows/macOS/Linux 중 선택한 항상 켜진 PC에서 `discord:agent-worker:check`를 통과시키고 72시간 shadow를 수행한다. 그 뒤 Discord endpoint를 Gateway로 전환해 멘션·Slash·기록/취소 버튼→PostgreSQL 반영과 미허용 사용자 차단을 smoke 검증한다. 실제 증권사 주문은 연결하지 않는다.
 
 ## 운영 루프
 

@@ -4,6 +4,8 @@ const { DISCORD_CHANNELS, discordWebhookEnvName } = require('../config/discord-c
 
 const DEFAULT_TIMEOUT_MS = 10000;
 const DEFAULT_MESSAGE_LIMIT = 3800;
+const MAX_EMBED_DESCRIPTION_LENGTH = 4096;
+const MAX_EMBED_FIELD_VALUE_LENGTH = 1024;
 const DEFAULT_WEBHOOK_FILE = path.join(__dirname, '..', '..', 'data', 'discord-webhooks.json');
 const DISCORD_CHANNEL_THEMES = {
   urgent: { title: '긴급 알림', emoji: '🚨', color: 0xED4245 },
@@ -102,8 +104,34 @@ function reportHtmlToDiscordMarkdown(value = '') {
     .replace(/<pre>([\s\S]*?)<\/pre>/gi, (_, code) => `\`\`\`\n${code}\n\`\`\``)
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<[^>]+>/g, ''));
-  return markdown
+  return enhanceDiscordMarkdown(markdown
     .replace(/[ \t]+$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim());
+}
+
+function enhanceDiscordMarkdown(value = '') {
+  let inCodeFence = false;
+  return String(value).split('\n').map(line => {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('```')) {
+      inCodeFence = !inCodeFence;
+      return line;
+    }
+    if (inCodeFence) return line;
+    if (/^[━─—-]{4,}$/.test(trimmed)) return '';
+    if (trimmed.startsWith('▸ ')) return `- ${trimmed.slice(2)}`;
+
+    const emojiHeading = trimmed.match(/^([^\w\s*]{1,3})\s*\*\*(.+)\*\*$/u);
+    if (emojiHeading) return `## ${emojiHeading[1]} ${emojiHeading[2]}`;
+    const numberedHeading = trimmed.match(/^\*\*((?:\d+\.|Step\s+\d+\b).+)\*\*$/i);
+    if (numberedHeading) return `### ${numberedHeading[1]}`;
+    const heading = trimmed.match(/^\*\*([^*]{2,80})\*\*$/);
+    if (heading) return `## ${heading[1]}`;
+    const caveat = trimmed.match(/^\*([^*].+)\*$/);
+    if (caveat) return `> *${caveat[1]}*`;
+    return line;
+  }).join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
@@ -117,21 +145,78 @@ function discordChannelTheme(channel) {
   };
 }
 
+const EMBED_FIELD_LABELS = new Set([
+  '상태', '워크플로우', '작업', '브랜치', '커밋', '실행자',
+  '점검 방식', 'Webhook 설정', '수신 채널', '배포 커밋', '점검 시각',
+]);
+
+function clipDiscord(value, maxLength) {
+  const text = String(value || '').trim();
+  return text.length > maxLength ? `${text.slice(0, Math.max(0, maxLength - 1))}…` : text;
+}
+
+function prepareDiscordPresentation(markdown, options = {}) {
+  const lines = String(markdown || '').replace(/\r\n/g, '\n').split('\n');
+  let title = options.title ? String(options.title) : '';
+  const firstContentIndex = lines.findIndex(line => line.trim());
+  if (!title && firstContentIndex >= 0) {
+    const heading = lines[firstContentIndex].trim().match(/^#{1,3}\s+(.+)$/);
+    if (heading) {
+      title = heading[1];
+      lines.splice(firstContentIndex, 1);
+    }
+  }
+
+  const fields = [];
+  const bodyLines = [];
+  let inCodeFence = false;
+  for (const line of lines) {
+    if (line.trim().startsWith('```')) inCodeFence = !inCodeFence;
+    const metadata = !inCodeFence
+      ? line.trim().match(/^\*\*([^*]{1,40})\*\*\s{2}(.+)$/)
+      : null;
+    if (metadata && EMBED_FIELD_LABELS.has(metadata[1]) && fields.length < 12) {
+      fields.push({
+        name: metadata[1],
+        value: clipDiscord(metadata[2], MAX_EMBED_FIELD_VALUE_LENGTH),
+        inline: !['워크플로우', '작업'].includes(metadata[1]),
+      });
+    } else {
+      bodyLines.push(line);
+    }
+  }
+
+  return {
+    title: clipDiscord(title, 256),
+    description: bodyLines.join('\n').replace(/^\s+|\s+$/g, '').replace(/\n{3,}/g, '\n\n'),
+    fields,
+  };
+}
+
 function buildDiscordEmbed(markdown, options = {}) {
   const channel = String(options.channel || 'ops');
   const theme = discordChannelTheme(channel);
   const total = Math.max(1, Number(options.total || 1));
   const index = Math.max(0, Number(options.index || 0));
   const page = total > 1 ? ` · ${index + 1}/${total}` : '';
-  return {
-    title: `${theme.emoji} ${theme.title}${page}`,
-    description: String(markdown || '').slice(0, 4096),
+  const presentation = prepareDiscordPresentation(markdown, options);
+  const baseTitle = presentation.title || `${theme.emoji} ${theme.title}`;
+  const embed = {
+    author: {
+      name: `Economic Agent · #${DISCORD_CHANNELS[channel]?.name || channel}`,
+    },
+    title: `${baseTitle}${page}`.slice(0, 256),
+    description: clipDiscord(presentation.description || '세부 내용 없음', MAX_EMBED_DESCRIPTION_LENGTH),
     color: theme.color,
     footer: {
-      text: `#${DISCORD_CHANNELS[channel]?.name || channel} · Economic Agent`,
+      text: '자동 생성 리포트 · 원문과 최신 데이터를 함께 확인하세요',
     },
     timestamp: new Date(options.now || Date.now()).toISOString(),
   };
+  const fields = options.fields || presentation.fields;
+  if (fields?.length > 0) embed.fields = fields.slice(0, 25);
+  if (options.url) embed.url = String(options.url);
+  return embed;
 }
 
 function shouldUseEmbeds(options = {}) {
@@ -228,9 +313,13 @@ async function sendDiscordMessage(text, options = {}) {
   }
 
   const markdown = options.reportHtml === false
-    ? String(text)
+    ? enhanceDiscordMarkdown(String(text))
     : reportHtmlToDiscordMarkdown(text);
-  const chunks = splitDiscordMessage(markdown, options.maxLength || DEFAULT_MESSAGE_LIMIT);
+  const presentation = prepareDiscordPresentation(markdown, options);
+  const chunks = splitDiscordMessage(
+    presentation.description || '세부 내용 없음',
+    options.maxLength || DEFAULT_MESSAGE_LIMIT
+  );
   if (chunks.length === 0) return { delivered: false, channel, messageCount: 0 };
 
   for (let index = 0; index < chunks.length; index += 1) {
@@ -245,6 +334,8 @@ async function sendDiscordMessage(text, options = {}) {
         channel,
         index,
         total: chunks.length,
+        title: presentation.title,
+        fields: index === 0 ? presentation.fields : [],
       })),
     }, options);
     if (!res.ok) {
@@ -288,6 +379,8 @@ module.exports = {
   isDiscordWebhookUrl,
   resolveDiscordWebhook,
   reportHtmlToDiscordMarkdown,
+  enhanceDiscordMarkdown,
+  prepareDiscordPresentation,
   discordChannelTheme,
   buildDiscordEmbed,
   shouldUseEmbeds,

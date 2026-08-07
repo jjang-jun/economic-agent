@@ -265,6 +265,37 @@ create table if not exists decision_contexts (
   created_at timestamptz not null default now()
 );
 
+create table if not exists policy_events (
+  id text primary key,
+  event_key text not null,
+  title text not null,
+  summary text,
+  domain text not null,
+  domains jsonb not null default '[]'::jsonb,
+  stage text not null,
+  authority text not null,
+  source_id text not null,
+  source_url text,
+  published_at timestamptz,
+  mentioned_dates jsonb not null default '[]'::jsonb,
+  content_hash text not null,
+  last_notified_hash text,
+  first_seen_at timestamptz not null default now(),
+  last_seen_at timestamptz not null default now(),
+  last_notified_at timestamptz,
+  payload jsonb not null default '{}'::jsonb
+);
+
+create table if not exists policy_event_versions (
+  id text primary key,
+  policy_event_id text not null references policy_events(id) on delete cascade,
+  content_hash text not null,
+  stage text not null,
+  observed_at timestamptz not null default now(),
+  payload jsonb not null default '{}'::jsonb,
+  unique (policy_event_id, content_hash)
+);
+
 create table if not exists performance_reviews (
   id text primary key,
   period text not null,
@@ -417,6 +448,179 @@ create table if not exists job_locks (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists real_estate_goals (
+  id text primary key,
+  objective text not null,
+  target_start date,
+  target_end date,
+  monitor_price_min_krw bigint not null,
+  monitor_price_max_krw bigint not null,
+  target_price_min_krw bigint not null,
+  target_price_max_krw bigint not null,
+  desired_mortgage_krw bigint,
+  assumptions jsonb not null default '{}'::jsonb,
+  payload jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists real_estate_transactions (
+  id text primary key,
+  source text not null default 'molit_rtms',
+  lawd_code text not null,
+  province_name text,
+  district_name text,
+  neighborhood_name text,
+  apartment_name text not null,
+  parcel_address text,
+  exclusive_area_sqm numeric,
+  floor integer,
+  built_year integer,
+  contract_date date not null,
+  price_krw bigint not null,
+  cancelled boolean not null default false,
+  cancellation_date date,
+  dealing_type text,
+  observed_at timestamptz not null default now(),
+  payload jsonb not null default '{}'::jsonb
+);
+
+create table if not exists real_estate_rent_transactions (
+  id text primary key,
+  source text not null default 'molit_rtms',
+  lawd_code text not null,
+  province_name text,
+  district_name text,
+  neighborhood_name text,
+  apartment_name text not null,
+  parcel_address text,
+  exclusive_area_sqm numeric,
+  floor integer,
+  built_year integer,
+  contract_date date not null,
+  rent_type text not null,
+  deposit_krw bigint not null,
+  monthly_rent_krw bigint not null default 0,
+  contract_type text,
+  contract_term text,
+  renewal_right_used boolean not null default false,
+  observed_at timestamptz not null default now(),
+  payload jsonb not null default '{}'::jsonb
+);
+
+create table if not exists real_estate_listing_snapshots (
+  id text primary key,
+  captured_at timestamptz not null,
+  source_kind text not null,
+  source_reference text,
+  lawd_code text,
+  apartment_name text not null,
+  exclusive_area_sqm numeric,
+  floor_text text,
+  asking_price_krw bigint not null,
+  listing_status text not null default 'active',
+  verified boolean not null default false,
+  payload jsonb not null default '{}'::jsonb
+);
+
+create table if not exists real_estate_area_metrics (
+  id text primary key,
+  metric_month date not null,
+  area_code text not null,
+  area_name text not null,
+  price_band_min_krw bigint,
+  price_band_max_krw bigint,
+  transaction_count integer,
+  median_price_krw bigint,
+  median_price_per_sqm_krw bigint,
+  price_change_1m_pct numeric,
+  transaction_change_1m_pct numeric,
+  price_change_3m_pct numeric,
+  price_change_12m_pct numeric,
+  transaction_change_12m_pct numeric,
+  drawdown_from_24m_high_pct numeric,
+  cancellation_ratio numeric,
+  jeonse_ratio numeric,
+  source_cutoff_at timestamptz,
+  payload jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now(),
+  unique(metric_month, area_code, price_band_min_krw, price_band_max_krw)
+);
+
+create table if not exists housing_finance_snapshots (
+  id text primary key,
+  as_of_date date not null,
+  purchase_price_krw bigint not null,
+  estimated_loan_krw bigint,
+  minimum_purchase_cash_krw bigint,
+  estimated_monthly_payment_krw bigint,
+  dsr_verification_required boolean not null default true,
+  assumptions jsonb not null default '{}'::jsonb,
+  payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists real_estate_market_indices (
+  id text primary key,
+  source text not null default 'reb_r_one',
+  statbl_id text not null,
+  period date not null,
+  area_id text not null,
+  area_name text not null,
+  area_path text not null,
+  index_value numeric not null,
+  change_1m_pct numeric,
+  change_3m_pct numeric,
+  change_12m_pct numeric,
+  drawdown_from_24m_high_pct numeric,
+  observed_at timestamptz not null default now(),
+  payload jsonb not null default '{}'::jsonb,
+  unique(statbl_id, period, area_id)
+);
+
+create table if not exists worker_job_runs (
+  id text primary key,
+  worker_id text not null,
+  job_name text not null,
+  scheduled_for timestamptz not null,
+  mode text not null,
+  status text not null,
+  attempt integer not null default 0,
+  started_at timestamptz,
+  finished_at timestamptz,
+  exit_code integer,
+  error_message text,
+  payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (job_name, scheduled_for)
+);
+
+create table if not exists worker_heartbeats (
+  worker_id text primary key,
+  hostname text not null,
+  platform text not null,
+  mode text not null,
+  version text,
+  started_at timestamptz not null,
+  last_seen_at timestamptz not null,
+  gateway_connected boolean not null default false,
+  running_jobs integer not null default 0,
+  queued_jobs integer not null default 0,
+  payload jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+alter table worker_job_runs enable row level security;
+alter table worker_heartbeats enable row level security;
+alter table real_estate_goals enable row level security;
+alter table real_estate_transactions enable row level security;
+alter table real_estate_rent_transactions enable row level security;
+alter table real_estate_listing_snapshots enable row level security;
+alter table real_estate_area_metrics enable row level security;
+alter table housing_finance_snapshots enable row level security;
+alter table real_estate_market_indices enable row level security;
+alter table real_estate_area_metrics add column if not exists drawdown_from_24m_high_pct numeric;
+
 create table if not exists api_token_cache (
   provider text primary key,
   access_token text not null,
@@ -445,6 +649,9 @@ create index if not exists price_snapshots_source_type_idx on price_snapshots(so
 create index if not exists price_provider_attempts_provider_time_idx on price_provider_attempts(provider, attempted_at desc);
 create index if not exists price_provider_attempts_status_time_idx on price_provider_attempts(status, attempted_at desc);
 create index if not exists investor_flows_date_idx on investor_flows(date);
+create index if not exists policy_events_event_key_idx on policy_events(event_key, published_at desc);
+create index if not exists policy_events_domain_stage_idx on policy_events(domain, stage, last_seen_at desc);
+create index if not exists policy_event_versions_event_idx on policy_event_versions(policy_event_id, observed_at desc);
 create index if not exists performance_reviews_period_idx on performance_reviews(period, end_date);
 create index if not exists financial_freedom_goals_user_date_idx on financial_freedom_goals(user_key, date);
 create index if not exists portfolio_accounts_user_idx on portfolio_accounts(user_key);
@@ -454,3 +661,15 @@ create index if not exists conversation_messages_chat_created_idx on conversatio
 create index if not exists pending_actions_chat_status_idx on pending_actions(chat_id, status);
 create index if not exists collector_runs_job_status_idx on collector_runs(job_name, status, finished_at desc);
 create index if not exists alert_events_status_idx on alert_events(status, alert_type, created_at);
+create index if not exists worker_job_runs_job_schedule_idx on worker_job_runs(job_name, scheduled_for desc);
+create index if not exists worker_job_runs_status_schedule_idx on worker_job_runs(status, scheduled_for desc);
+create index if not exists worker_heartbeats_last_seen_idx on worker_heartbeats(last_seen_at desc);
+create index if not exists real_estate_transactions_area_date_idx on real_estate_transactions(lawd_code, contract_date desc);
+create index if not exists real_estate_transactions_price_date_idx on real_estate_transactions(price_krw, contract_date desc);
+create index if not exists real_estate_transactions_complex_idx on real_estate_transactions(apartment_name, exclusive_area_sqm, contract_date desc);
+create index if not exists real_estate_rent_area_date_idx on real_estate_rent_transactions(lawd_code, contract_date desc);
+create index if not exists real_estate_rent_complex_idx on real_estate_rent_transactions(apartment_name, exclusive_area_sqm, contract_date desc);
+create index if not exists real_estate_listing_complex_time_idx on real_estate_listing_snapshots(apartment_name, exclusive_area_sqm, captured_at desc);
+create index if not exists real_estate_area_metrics_month_idx on real_estate_area_metrics(metric_month desc, area_code);
+create index if not exists housing_finance_snapshots_date_idx on housing_finance_snapshots(as_of_date desc, purchase_price_krw);
+create index if not exists real_estate_market_indices_period_idx on real_estate_market_indices(period desc, area_id);

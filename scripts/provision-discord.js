@@ -247,4 +247,5 @@ module.exports = {
   saveWebhookMap,
   provisionDiscordInfrastructure,
   formatPlan,
+  discordRequest,
 };

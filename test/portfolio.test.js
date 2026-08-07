@@ -126,6 +126,7 @@ test('enrichPortfolio preserves USD valuation fields when FX and quote fetches f
 });
 
 test('enrichPortfolio preserves explicitly locked manual USD valuation even when FX refresh succeeds', async () => {
+  const fetchedSymbols = [];
   const portfolio = await enrichPortfolio({
     cashAmount: 15000000,
     investedAmount: 42377347,
@@ -153,6 +154,7 @@ test('enrichPortfolio preserves explicitly locked manual USD valuation even when
     ],
   }, {
     fetcher: async symbol => {
+      fetchedSymbols.push(symbol);
       if (symbol === 'KRW=X') return { price: 1410, currency: 'KRW', source: 'test' };
       return { price: 55, currency: 'USD', source: 'test' };
     },
@@ -163,6 +165,7 @@ test('enrichPortfolio preserves explicitly locked manual USD valuation even when
   assert.equal(portfolio.positions[0].unrealizedPnl, 2239016);
   assert.equal(portfolio.positions[0].unrealizedPnlPct, 17.3);
   assert.equal(portfolio.totalAssetValue, 57377347);
+  assert.deepEqual(fetchedSymbols, ['KRW=X']);
 });
 
 test('enrichPortfolio includes unclassified non-cash assets without treating them as buying power', async () => {

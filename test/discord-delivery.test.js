@@ -62,7 +62,14 @@ test('report HTML is converted to Discord Markdown and safe links', () => {
   );
   assert.equal(
     reportHtmlToDiscordMarkdown('<strong>제목</strong><br><br><br><u>강조</u> <code>005930</code>&nbsp;'),
-    '**제목**\n\n__강조__ `005930`',
+    '## 제목\n\n__강조__ `005930`',
+  );
+});
+
+test('Discord Markdown promotes report structure, bullets, and caveats', () => {
+  assert.equal(
+    reportHtmlToDiscordMarkdown('🏛️ <b>정책 레이더</b>\n▸ 상태: 공식 발표\n<i>시행일을 확인하세요.</i>'),
+    '## 🏛️ 정책 레이더\n- 상태: 공식 발표\n> *시행일을 확인하세요.*',
   );
 });
 
@@ -76,8 +83,25 @@ test('Discord embeds use readable channel themes and bounded descriptions', () =
   assert.equal(embed.title, '🗞️ 시장 브리핑 · 2/3');
   assert.equal(embed.description, '시장 본문');
   assert.equal(embed.color, 0x5865F2);
-  assert.equal(embed.footer.text, '#시장-브리핑 · Economic Agent');
+  assert.equal(embed.author.name, 'Economic Agent · #시장-브리핑');
+  assert.equal(embed.footer.text, '자동 생성 리포트 · 원문과 최신 데이터를 함께 확인하세요');
   assert.equal(embed.timestamp, '2026-08-04T08:00:00.000Z');
+});
+
+test('Discord embeds lift report titles and operational metadata into fields', () => {
+  const markdown = reportHtmlToDiscordMarkdown([
+    '🚨 <b>Workflow 실패</b>',
+    '<b>상태</b>  자동 작업이 완료되지 않았습니다',
+    '<b>워크플로우</b>  Policy Radar',
+    '<b>커밋</b>  <code>40520bd</code>',
+    '',
+    '🔎 <a href="https://example.com/run">실패 로그에서 원인 확인</a>',
+  ].join('\n'));
+  const embed = buildDiscordEmbed(markdown, { channel: 'ops' });
+  assert.equal(embed.title, '🚨 Workflow 실패');
+  assert.match(embed.description, /실패 로그에서 원인 확인/);
+  assert.deepEqual(embed.fields.map(field => field.name), ['상태', '워크플로우', '커밋']);
+  assert.equal(embed.fields[2].value, '`40520bd`');
 });
 
 test('Discord payload defaults to embeds and supports explicit plain-text fallback', () => {

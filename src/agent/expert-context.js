@@ -6,8 +6,11 @@ const { buildFreedomStatus } = require('../utils/freedom-engine');
 const { loadRecommendationsWithStatus } = require('../utils/recommendation-log');
 const { loadTradeExecutionsWithStatus } = require('../utils/trade-log');
 const { loadRecentPolicyEvents } = require('../utils/policy-event-store');
+const { loadRealEstateGoal } = require('../config/real-estate-goal');
+const { buildTargetRangeScenarios } = require('../utils/housing-finance');
+const { selectRows } = require('../utils/persistence');
 
-const DEFAULT_CONTEXT_MAX_CHARS = 9_000;
+const DEFAULT_CONTEXT_MAX_CHARS = 6_000;
 
 function clip(value = '', max = 240) {
   const text = String(value || '').replace(/\s+/g, ' ').trim();
@@ -97,14 +100,14 @@ function compactTrades(trades = []) {
 }
 
 function compactPolicyEvents(events = []) {
-  return (events || []).slice(0, 8).map(event => ({
-    title: clip(event.title, 150),
+  return (events || []).slice(0, 5).map(event => ({
+    title: clip(event.title, 120),
     domains: [...new Set([event.domain, ...(event.domains || [])].filter(Boolean))],
     stage: event.stageLabel || event.stage || '',
     authority: event.authority || '',
     publishedAt: event.publishedAt || '',
-    summary: clip(event.summary, 220),
-    action: clip(event.action, 140),
+    summary: clip(event.summary, 160),
+    action: clip(event.action, 100),
     sourceUrl: event.link || '',
   }));
 }
@@ -132,6 +135,16 @@ async function buildExpertContext(roleId, options = {}) {
   const recommendationLoader = options.recommendationLoader || loadRecommendationsWithStatus;
   const tradeLoader = options.tradeLoader || loadTradeExecutionsWithStatus;
   const policyLoader = options.policyLoader || loadRecentPolicyEvents;
+  const realEstateMarketLoader = options.realEstateMarketLoader || (async () => selectRows('real_estate_area_metrics', {
+    select: 'metric_month,area_code,area_name,transaction_count,median_price_krw,price_change_1m_pct,transaction_change_1m_pct,jeonse_ratio,payload,source_cutoff_at',
+    order: 'metric_month.desc,transaction_count.desc',
+    limit: '12',
+  }));
+  const realEstateIndexLoader = options.realEstateIndexLoader || (async () => selectRows('real_estate_market_indices', {
+    select: 'period,area_id,area_name,area_path,index_value,change_1m_pct,change_3m_pct,change_12m_pct,drawdown_from_24m_high_pct,observed_at',
+    order: 'period.desc,area_path.asc',
+    limit: '20',
+  }));
   let portfolioPromise;
   const getPortfolio = () => {
     portfolioPromise ||= portfolioLoader();
@@ -146,6 +159,51 @@ async function buildExpertContext(roleId, options = {}) {
     freedom_goal: async () => {
       const portfolio = await getPortfolio();
       return { data: compactFreedomStatus(buildFreedomStatus({ portfolio: portfolio || {} })), source: 'freedom_engine' };
+    },
+    real_estate_goal: async () => {
+      const goal = loadRealEstateGoal(env);
+      return {
+        data: { goal, financingScenarios: buildTargetRangeScenarios({ goal }) },
+        source: 'real_estate_goal_ssot',
+      };
+    },
+    real_estate_market: async () => {
+      const result = await realEstateMarketLoader();
+      return {
+        data: (result?.rows || []).map(row => ({
+          month: row.metric_month,
+          areaCode: row.area_code,
+          areaName: row.area_name,
+          transactions: numeric(row.transaction_count),
+          medianPriceKrw: numeric(row.median_price_krw),
+          priceChange1mPct: numeric(row.price_change_1m_pct),
+          transactionChange1mPct: numeric(row.transaction_change_1m_pct),
+          jeonseRatio: numeric(row.jeonse_ratio),
+          marketPhase: row.payload?.marketPhase || '',
+          cutoffAt: row.source_cutoff_at || '',
+        })),
+        source: result?.disabled ? 'unavailable' : 'real_estate_area_metrics',
+        warning: result?.error?.message || '',
+      };
+    },
+    real_estate_indices: async () => {
+      const result = await realEstateIndexLoader();
+      return {
+        data: (result?.rows || []).map(row => ({
+          period: row.period,
+          areaId: row.area_id,
+          areaName: row.area_name,
+          areaPath: row.area_path,
+          indexValue: numeric(row.index_value),
+          change1mPct: numeric(row.change_1m_pct),
+          change3mPct: numeric(row.change_3m_pct),
+          change12mPct: numeric(row.change_12m_pct),
+          drawdownFrom24mHighPct: numeric(row.drawdown_from_24m_high_pct),
+          observedAt: row.observed_at || '',
+        })),
+        source: result?.disabled ? 'unavailable' : 'reb_r_one',
+        warning: result?.error?.message || '',
+      };
     },
     recommendations: async () => {
       const result = await recommendationLoader();
@@ -218,7 +276,7 @@ async function buildExpertContext(roleId, options = {}) {
   return {
     role,
     snapshot,
-    contextText: clipContext(JSON.stringify(snapshot, null, 2), maxChars),
+    contextText: clipContext(JSON.stringify(snapshot), maxChars),
     dataCutoff: { generatedAt, sources },
   };
 }

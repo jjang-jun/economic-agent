@@ -104,6 +104,18 @@ npm run discord:sync-secret
 
 이 명령은 `data/discord-webhooks.json`을 검증한 뒤 하나의 `DISCORD_WEBHOOKS_JSON_BASE64` Secret으로 저장하며 URL을 출력하지 않습니다. 이후 Actions의 `Discord Infrastructure Smoke`를 수동 실행합니다. 운영에서는 같은 Workflow가 평일 08:10 KST에 자동 실행되어 9개 설정을 검사하고 첫 장전 브리핑 전에 `#시스템-점검` health 카드를 보냅니다. 실패 알림도 가능한 경우 같은 Discord 운영 채널로 전달됩니다.
 
+Webhook URL이 노출됐을 때에는 새 URL을 먼저 적용하고 검증한 뒤 기존 URL을 폐기합니다.
+
+```bash
+npm run discord:webhooks:rotate -- --keys=policy_tax,policy_real_estate
+npm run discord:sync-secret
+npm run discord:smoke -- --channel=policy_tax
+npm run discord:smoke -- --channel=policy_real_estate
+npm run discord:webhooks:rotate -- --revoke-old
+```
+
+회전 상태에는 Webhook ID만 저장하고 token은 로컬 ignored Webhook map에만 둡니다. smoke가 실패하면 `--revoke-old`를 실행하지 않아 기존 전달 경로를 보존합니다.
+
 ## 5. 읽기 전용 Slash 명령 연결
 
 Slash 명령은 기존 Webhook과 별개로 Discord Application의 Interaction endpoint를 사용합니다. 서버는 Discord의 Ed25519 서명을 원문 body 기준으로 검증하고, 허용한 서버·사용자·채널에서만 조회를 실행합니다. 모든 결과는 명령을 실행한 사용자만 볼 수 있는 ephemeral 응답으로 보냅니다.
@@ -127,6 +139,8 @@ DISCORD_INTERACTION_ACK_TIMEOUT_MS=2500
 ```text
 https://YOUR_AGENT_URL/discord/interactions
 ```
+
+위 HTTP endpoint는 Cloud Run 안전망 단계에서만 사용합니다. Discord는 Interaction 전달을 HTTP endpoint와 Gateway 중 하나로만 선택하므로, 홈 PC worker에서 Slash/버튼까지 받는 최종 전환 시 Developer Portal의 `Interactions Endpoint URL`을 비워 Gateway `INTERACTION_CREATE`로 되돌립니다. 72시간 shadow 중에는 endpoint를 유지하고 worker의 멘션·heartbeat만 검증합니다.
 
 이후 현재 비공개 서버에 guild 명령을 동기화합니다. Guild 명령은 테스트 서버에서 즉시 반영되므로 운영 전 확인에 적합합니다.
 
@@ -153,6 +167,7 @@ npm run discord:sync-commands
 
 ```env
 DISCORD_ALLOWED_CHANNEL_IDS=...       # 필수: 개인 #포트폴리오 채널 등
+DISCORD_AGENT_ROLE_IDS=...           # 선택: 봇과 같은 이름의 역할 멘션 ID, 쉼표 구분
 DISCORD_MENTION_ACTIONS_ENABLED=true  # 기본 false, 거래·현금 초안 명시적 활성화
 DISCORD_EXPERT_RESPONSES_ENABLED=true # 기본 false, 경제 전문가 AI 응답 활성화
 DISCORD_EXPERT_MAX_REVIEWERS=1        # 0~2, 기본 1
@@ -176,14 +191,14 @@ Gateway worker 애플리케이션은 **Windows 10/11·Windows Server, macOS, Lin
 - `npm run discord:agent-worker:check`는 네트워크에 연결하거나 Discord 메시지를 보내지 않고 현재 OS·Node 버전·필수 런타임 기능을 검사합니다.
 - 변경이 원격 저장소에 반영되면 `Discord Worker Portability` Workflow가 `windows-latest`, `macos-latest`, `ubuntu-latest` 실제 runner에서 같은 검사와 멘션 worker 테스트를 실행합니다.
 - Gateway 연결 종료 시 운영체제와 무관하게 지수 backoff로 재연결하고, Windows의 `SIGBREAK`와 공통 종료 신호를 처리합니다.
-- 대화·승인 상태의 기준 저장소는 Supabase이며 실행 PC의 로컬 디스크나 절대 경로를 기준 저장소로 삼지 않습니다. 따라서 같은 환경변수를 가진 다른 OS 호스트로 worker를 옮겨도 대화를 이어갈 수 있습니다.
+- 대화·승인 상태의 기준 저장소는 홈 서버 PostgreSQL이며 JSON 파일은 bootstrap/fallback입니다. 다른 OS 호스트로 옮길 때에는 PostgreSQL 백업도 함께 복원합니다.
 
 설치와 수동 실행 절차도 세 운영체제에서 같습니다.
 
 ```text
 1. Node.js 22 이상 설치
 2. 저장소 복제 후 npm ci
-3. 같은 Discord/Supabase 환경변수 설정
+3. 같은 Discord/PostgreSQL 환경변수 설정
 4. npm run discord:agent-worker:check
 5. npm run discord:agent-worker
 ```
@@ -203,7 +218,7 @@ Gateway worker 애플리케이션은 **Windows 10/11·Windows Server, macOS, Lin
 @Economic Agent 현금 잔액은 500만원이야
 ```
 
-worker는 직접 멘션된 `MESSAGE_CREATE`만 처리하며 봇 메시지, 미허용 guild/user/channel은 무시합니다. 직접 멘션된 메시지 내용은 Discord의 Message Content 예외에 해당하므로 이 구조는 전체 채널 대화를 읽는 privileged `MESSAGE_CONTENT` intent를 요청하지 않고 `GUILDS + GUILD_MESSAGES`만 사용합니다. 봇 권한은 `View Channels`, `Send Messages`, `Read Message History`로 제한합니다.
+worker는 봇 계정 직접 멘션 또는 `DISCORD_AGENT_ROLE_IDS`에 명시한 역할 멘션의 `MESSAGE_CREATE`만 처리하며 봇 메시지, 미허용 guild/user/channel은 무시합니다. Discord 자동완성에서 봇과 같은 이름의 관리 역할이 선택될 수 있으므로 역할 ID도 명시적으로 허용할 수 있습니다. 자연어 본문을 안정적으로 받기 위해 Gateway는 `GUILDS + GUILD_MESSAGES + MESSAGE_CONTENT` intent를 요청하므로 Discord Developer Portal의 Bot 설정에서 Message Content Intent를 켭니다. 앱 로직은 허용 채널의 허용 멘션만 처리하고 나머지는 즉시 버립니다. 봇 권한은 `View Channels`, `Send Messages`, `Read Message History`로 제한합니다.
 
 자연어 파서는 비용이 드는 LLM 호출 없이 보수적 규칙으로 먼저 동작합니다.
 
@@ -230,7 +245,7 @@ worker는 직접 멘션된 `MESSAGE_CREATE`만 처리하며 봇 메시지, 미�
 
 이 기능은 개인 포트폴리오와 거래 요약을 설정된 AI provider로 전송할 수 있으므로 기본 비활성입니다. 현재 제공자의 데이터 처리 정책을 확인한 후에만 `DISCORD_EXPERT_RESPONSES_ENABLED=true`로 켭니다. 실제 주문·계약·가입은 수행하지 않습니다.
 
-일반 봇 답변은 ephemeral이 아니므로 `DISCORD_ALLOWED_CHANNEL_IDS`는 본인만 볼 수 있는 개인 채널로 반드시 제한합니다. 버튼 처리 결과는 HTTP Interaction endpoint가 ephemeral로 보냅니다. worker가 실행되는 호스트가 꺼지면 새 멘션은 즉시 처리되지 않으므로 24시간 응답이 필요하면 OS와 무관하게 항상 켜진 개인 PC·미니PC·VM에서 실행해야 합니다. Cloud Run의 요청형 Agent Server는 Slash와 버튼을 담당하고, 장시간 Gateway worker는 별도 상시 프로세스로 운영하는 구성이 안정적입니다.
+일반 봇 답변은 ephemeral이 아니므로 `DISCORD_ALLOWED_CHANNEL_IDS`는 본인만 볼 수 있는 개인 채널로 반드시 제한합니다. Slash와 버튼은 Gateway `INTERACTION_CREATE` 경로에서 ephemeral로 처리합니다. worker가 실행되는 호스트가 꺼지면 새 요청은 즉시 처리되지 않으므로 24시간 응답이 필요하면 OS와 무관하게 항상 켜진 개인 PC·미니PC·VM에서 실행해야 합니다. 구축과 cloud 전환 절차는 `docs/HOME_SERVER.md`를 따릅니다.
 
 ## 7. 리포트 라우팅
 

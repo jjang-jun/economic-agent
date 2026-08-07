@@ -19,13 +19,14 @@ function formatWorkflowFailureMessage({
 } = {}) {
   const shortSha = sha ? String(sha).slice(0, 7) : 'n/a';
   return [
-    '⚠️ <b>Workflow 실패 알림</b>',
-    `워크플로우: ${workflowName || 'unknown'}`,
-    jobName ? `작업: ${jobName}` : '',
-    `브랜치: ${branch || 'n/a'}`,
-    `커밋: ${shortSha}`,
-    actor ? `실행자: ${actor}` : '',
-    runUrl ? `<a href="${runUrl}">GitHub Actions 로그 보기</a>` : '',
+    '🚨 <b>Workflow 실패</b>',
+    '<b>상태</b>  자동 작업이 완료되지 않았습니다',
+    `<b>워크플로우</b>  ${workflowName || 'unknown'}`,
+    jobName ? `<b>작업</b>  ${jobName}` : '',
+    `<b>브랜치</b>  <code>${branch || 'n/a'}</code>`,
+    `<b>커밋</b>  <code>${shortSha}</code>`,
+    actor ? `<b>실행자</b>  ${actor}` : '',
+    runUrl ? `\n🔎 <a href="${runUrl}">실패 로그에서 원인 확인</a>` : '',
   ].filter(Boolean).join('\n');
 }
 

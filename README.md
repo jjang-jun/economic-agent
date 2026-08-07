@@ -23,6 +23,8 @@ AI는 분석 참모이며 최종 판단자나 자동 주문자가 아닙니다. 
 - **섹터 자동 분류** — 반도체, 에너지·원자재, 금융·통화, 부동산, 거시경제, 테크, 무역·지정학, 공시·기업이벤트
 - **DART 공시 수집** — 주요 공시를 뉴스와 함께 스코어링하여 기업 이벤트 반영
 - **정책·자산 레이더** — 재정경제부·금융위원회·국토교통부 공식 발표를 세금·부동산·대출·연금·자본시장으로 분류하고 정부안/정정/입법예고/시행 상태와 행동 주의를 Discord 분야별 채널로 전달
+- **부동산 매수 검토 레이더** — 서울·경기 5.8억~9.5억원 아파트의 국토교통부 매매·전월세를 매일 재수집하고 거래량·중위가격·전세가율·계약해제를 분리해 저점에 가까운 검토 구간을 탐색
+- **부동산 장기 기준선** — 한국부동산원 월간 아파트 매매가격지수의 서울·경기 1·3·12개월 변화와 24개월 고점 대비 낙폭을 실거래와 별도 저장
 - **Discord 리포트·대화 인프라** — 분야별 Webhook 리포트, 서명 검증 비공개 Slash 조회, 허용 채널의 봇 멘션 자연어 조회와 거래 초안·승인 버튼 지원
 - **경제 도메인 전문가 팀** — 하나의 `@Economic Agent` 뒤에서 투자·부동산·세금/연금·포트폴리오·리스크·데이터 검증 담당을 역할별 SSoT와 독립 AI 컨텍스트로 라우팅하고, 의사결정 질문만 제한적으로 `to/cc` 교차검토
 - **프리마켓 스냅샷** — 개장 전/미국장 오픈 브리핑에 관심 지수·종목·원자재 가격 반영
@@ -38,8 +40,8 @@ AI는 분석 참모이며 최종 판단자나 자동 주문자가 아닙니다. 
 - **일일 행동 리포트** — 신규 매수/관찰/보유/축소/매도 후보를 포트폴리오 기준으로 분리
 - **경제적 자유 추적** — 목표 순자산, 현재 달성률, 예상 달성 시점 계산
 - **현금흐름 조정 계좌 성과** — 입출금 원장을 일자 가중한 linked Modified Dietz 수익률·연환산 MWR로 계산하고 같은 구간 KOSPI와 비교
-- **히스토리 영구 저장** — Supabase/Postgres에 기사, 리포트, 추천, 성과, 시장 스냅샷 저장
-- **로컬 분석 미러** — Supabase 데이터를 JSON과 SQLite로 내려받아 로컬 파일시스템에서 직접 질의
+- **히스토리 영구 저장** — 홈 서버 PostgreSQL에 기사, 리포트, 추천, 성과, 시장 스냅샷 저장
+- **로컬 분석 미러** — PostgreSQL 데이터를 JSON과 SQLite로 내려받아 로컬 파일시스템에서 직접 질의
 - **AI 토큰 예산 관리** — 중요도 상위 기사와 핵심 가격 스냅샷만 AI 프롬프트에 투입
 
 ## 아키텍처
@@ -66,6 +68,17 @@ AI는 분석 참모이며 최종 판단자나 자동 주문자가 아닙니다. 
   정부 공식 RSS/보도자료 → 정책 분야·법적 단계 분류 → 변경 이력 저장
   → 정부안은 행동 보류, 공포·시행은 적용일 점검 → Discord 정책 채널
 
+매일 03:20 ─ 부동산 공식 데이터 (설정 시, AI 비용 없음)
+  국토교통부 아파트 매매·전월세 최근 2개월 재조회
+  → 목표 가격대 실거래 + 전세 하방 + 지역월 거래량/중위가격 저장
+  → 바닥 확정이 아닌 매수 검토 단계 분류
+
+매일 03:50 ─ 호가 스냅샷 (허가받은 feed 설정 시에만)
+  외부 호가 JSON feed → 출처·검증 상태를 보존해 실거래와 별도 저장
+
+월요일 04:10 ─ 한국부동산원 지수 (R-ONE 키 설정 시)
+  월간 아파트 매매가격지수 24개월 → 1·3·12개월 변화와 24개월 고점 대비 낙폭
+
 하루 1회 ─ 종목 분석 (AI 1회/일)
   일별 기사 + 글로벌 ETF 가격·거래량 자금이동 프록시 → AI 섹터/종목 분석 → Discord 발송
       ↓
@@ -87,6 +100,8 @@ AI는 분석 참모이며 최종 판단자나 자동 주문자가 아닙니다. 
 | 🇺🇸 22:40 | 미국장 오픈 브리핑 | 미국 주요 지표/정규장 오픈 + 다음날 국내 영향 |
 
 정기 다이제스트 5개와 하루 단위 장 마감·행동·성과 리포트는 그대로 유지합니다. 실시간으로 반복될 수 있는 속보·선행신호·타이밍 알림만 엄격하게 제한합니다.
+
+부동산 레이더의 설정·판단 단계·데이터 지연과 호가 출처 원칙은 [`docs/REAL_ESTATE_STRATEGY.md`](docs/REAL_ESTATE_STRATEGY.md)를 따릅니다. 최초 실행에는 공공데이터포털의 아파트 매매·전월세 API 활용신청과 `PUBLIC_DATA_API_KEY` 설정이 필요합니다.
 
 스케줄은 KRX 정규장 09:00~15:30과 호가 접수 08:30, 미국 정규장 09:30~16:00 ET, 미국 주요 지표의 08:30/10:00 ET 발표 시간, 유럽장 초반 흐름을 기준으로 맞췄습니다.
 
@@ -184,7 +199,11 @@ npm run agent:harness-check
 
 개발 진행 상황과 현재 운영 컨텍스트는 `docs/PROGRESS.md`에 기록합니다.
 
-대화형 Agent 실행 플랫폼은 `docs/AGENT_PLATFORM.md`에 정리되어 있습니다. Discord가 분야별 리포트·비공개 Slash 조회·멘션 초안과 승인·경제 도메인 전문가 `to/cc`를 담당합니다. GitHub Actions는 정기 작업, Node.js Agent Server와 Gateway worker는 즉시 요청 처리, Supabase는 기준 저장소로 둡니다.
+홈 PC worker의 72시간 전환 판정은 `npm run worker:shadow-audit`으로 기대 스케줄, 실제 shadow 기록, 누락·지연과 Gateway heartbeat를 함께 확인합니다.
+
+대화형 Agent 실행 플랫폼은 `docs/AGENT_PLATFORM.md`에 정리되어 있습니다. Discord가 분야별 리포트·비공개 Slash 조회·멘션 초안과 승인·경제 도메인 전문가 `to/cc`를 담당합니다. 목표 운영은 항상 켜진 Node.js PC worker가 즉시 요청과 정기 작업을 맡고, 홈 서버 PostgreSQL을 기준 저장소로 쓰는 구조입니다. 구축·전환·백업은 `docs/HOME_SERVER.md`를 따릅니다.
+
+PC scheduler는 기본 `shadow` 모드에서 예정 작업과 heartbeat만 기록하며 실제 정기 작업을 실행하지 않습니다. 72시간 비교 검증 후에만 `PC_WORKER_SCHEDULER_MODE=active`로 전환합니다. 평일 08:05 KST에는 최근 24시간 worker 상태를 Discord 운영 채널에 보고합니다.
 
 ## 운영 모드
 
@@ -222,21 +241,28 @@ npm run agent:harness-check
 
 ## 영구 저장소
 
-Supabase는 장기 히스토리 저장소, `data/`는 GitHub Actions 캐시와 로컬 분석용 보조 저장소입니다. GitHub Actions 캐시는 영구 DB가 아니므로 추천 성과 학습에는 Supabase를 기준 저장소로 사용합니다.
+목표 기준 저장소는 홈 서버 PostgreSQL이고 PostgREST는 기존 Node.js 저장 코드가 사용하는 localhost 전용 호환 API입니다. `data/`는 실행 fallback과 로컬 분석용 보조 저장소입니다. Supabase는 데이터 이관과 72시간 shadow 검증이 끝날 때까지만 안전망으로 유지합니다.
 
 ```bash
-# Supabase 스키마 적용
-npm run db:push
+# 홈 PostgreSQL/PostgREST 시작 및 스키마 적용
+npm run home:up
+npm run home:db:schema
+npm run home:check
 
-# Supabase 데이터를 로컬 파일시스템으로 내려받기
+# 기준 DB 데이터를 로컬 파일시스템으로 내려받기
 npm run db:pull
 
-# 기존 data/*.json 히스토리를 Supabase로 업로드
+# 기존 data/*.json 히스토리를 설정된 기준 DB로 업로드
 npm run db:import-local
+
+# PostgreSQL 백업
+npm run home:db:backup
 
 # SQLite 질의 예시
 sqlite3 data/economic-agent.db "select count(*) from articles;"
 ```
+
+`HOME_DB_OFFSITE_BACKUP_DIR`를 별도 디스크나 동기화 폴더로 설정하면 로컬 백업과 같은 암호화 `.aes` 파일을 추가 복제합니다. 외부 복제는 `HOME_DB_BACKUP_KEY_BASE64`가 없으면 시작 전에 실패하며 평문 백업은 외부 경로에 쓰지 않습니다.
 
 `db:pull`은 Supabase REST 응답을 페이지 단위로 모두 내려받아 `data/supabase/*.json`과 SQLite 미러를 갱신합니다. 공통 persistence는 `SUPABASE_REQUEST_TIMEOUT_MS` 안에 응답이 없으면 요청을 중단하고, PostgREST 408/429/5xx 오류는 `SUPABASE_RETRY_COUNT`, `SUPABASE_RETRY_DELAY_MS`, `SUPABASE_RETRY_MAX_DELAY_MS` 기준으로 제한된 재시도를 수행합니다. 429의 `Retry-After`를 우선하며, 반복 장애 중에는 circuit breaker가 후속 요청을 빠르게 건너뜁니다. `db:pull` 페이지 크기는 `SUPABASE_PULL_PAGE_SIZE`로 조정할 수 있습니다.
 
@@ -470,6 +496,7 @@ DISCORD_REPORTS_ENABLED=true
 DISCORD_GUILD_ID=...
 DISCORD_ALLOWED_USER_IDS=...
 # DISCORD_ALLOWED_CHANNEL_IDS=...
+# DISCORD_AGENT_ROLE_IDS=... # 선택: 봇과 같은 이름의 역할 멘션도 허용
 # DISCORD_WEBHOOKS_JSON_BASE64=...
 
 # 경제지표 (선택)
@@ -517,6 +544,8 @@ SUPABASE_DB_PASSWORD=...
 # STRATEGY_MIN_EVALUATED=30
 # STRATEGY_MIN_LINKED_TRADES=10
 ```
+
+Discord 정기 리포트는 기본적으로 채널별 색상 Embed를 사용합니다. 첫 제목은 Embed 제목으로, 운영 상태·워크플로우·커밋 같은 메타데이터는 필드로 분리되며, 본문의 독립 제목·목록·주의문은 Discord의 heading·bullet·blockquote 문법으로 정리됩니다. 긴 메시지는 페이지 번호를 붙여 안전하게 나누고, 모든 전송은 의도하지 않은 사용자·역할 멘션을 차단합니다. 멘션 기반 대화와 Slash 응답에도 같은 Markdown 정리 규칙을 적용합니다.
 
 ### 실행
 
@@ -569,7 +598,7 @@ npm run db:import-local
 npm run db:pull
 ```
 
-정책 레이더는 공식 소스를 병렬로 확인하며, 한 기관의 RSS가 일시적으로 실패해도 다른 기관 결과는 계속 처리합니다. 실패한 기관은 리포트에 `미확인`으로 표시하고 다음 실행에서 재시도하며, 정부안·추진안은 확정 법률처럼 행동 신호로 승격하지 않습니다.
+정책 레이더는 공식 소스를 병렬로 확인하며, 한 기관의 RSS가 일시적으로 실패해도 다른 기관 결과는 계속 처리합니다. 소스별 기본 20초 제한과 2회 재시도를 적용하고 국토교통부 RSS의 자체 307/WAF 쿠키 절차도 처리합니다. 그래도 실패하면 `정책 미확정`이 아니라 `이번 실행 수집 공백`으로 기관명과 문서 종류를 표시하며 다음 실행에서 재시도합니다. 알림은 `상세 요약 → 개인 영향 → 지금 할 일 → 반드시 확인할 조건 → 공식 근거` 순서로 제공하며, RSS가 제목만 제공하는 경우 알림 후보에 한해 안정적으로 읽을 수 있는 공식 상세 페이지 본문을 추가 조회합니다. 공식 본문을 읽을 수 없으면 내용을 추정하지 않고 원문 확인 필요를 명시합니다. 정부안·추진안은 확정 법률처럼 행동 신호로 승격하지 않습니다. `POLICY_SOURCE_TIMEOUT_MS`, `POLICY_SOURCE_RETRY_COUNT`, `POLICY_SOURCE_RETRY_DELAY_MS`, `POLICY_DETAIL_TIMEOUT_MS`, `POLICY_DETAIL_MAX_EVENTS`로 수집 복원력과 보강 범위를 조정할 수 있습니다.
 
 ## AI 제공자 지원
 

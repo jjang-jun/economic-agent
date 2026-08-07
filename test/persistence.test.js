@@ -160,3 +160,84 @@ test('Supabase transient failure opens circuit breaker for follow-up persistence
     console.warn = previousWarn;
   }
 });
+
+test('price provider telemetry failure does not open the critical persistence circuit', async () => {
+  const previousFetch = global.fetch;
+  const previousWarn = console.warn;
+  console.warn = () => {};
+  let calls = 0;
+  global.fetch = async () => {
+    calls += 1;
+    if (calls === 1) {
+      return new Response(JSON.stringify({ message: 'temporary telemetry outage' }), {
+        status: 503,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    return new Response(JSON.stringify([]), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+
+  const { persistence, restore } = loadFreshPersistence({
+    SUPABASE_PROJECT_URL: 'https://example.supabase.co',
+    SUPABASE_SERVICE_ROLE_KEY: 'service-role-key',
+    SUPABASE_RETRY_COUNT: '0',
+    SUPABASE_CIRCUIT_BREAKER_MS: '60000',
+  });
+
+  try {
+    const telemetry = await persistence.persistPriceProviderAttempt({
+      provider: 'test-provider',
+      ticker: '005930',
+      priceType: 'current',
+      status: 'failed',
+    });
+    const criticalRead = await persistence.selectRows('stock_reports', {
+      select: 'id',
+      limit: '1',
+    });
+
+    assert.equal(telemetry.saved, 0);
+    assert.equal(telemetry.error.status, 503);
+    assert.deepEqual(criticalRead.rows, []);
+    assert.equal(criticalRead.skipped, undefined);
+    assert.equal(calls, 2);
+  } finally {
+    restore();
+    global.fetch = previousFetch;
+    console.warn = previousWarn;
+  }
+});
+
+test('persistence supports keyless localhost PostgREST as the preferred database endpoint', async () => {
+  const previousFetch = global.fetch;
+  let requestUrl = '';
+  let requestHeaders;
+  global.fetch = async (url, options = {}) => {
+    requestUrl = String(url);
+    requestHeaders = options.headers;
+    return new Response(JSON.stringify([]), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+  const { persistence, restore } = loadFreshPersistence({
+    DATABASE_REST_URL: 'http://127.0.0.1:3000',
+    DATABASE_REST_KEY: undefined,
+    SUPABASE_PROJECT_URL: 'https://legacy.supabase.co',
+    SUPABASE_SERVICE_ROLE_KEY: 'legacy-key-must-not-leak',
+  });
+
+  try {
+    const result = await persistence.selectRows('articles', { select: 'id', limit: '1' });
+    assert.deepEqual(result.rows, []);
+    assert.match(requestUrl, /^http:\/\/127\.0\.0\.1:3000\/articles\?/);
+    assert.equal(requestHeaders.apikey, undefined);
+    assert.equal(requestHeaders.Authorization, undefined);
+  } finally {
+    restore();
+    global.fetch = previousFetch;
+  }
+});

@@ -1,0 +1,44 @@
+name: economic-agent-home
+
+services:
+  database:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-economic_agent}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in infra/home-server/.env}
+      TZ: Asia/Seoul
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - economic_agent_postgres:/var/lib/postgresql/data
+      - ../../supabase/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+      - ./init/010-api-role.sh:/docker-entrypoint-initdb.d/010-api-role.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+
+  rest:
+    image: postgrest/postgrest:v12.2.3
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://economic_agent_api:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-economic_agent}
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: economic_agent_api
+      PGRST_SERVER_PORT: 3000
+    ports:
+      - "127.0.0.1:${POSTGREST_PORT:-3210}:3000"
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  economic_agent_postgres:

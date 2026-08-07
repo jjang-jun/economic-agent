@@ -2,12 +2,147 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { routeDiscordMention } = require('../src/agent/discord-mention-router');
 const {
+  DiscordGatewayWorker,
   authorizeMentionMessage,
   discordMessagePayload,
   handleGatewayMessage,
   inspectRuntimeCompatibility,
   requireGatewayConfig,
 } = require('../scripts/discord-agent-worker');
+
+test('fatal Gateway close stops the scheduler so a supervisor can restart cleanly', async () => {
+  let schedulerStopped = false;
+  let fatalCode = null;
+  const worker = new DiscordGatewayWorker({
+    env: {},
+    scheduler: {
+      setGatewayConnected() {},
+      async stop() { schedulerStopped = true; },
+    },
+    onFatalClose(code) { fatalCode = code; },
+  });
+  worker.handleClose({ code: 4014 });
+  await worker.fatalClosePromise;
+  assert.equal(worker.stopped, true);
+  assert.equal(schedulerStopped, true);
+  assert.equal(fatalCode, 4014);
+});
+
+test('Gateway error without a close event still schedules reconnection', async () => {
+  class ErrorOnlyWebSocket {
+    static OPEN = 1;
+
+    constructor() {
+      this.listeners = {};
+      this.readyState = 0;
+      this.closeCalls = 0;
+    }
+
+    addEventListener(type, listener) {
+      this.listeners[type] = listener;
+    }
+
+    close() {
+      this.closeCalls += 1;
+    }
+  }
+
+  const scheduler = {
+    connected: true,
+    setGatewayConnected(value) { this.connected = value; },
+    async stop() {},
+  };
+  const worker = new DiscordGatewayWorker({
+    env: {},
+    scheduler,
+    WebSocketClass: ErrorOnlyWebSocket,
+  });
+  worker.gatewayUrl = 'wss://gateway.example.test';
+  await worker.connect();
+  const socket = worker.socket;
+
+  socket.listeners.error({ message: 'connection failed' });
+
+  assert.equal(socket.closeCalls, 1);
+  assert.equal(worker.socket, null);
+  assert.equal(scheduler.connected, false);
+  assert.ok(worker.reconnectTimer);
+  await worker.stop();
+});
+
+test('Gateway close errors cannot recursively flood the worker log', async () => {
+  class ReentrantErrorWebSocket {
+    static OPEN = 1;
+
+    constructor() {
+      this.listeners = {};
+      this.readyState = 0;
+      this.closeCalls = 0;
+      ReentrantErrorWebSocket.instance = this;
+    }
+
+    addEventListener(type, listener) {
+      this.listeners[type] = listener;
+    }
+
+    close() {
+      this.closeCalls += 1;
+      this.listeners.error({ message: 'close before open' });
+    }
+  }
+
+  const scheduler = {
+    disconnectedCalls: 0,
+    setGatewayConnected(value) {
+      if (!value) this.disconnectedCalls += 1;
+    },
+    async stop() {},
+  };
+  const worker = new DiscordGatewayWorker({
+    env: {},
+    scheduler,
+    WebSocketClass: ReentrantErrorWebSocket,
+  });
+  worker.gatewayUrl = 'wss://gateway.example.test';
+  await worker.connect();
+  const socket = ReentrantErrorWebSocket.instance;
+
+  socket.listeners.error({ message: 'connection failed' });
+
+  assert.equal(socket.closeCalls, 1);
+  assert.equal(scheduler.disconnectedCalls, 1);
+  assert.equal(worker.reconnectAttempt, 1);
+  assert.ok(worker.reconnectTimer);
+  await worker.stop();
+});
+
+test('initial transient Gateway discovery failure keeps scheduler alive and retries', async () => {
+  let schedulerStarted = false;
+  let schedulerStopped = false;
+  const scheduler = {
+    setGatewayConnected() {},
+    async start() { schedulerStarted = true; },
+    async stop() { schedulerStopped = true; },
+  };
+  const worker = new DiscordGatewayWorker({
+    env: {
+      DISCORD_BOT_TOKEN: 'token',
+      DISCORD_GUILD_ID: 'guild',
+      DISCORD_ALLOWED_USER_IDS: 'user',
+      DISCORD_ALLOWED_CHANNEL_IDS: 'channel',
+    },
+    scheduler,
+    fetcher: async () => { throw new Error('network offline'); },
+  });
+
+  await worker.start();
+
+  assert.equal(schedulerStarted, true);
+  assert.equal(schedulerStopped, false);
+  assert.equal(worker.stopped, false);
+  assert.ok(worker.reconnectTimer);
+  await worker.stop();
+});
 
 function message(content = '<@999> 삼성전자 3주를 7만원에 샀어') {
   return {
@@ -185,6 +320,16 @@ test('ordinary risk status questions keep the deterministic read-only route', as
 test('Gateway mention authorization requires the exact bot mention, user, guild, and channel', () => {
   assert.equal(authorizeMentionMessage(message(), '999', env).allowed, true);
   assert.equal(authorizeMentionMessage({ ...message(), mentions: [] }, '999', env).allowed, false);
+  assert.equal(authorizeMentionMessage({
+    ...message('<@&777> 내 포트폴리오 상태 알려줘'),
+    mentions: [],
+    mention_roles: ['777'],
+  }, '999', { ...env, DISCORD_AGENT_ROLE_IDS: '777' }).allowed, true);
+  assert.equal(authorizeMentionMessage({
+    ...message('<@&888> 내 포트폴리오 상태 알려줘'),
+    mentions: [],
+    mention_roles: ['888'],
+  }, '999', { ...env, DISCORD_AGENT_ROLE_IDS: '777' }).allowed, false);
   assert.equal(authorizeMentionMessage({ ...message(), channel_id: '555' }, '999', env).allowed, false);
   assert.throws(() => requireGatewayConfig({
     DISCORD_BOT_TOKEN: 'token',
@@ -209,7 +354,7 @@ test('Gateway message handling ignores unauthorized messages and sends safe mark
   });
   assert.equal(handled.handled, true);
   assert.equal(routed, 1);
-  assert.equal(sentPayload.content, '**초안**');
+  assert.equal(sentPayload.content, '## 초안');
   assert.deepEqual(sentPayload.allowed_mentions, { parse: [], replied_user: false });
 
   const ignored = await handleGatewayMessage({ ...message(), author: { id: 'unauthorized', bot: false } }, {

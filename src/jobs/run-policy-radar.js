@@ -1,4 +1,4 @@
-const { fetchPolicyDocuments } = require('../sources/policy-fetcher');
+const { fetchPolicyDocuments, enrichPolicyEventDetails } = require('../sources/policy-fetcher');
 const { classifyPolicyDocuments } = require('../utils/policy-classifier');
 const {
   loadPolicyEventState,
@@ -81,9 +81,12 @@ async function runPolicyRadar(options = {}) {
       bootstrapHours: options.bootstrapHours || process.env.POLICY_RADAR_BOOTSTRAP_HOURS || 72,
       maxEvents: options.maxEvents || process.env.POLICY_RADAR_MAX_EVENTS || 10,
     });
+    const enrichedNotifications = await (
+      options.enrichEvents || enrichPolicyEventDetails
+    )(selection.notify, options.detailOptions || {});
     const report = {
       generatedAt: now.toISOString(),
-      events: selection.notify,
+      events: enrichedNotifications,
       sourceResults: fetched.sourceResults,
       successfulSourceCount,
       fetchedCount: fetched.documents.length,

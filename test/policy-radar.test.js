@@ -6,6 +6,7 @@ const {
   runPolicyRadar,
 } = require('../src/jobs/run-policy-radar');
 const {
+  extractSummaryPoints,
   formatPolicyRadarReport,
   splitPolicyRadarReports,
   sendPolicyRadarReport,
@@ -58,14 +59,52 @@ test('policy report exposes stage, action, official source, and partial failures
   const message = formatPolicyRadarReport({
     events: [event({ title: 'ISA <개편안>' })],
     successfulSourceCount: 2,
-    sourceResults: [{ id: 'mofe', ok: true }, { id: 'molit', ok: false }],
+    sourceResults: [
+      { id: 'mofe', authority: '재정경제부', sourceKind: 'official_press', ok: true },
+      { id: 'molit', authority: '국토교통부', sourceKind: 'official_press', ok: false },
+    ],
   });
   assert.match(message, /정부안·추진안/);
+  assert.match(message, /상세 요약/);
+  assert.match(message, /나에게 미치는 영향\(조건부\)/);
+  assert.match(message, /세후 수익·납부세액·ISA\/절세계좌 운용 조건/);
+  assert.match(message, /정부안 원문, 적용 대상·한도/);
   assert.match(message, /가입·해지·매매 보류/);
-  assert.match(message, /molit/);
+  assert.match(message, /국토교통부 보도자료/);
+  assert.match(message, /정책 상태가 ‘미확정’이라는 뜻은 아니며/);
   assert.match(message, /ISA &lt;개편안&gt;/);
   assert.match(message, /https:\/\/mofe\.go\.kr\/policy\/1/);
   assert.doesNotMatch(message, /\n{3,}/);
+});
+
+test('policy summary extracts several official facts without repeating the title', () => {
+  const points = extractSummaryPoints(event({
+    title: 'ISA 세제개편안 발표',
+    summary: 'ISA 세제개편안 발표. 비과세 한도를 확대합니다. 적용 대상은 법률 개정 과정에서 확정됩니다. 시행일은 공포 후 확인해야 합니다.',
+  }));
+  assert.deepEqual(points, [
+    '비과세 한도를 확대합니다.',
+    '적용 대상은 법률 개정 과정에서 확정됩니다.',
+    '시행일은 공포 후 확인해야 합니다.',
+  ]);
+});
+
+test('policy report clearly labels missing official detail instead of inventing a summary', () => {
+  const message = formatPolicyRadarReport({
+    events: [event({ summary: '' })],
+    successfulSourceCount: 1,
+    sourceResults: [{ id: 'mofe', ok: true }],
+  });
+  assert.match(message, /공식 RSS에 상세 요약이 없어/);
+  assert.doesNotMatch(message, /혜택을 확대/);
+});
+
+test('clarification summary prioritizes the official correction over the quoted press claim', () => {
+  const points = extractSummaryPoints(event({
+    stage: 'official_clarification',
+    summary: '언론은 보증 한도를 확대한다고 보도했습니다. □ 현재 다양한 지원 방안을 검토 중이나 구체적인 내용은 확정된 바 없음을 알려드립니다.',
+  }));
+  assert.match(points[0], /확정된 바 없음|확정된 바 없음을/);
 });
 
 test('long policy reports are split below Discord limits without dropping events', async () => {
@@ -125,9 +164,16 @@ test('runPolicyRadar dry run classifies official documents without writing or se
       }],
       sourceResults: [{ id: 'mofe-press', ok: true, count: 1 }],
     }),
+    enrichEvents: async events => events.map(item => ({
+      ...item,
+      summary: '공식 상세 페이지에서 확인한 비과세 한도와 적용 대상입니다.',
+      detailSource: 'official_page',
+    })),
   });
   assert.equal(result.ok, true);
   assert.equal(result.dryRun, true);
   assert.equal(result.events.length, 1);
   assert.equal(result.events[0].domain, 'tax');
+  assert.equal(result.events[0].detailSource, 'official_page');
+  assert.match(result.events[0].summary, /공식 상세 페이지/);
 });

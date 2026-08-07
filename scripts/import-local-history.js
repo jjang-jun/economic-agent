@@ -169,7 +169,7 @@ async function importPortfolioSnapshots() {
 
 async function main() {
   if (!isPersistenceEnabled()) {
-    console.error('SUPABASE_PROJECT_URL/SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY/SUPABASE_PUBLISHABLE_KEY are required.');
+    console.error('DATABASE_REST_URL or Supabase REST URL/key compatibility settings are required.');
     process.exit(1);
   }
 

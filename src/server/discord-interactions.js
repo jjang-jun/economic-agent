@@ -127,6 +127,28 @@ async function deferDiscordInteraction(interaction, fetcher = fetch, apiBase = D
   }
 }
 
+async function replyDiscordInteraction(
+  interaction,
+  payload,
+  fetcher = fetch,
+  apiBase = DISCORD_API_BASE,
+  timeoutMs = DEFAULT_ACK_TIMEOUT_MS,
+) {
+  const response = await fetcher(
+    `${apiBase}/interactions/${encodeURIComponent(interaction.id)}/${encodeURIComponent(interaction.token)}/callback`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(timeoutMs),
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!response.ok) {
+    const detail = await readDiscordResponse(response);
+    throw new Error(`Discord reply failed (${response.status}): ${detail.message || 'unknown error'}`);
+  }
+}
+
 async function editDiscordOriginalResponse(
   interaction,
   content,
@@ -278,14 +300,111 @@ async function handleDiscordInteraction(req, res, rawBody, options = {}) {
   res.end();
 }
 
+async function handleGatewayDiscordInteraction(interaction, options = {}) {
+  const env = options.env || process.env;
+  const fetcher = options.fetcher || fetch;
+  const apiBase = options.apiBase || DISCORD_API_BASE;
+  const ackTimeoutMs = Math.max(1, Number(env.DISCORD_INTERACTION_ACK_TIMEOUT_MS || DEFAULT_ACK_TIMEOUT_MS));
+  const updateTimeoutMs = Math.max(1, Number(env.DISCORD_REQUEST_TIMEOUT_MS || DEFAULT_UPDATE_TIMEOUT_MS));
+
+  if (interaction.type === INTERACTION_PING) {
+    await replyDiscordInteraction(interaction, { type: RESPONSE_PONG }, fetcher, apiBase, ackTimeoutMs);
+    return { handled: true, intent: 'ping' };
+  }
+  if (![INTERACTION_APPLICATION_COMMAND, INTERACTION_MESSAGE_COMPONENT].includes(interaction.type)) {
+    await replyDiscordInteraction(
+      interaction,
+      interactionMessage('지원하지 않는 Discord Interaction입니다.'),
+      fetcher,
+      apiBase,
+      ackTimeoutMs,
+    );
+    return { handled: false, reason: 'unsupported_interaction' };
+  }
+
+  const authorization = authorizeDiscordInteraction(interaction, env);
+  if (!authorization.allowed) {
+    await replyDiscordInteraction(
+      interaction,
+      interactionMessage(authorization.reason),
+      fetcher,
+      apiBase,
+      ackTimeoutMs,
+    );
+    return { handled: false, reason: authorization.reason };
+  }
+
+  if (interaction.type === INTERACTION_MESSAGE_COMPONENT) {
+    const customId = String(interaction.data?.custom_id || '');
+    if (!mentionActionsEnabled(env)) {
+      await replyDiscordInteraction(
+        interaction,
+        interactionMessage('Discord 자연어 거래 승인이 비활성 상태입니다.'),
+        fetcher,
+        apiBase,
+        ackTimeoutMs,
+      );
+      return { handled: false, reason: 'mention_actions_disabled' };
+    }
+    if (!/^(?:confirm|cancel):[0-9a-f-]{36}:[0-9a-f]{16}$/i.test(customId)) {
+      await replyDiscordInteraction(
+        interaction,
+        interactionMessage('지원하지 않는 승인 버튼입니다.'),
+        fetcher,
+        apiBase,
+        ackTimeoutMs,
+      );
+      return { handled: false, reason: 'unsupported_component' };
+    }
+  }
+
+  if (interaction.type === INTERACTION_APPLICATION_COMMAND && !discordInteractionToAgentText(interaction)) {
+    await replyDiscordInteraction(
+      interaction,
+      interactionMessage('지원하지 않는 명령입니다.'),
+      fetcher,
+      apiBase,
+      ackTimeoutMs,
+    );
+    return { handled: false, reason: 'unsupported_command' };
+  }
+
+  await deferDiscordInteraction(interaction, fetcher, apiBase, ackTimeoutMs);
+  const router = interaction.type === INTERACTION_MESSAGE_COMPONENT
+    ? (options.componentRouter || routeDiscordPendingComponent)
+    : (options.router || routeDiscordReadOnlyCommand);
+  let result;
+  let routedSuccessfully = false;
+  try {
+    result = await router(interaction);
+    routedSuccessfully = true;
+  } catch (err) {
+    console.error(`[DiscordInteraction] Gateway 명령 처리 실패: ${err.message}`);
+    result = { intent: 'error', response: '조회 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.' };
+  }
+  await editDiscordOriginalResponse(interaction, result.response, fetcher, apiBase, updateTimeoutMs);
+
+  if (interaction.type === INTERACTION_MESSAGE_COMPONENT && routedSuccessfully) {
+    const componentCleaner = options.componentCleaner || removeDiscordSourceComponents;
+    try {
+      await componentCleaner(interaction, env, fetcher, apiBase, updateTimeoutMs);
+    } catch (err) {
+      console.error(`[DiscordInteraction] Gateway 승인 버튼 정리 실패: ${err.message}`);
+    }
+  }
+  return { handled: true, intent: result.intent };
+}
+
 module.exports = {
   authorizeDiscordInteraction,
   clipDiscordContent,
   deferDiscordInteraction,
   editDiscordOriginalResponse,
   getDiscordAccessPolicy,
+  handleGatewayDiscordInteraction,
   handleDiscordInteraction,
   interactionMessage,
   removeDiscordSourceComponents,
+  replyDiscordInteraction,
   verifyDiscordSignature,
 };

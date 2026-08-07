@@ -1,10 +1,12 @@
 const { authorizeDiscordContext, getDiscordAccessPolicy } = require('../src/config/discord-access');
 const { routeDiscordMention } = require('../src/agent/discord-mention-router');
 const { reportHtmlToDiscordMarkdown } = require('../src/notify/discord');
+const { handleGatewayDiscordInteraction } = require('../src/server/discord-interactions');
+const { PcWorkerScheduler } = require('../src/worker/pc-scheduler');
 
 const DISCORD_API_BASE = 'https://discord.com/api/v10';
 const GATEWAY_VERSION = 10;
-const GATEWAY_INTENTS = (1 << 0) | (1 << 9); // GUILDS + GUILD_MESSAGES
+const GATEWAY_INTENTS = (1 << 0) | (1 << 9) | (1 << 15); // GUILDS + GUILD_MESSAGES + MESSAGE_CONTENT
 const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
 const SUPPORTED_HOST_PLATFORMS = Object.freeze({
   darwin: 'macOS',
@@ -67,12 +69,25 @@ function requireGatewayConfig(env = process.env) {
   return { token, policy };
 }
 
-function messageMentionsBot(message = {}, botUserId = '') {
-  return Boolean(botUserId && (message.mentions || []).some(user => String(user.id) === String(botUserId)));
+function configuredAgentRoleIds(env = process.env) {
+  return String(env.DISCORD_AGENT_ROLE_IDS || '')
+    .split(',')
+    .map(value => value.trim())
+    .filter(Boolean);
+}
+
+function messageMentionsBot(message = {}, botUserId = '', env = process.env) {
+  const directMention = Boolean(
+    botUserId && (message.mentions || []).some(user => String(user.id) === String(botUserId)),
+  );
+  const allowedRoleIds = configuredAgentRoleIds(env);
+  const roleMention = (message.mention_roles || [])
+    .some(roleId => allowedRoleIds.includes(String(roleId)));
+  return directMention || roleMention;
 }
 
 function authorizeMentionMessage(message = {}, botUserId = '', env = process.env) {
-  if (message.author?.bot || !messageMentionsBot(message, botUserId)) {
+  if (message.author?.bot || !messageMentionsBot(message, botUserId, env)) {
     return { allowed: false, ignored: true, reason: 'not an allowed human mention' };
   }
   return authorizeDiscordContext({
@@ -123,7 +138,9 @@ async function discordApiRequest(path, options = {}, config = {}) {
   const body = await readResponse(response);
   if (!response.ok) {
     const detail = typeof body === 'object' ? body?.message : body;
-    throw new Error(`Discord API failed (${response.status}): ${detail || 'unknown error'}`);
+    const error = new Error(`Discord API failed (${response.status}): ${detail || 'unknown error'}`);
+    error.status = response.status;
+    throw error;
   }
   return body;
 }
@@ -135,15 +152,41 @@ async function sendMentionResponse(message, result, config = {}) {
   }, config);
 }
 
+async function sendTypingIndicator(message, config = {}) {
+  return discordApiRequest(`/channels/${encodeURIComponent(message.channel_id)}/typing`, {
+    method: 'POST',
+  }, config);
+}
+
+function startTypingLoop(message, config = {}) {
+  const notify = config.typingNotifier || sendTypingIndicator;
+  const send = () => Promise.resolve(notify(message, config))
+    .catch(err => console.warn(`[DiscordAgent] 타이핑 표시 실패: ${err.message}`));
+  send();
+  const timer = setInterval(send, 7_000);
+  timer.unref?.();
+  return () => clearInterval(timer);
+}
+
 async function handleGatewayMessage(message, options = {}) {
   const env = options.env || process.env;
   const authorization = authorizeMentionMessage(message, options.botUserId, env);
   if (!authorization.allowed) return { handled: false, reason: authorization.reason };
   const router = options.router || routeDiscordMention;
   const sender = options.sender || sendMentionResponse;
-  const result = await router(message, { env });
-  await sender(message, result, options);
-  return { handled: true, intent: result.intent };
+  const startedAt = Date.now();
+  const stopTyping = options.sender && !options.typingNotifier
+    ? () => {}
+    : startTypingLoop(message, options);
+  try {
+    const result = await router(message, { env });
+    await sender(message, result, options);
+    const elapsedMs = Date.now() - startedAt;
+    console.log(`[DiscordAgent] 멘션 처리 완료: intent=${result.intent}, elapsedMs=${elapsedMs}`);
+    return { handled: true, intent: result.intent, elapsedMs };
+  } finally {
+    stopTyping();
+  }
 }
 
 class DiscordGatewayWorker {
@@ -164,6 +207,10 @@ class DiscordGatewayWorker {
     this.heartbeatAcknowledged = true;
     this.stopped = false;
     this.reconnectAttempt = 0;
+    this.scheduler = options.scheduler || new PcWorkerScheduler({ env: this.env });
+    this.onFatalClose = options.onFatalClose || (() => { process.exitCode = 1; });
+    this.fatalClosePromise = null;
+    this.reconnectHandledSockets = new WeakSet();
   }
 
   async start() {
@@ -176,12 +223,28 @@ class DiscordGatewayWorker {
     });
     const config = requireGatewayConfig(this.env);
     this.token = this.token || config.token;
-    const gateway = await discordApiRequest('/gateway/bot', { method: 'GET' }, {
-      env: this.env,
-      fetcher: this.fetcher,
-      token: this.token,
-    });
-    this.gatewayUrl = gateway.url;
+    await this.scheduler.start();
+    try {
+      await this.ensureConnected();
+    } catch (err) {
+      if ([401, 403].includes(Number(err.status))) {
+        await this.stop();
+        throw err;
+      }
+      console.error(`[DiscordAgent] 초기 Gateway 연결 지연: ${err.message}`);
+      this.handleClose({ code: 0 });
+    }
+  }
+
+  async ensureConnected() {
+    if (!this.gatewayUrl) {
+      const gateway = await discordApiRequest('/gateway/bot', { method: 'GET' }, {
+        env: this.env,
+        fetcher: this.fetcher,
+        token: this.token,
+      });
+      this.gatewayUrl = gateway.url;
+    }
     await this.connect();
   }
 
@@ -194,9 +257,19 @@ class DiscordGatewayWorker {
     const socket = new this.WebSocketClass(url);
     this.socket = socket;
     socket.addEventListener('message', event => this.handlePayload(event.data));
-    socket.addEventListener('close', event => this.handleClose(event));
+    socket.addEventListener('close', event => this.handleClose(event, socket));
     socket.addEventListener('error', event => {
+      if (this.socket !== socket || this.reconnectHandledSockets.has(socket)) return;
       console.error(`[DiscordAgent] Gateway 오류: ${event.message || 'websocket error'}`);
+      // Mark and schedule the reconnect before close(). Some WebSocket
+      // implementations synchronously emit another error while closing a
+      // connection that never reached OPEN, which otherwise recurses here.
+      this.handleClose({ code: 0 }, socket);
+      try {
+        socket.close(4000, 'gateway websocket error');
+      } catch {
+        // Some WebSocket implementations reject close() before OPEN.
+      }
     });
   }
 
@@ -286,11 +359,14 @@ class DiscordGatewayWorker {
       this.resumeGatewayUrl = payload.d.resume_gateway_url || this.gatewayUrl;
       this.botUserId = payload.d.user?.id || '';
       this.reconnectAttempt = 0;
+      this.scheduler.setGatewayConnected(true);
+      this.scheduler.heartbeat().catch(err => console.error(`[DiscordAgent] heartbeat 갱신 실패: ${err.message}`));
       console.log(`[DiscordAgent] Gateway 연결 완료: bot=${this.botUserId}`);
       return;
     }
     if (payload.t === 'RESUMED') {
       this.reconnectAttempt = 0;
+      this.scheduler.setGatewayConnected(true);
       console.log('[DiscordAgent] Gateway 세션 재개 완료');
       return;
     }
@@ -301,36 +377,52 @@ class DiscordGatewayWorker {
         fetcher: this.fetcher,
         token: this.token,
       }).catch(err => console.error(`[DiscordAgent] 멘션 처리 실패: ${err.message}`));
+      return;
+    }
+    if (payload.t === 'INTERACTION_CREATE') {
+      handleGatewayDiscordInteraction(payload.d, {
+        env: this.env,
+        fetcher: this.fetcher,
+      }).catch(err => console.error(`[DiscordAgent] Interaction 처리 실패: ${err.message}`));
     }
   }
 
-  handleClose(event = {}) {
+  handleClose(event = {}, socket = this.socket) {
+    if (socket && this.socket !== socket) return;
+    if (socket && this.reconnectHandledSockets.has(socket)) return;
+    if (socket) this.reconnectHandledSockets.add(socket);
     clearInterval(this.heartbeatTimer);
     clearTimeout(this.heartbeatStartTimer);
     this.heartbeatTimer = null;
     this.heartbeatStartTimer = null;
     this.socket = null;
+    this.scheduler.setGatewayConnected(false);
     if (this.stopped) return;
     if ([4004, 4010, 4011, 4012, 4013, 4014].includes(Number(event.code))) {
       console.error(`[DiscordAgent] 재연결 불가 close code ${event.code}. Bot token과 intents 설정을 확인하세요.`);
+      this.stopped = true;
+      this.fatalClosePromise = this.scheduler.stop()
+        .catch(err => console.error(`[DiscordAgent] 치명적 종료 처리 실패: ${err.message}`))
+        .finally(() => this.onFatalClose(Number(event.code)));
       return;
     }
     this.reconnectAttempt += 1;
     const delayMs = Math.min(30_000, 1_000 * (2 ** Math.min(this.reconnectAttempt - 1, 5)));
     console.warn(`[DiscordAgent] Gateway 연결 종료(${event.code || 'unknown'}), ${delayMs}ms 후 재연결`);
     clearTimeout(this.reconnectTimer);
-    this.reconnectTimer = setTimeout(() => this.connect().catch(err => {
+    this.reconnectTimer = setTimeout(() => this.ensureConnected().catch(err => {
       console.error(`[DiscordAgent] 재연결 실패: ${err.message}`);
       this.handleClose({ code: 0 });
     }), delayMs);
   }
 
-  stop() {
+  async stop() {
     this.stopped = true;
     clearInterval(this.heartbeatTimer);
     clearTimeout(this.heartbeatStartTimer);
     clearTimeout(this.reconnectTimer);
     this.socket?.close(1000, 'worker stopped');
+    await this.scheduler.stop();
   }
 }
 
@@ -343,7 +435,9 @@ async function main() {
   }
   const worker = new DiscordGatewayWorker();
   await worker.start();
-  const stop = () => worker.stop();
+  const stop = () => worker.stop().catch(err => {
+    console.error(`[DiscordAgent] 종료 처리 실패: ${err.message}`);
+  });
   process.once('SIGINT', stop);
   process.once('SIGTERM', stop);
   process.once('SIGHUP', stop);
@@ -361,6 +455,7 @@ module.exports = {
   DiscordGatewayWorker,
   assertRuntimeCompatibility,
   authorizeMentionMessage,
+  configuredAgentRoleIds,
   discordApiRequest,
   discordMessagePayload,
   formatRuntimeCompatibility,
@@ -369,4 +464,6 @@ module.exports = {
   messageMentionsBot,
   requireGatewayConfig,
   sendMentionResponse,
+  sendTypingIndicator,
+  startTypingLoop,
 };

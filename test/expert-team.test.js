@@ -43,7 +43,7 @@ test('expert team uses isolated primary and reviewer contexts with separate toke
 });
 
 test('expert request timeout is bounded for an always-on Discord worker', () => {
-  assert.equal(expertRequestTimeoutMs({}), 45_000);
+  assert.equal(expertRequestTimeoutMs({}), 30_000);
   assert.equal(expertRequestTimeoutMs({ DISCORD_EXPERT_TIMEOUT_MS: '1000' }), 5_000);
   assert.equal(expertRequestTimeoutMs({ DISCORD_EXPERT_TIMEOUT_MS: '999999' }), 120_000);
 });
