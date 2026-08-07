@@ -1,4 +1,5 @@
 const ASSEMBLY_BILL_ENDPOINT = 'https://open.assembly.go.kr/portal/openapi/TVBPMBILL11';
+const { formatNetworkError } = require('../utils/network-error');
 
 const DEFAULT_POLICY_BILL_TERMS = [
   '조세특례제한법',
@@ -137,12 +138,16 @@ async function fetchAssemblyTerm(term, options = {}) {
   const config = assemblyOptions(options);
   const fetcher = options.fetcher || fetch;
   const fetchPage = async pageIndex => {
-    const response = await fetcher(buildAssemblyBillUrl(term, { ...config, pageIndex }), {
-      headers: { 'User-Agent': 'economic-agent/2.0 policy-radar' },
-      signal: AbortSignal.timeout(config.timeoutMs),
-    });
-    if (!response.ok) throw new Error(`${response.status} ${response.statusText || ''}`.trim());
-    return response.json();
+    try {
+      const response = await fetcher(buildAssemblyBillUrl(term, { ...config, pageIndex }), {
+        headers: { 'User-Agent': 'economic-agent/2.0 policy-radar' },
+        signal: AbortSignal.timeout(config.timeoutMs),
+      });
+      if (!response.ok) throw new Error(`${response.status} ${response.statusText || ''}`.trim());
+      return response.json();
+    } catch (error) {
+      throw new Error(formatNetworkError(error));
+    }
   };
 
   const firstPayload = await fetchPage(1);

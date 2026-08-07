@@ -19,6 +19,59 @@ function uniqueEvents(events = []) {
   return [...byId.values()];
 }
 
+function numericOption(value, fallback, minimum = 0, maximum = Number.MAX_SAFE_INTEGER) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(minimum, Math.min(maximum, Math.floor(parsed)));
+}
+
+function wait(ms) {
+  return ms > 0 ? new Promise(resolve => setTimeout(resolve, ms)) : Promise.resolve();
+}
+
+async function fetchAllPolicySources(options = {}) {
+  const rssFetched = await (options.fetchDocuments || fetchPolicyDocuments)(options.fetchOptions || {});
+  const assemblyFetched = await (
+    options.fetchAssemblyDocuments || fetchAssemblyPolicyDocuments
+  )(options.assemblyOptions || {});
+  const lawFetched = await (
+    options.fetchLawDocuments || fetchLawPolicyDocuments
+  )(options.lawOptions || {});
+  return {
+    documents: [
+      ...rssFetched.documents,
+      ...(assemblyFetched.documents || []),
+      ...(lawFetched.documents || []),
+    ],
+    sourceResults: [
+      ...rssFetched.sourceResults,
+      ...(assemblyFetched.sourceResults || []),
+      ...(lawFetched.sourceResults || []),
+    ],
+  };
+}
+
+async function fetchPolicySourcesWithOutageRetry(options = {}) {
+  const retryCount = numericOption(
+    options.allSourcesRetryCount ?? process.env.POLICY_ALL_SOURCES_RETRY_COUNT,
+    1, 0, 3
+  );
+  const retryDelayMs = numericOption(
+    options.allSourcesRetryDelayMs ?? process.env.POLICY_ALL_SOURCES_RETRY_DELAY_MS,
+    15_000, 0, 120_000
+  );
+  let fetched;
+  for (let attempt = 0; attempt <= retryCount; attempt += 1) {
+    fetched = await fetchAllPolicySources(options);
+    if (fetched.sourceResults.some(source => source.ok)) return fetched;
+    if (attempt < retryCount) {
+      console.warn(`[정책레이더] 모든 공식 소스 실패 · ${retryDelayMs}ms 후 전체 재시도 ${attempt + 1}/${retryCount}`);
+      await (options.wait || wait)(retryDelayMs);
+    }
+  }
+  return fetched;
+}
+
 function eventTime(event) {
   const value = Date.parse(event.publishedAt || '');
   return Number.isFinite(value) ? value : 0;
@@ -65,25 +118,7 @@ async function runPolicyRadar(options = {}) {
   }
 
   try {
-    const rssFetched = await (options.fetchDocuments || fetchPolicyDocuments)(options.fetchOptions || {});
-    const assemblyFetched = await (
-      options.fetchAssemblyDocuments || fetchAssemblyPolicyDocuments
-    )(options.assemblyOptions || {});
-    const lawFetched = await (
-      options.fetchLawDocuments || fetchLawPolicyDocuments
-    )(options.lawOptions || {});
-    const fetched = {
-      documents: [
-        ...rssFetched.documents,
-        ...(assemblyFetched.documents || []),
-        ...(lawFetched.documents || []),
-      ],
-      sourceResults: [
-        ...rssFetched.sourceResults,
-        ...(assemblyFetched.sourceResults || []),
-        ...(lawFetched.sourceResults || []),
-      ],
-    };
+    const fetched = await fetchPolicySourcesWithOutageRetry(options);
     const successfulSourceCount = fetched.sourceResults.filter(source => source.ok).length;
     fetched.sourceResults
       .filter(source => !source.ok)
@@ -150,6 +185,8 @@ async function runPolicyRadar(options = {}) {
 }
 
 module.exports = {
+  fetchAllPolicySources,
+  fetchPolicySourcesWithOutageRetry,
   uniqueEvents,
   isBootstrapRecent,
   selectPolicyNotifications,

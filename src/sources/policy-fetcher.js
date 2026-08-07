@@ -1,6 +1,7 @@
 const Parser = require('rss-parser');
 const POLICY_SOURCES = require('../config/policy-sources');
 const { RSS_TIMEOUT_MS } = require('../utils/config');
+const { formatNetworkError } = require('../utils/network-error');
 
 function numericOption(value, fallback, minimum = 0) {
   const parsed = Number(value);
@@ -223,7 +224,7 @@ async function fetchSource(source, options = {}) {
         if (attempt < retryCount) await wait(retryDelayMs * (attempt + 1));
       }
     }
-    throw new Error(`${lastError?.message || 'unknown error'} (${retryCount + 1}회 시도)`);
+    throw new Error(`${formatNetworkError(lastError)} (${retryCount + 1}회 시도)`);
   }
 
   throw new Error(`unsupported policy source format: ${source.format}`);

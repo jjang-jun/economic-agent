@@ -1,4 +1,5 @@
 const { DEFAULT_POLICY_BILL_TERMS } = require('./assembly-bills');
+const { formatNetworkError } = require('../utils/network-error');
 
 const LAW_SEARCH_ENDPOINT = 'https://www.law.go.kr/DRF/lawSearch.do';
 
@@ -126,11 +127,16 @@ function lawDocument(row = {}, options = {}) {
 async function fetchLawTerm(term, options = {}) {
   const config = lawOpenDataOptions(options);
   const fetcher = options.fetcher || fetch;
-  const response = await fetcher(buildLawSearchUrl(term, config), {
-    headers: { 'User-Agent': 'economic-agent/2.0 policy-radar' },
-    signal: AbortSignal.timeout(config.timeoutMs),
-  });
-  if (!response.ok) throw new Error(`${response.status} ${response.statusText || ''}`.trim());
+  let response;
+  try {
+    response = await fetcher(buildLawSearchUrl(term, config), {
+      headers: { 'User-Agent': 'economic-agent/2.0 policy-radar' },
+      signal: AbortSignal.timeout(config.timeoutMs),
+    });
+    if (!response.ok) throw new Error(`${response.status} ${response.statusText || ''}`.trim());
+  } catch (error) {
+    throw new Error(formatNetworkError(error));
+  }
   const rows = parseLawRows(await response.json());
   const normalizedTerm = normalizeLawName(term);
   return rows

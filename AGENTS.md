@@ -86,7 +86,7 @@ Most operational npm scripts read `.env` through Node's `--env-file-if-exists=.e
 - Optional anomaly/news timing validation: `PRE_NEWS_EVIDENCE_LOOKBACK_HOURS` (default 12), `PRE_NEWS_FOLLOW_UP_HOURS` (default 24)
 - Optional evidence gates: `STRATEGY_MIN_EVALUATED`, `STRATEGY_MIN_LINKED_TRADES`; `EVALUATION_ALLOW_CURRENT_FALLBACK` should remain false in normal operation.
 - Optional local research worker: `LOCAL_RESEARCH_WORKER_ENABLED=true` enables the monthly review sidecar that calls `scripts/local-backtest-worker.py`; `LOCAL_RESEARCH_WORKER_PROVIDER` and `LOCAL_RESEARCH_MAX_TICKERS` tune provider and ticker count.
-- Optional policy radar tuning: `POLICY_RADAR_BOOTSTRAP_HOURS` controls first-run history suppression and `POLICY_RADAR_MAX_EVENTS` caps one Discord report.
+- Optional policy radar tuning: `POLICY_RADAR_BOOTSTRAP_HOURS` controls first-run history suppression, `POLICY_RADAR_MAX_EVENTS` caps one Discord report, and `POLICY_ALL_SOURCES_RETRY_COUNT`/`POLICY_ALL_SOURCES_RETRY_DELAY_MS` retry the complete batch only during a total source outage.
 - Optional legislative sources: `OPEN_ASSEMBLY_API_KEY` enables National Assembly bill-stage tracking; separately approved `LAW_OPEN_DATA_OC` enables current-law promulgation/effective-date cross-checks. Each source skips cleanly when its credential is absent.
 - `.env` is private and must not be committed.
 

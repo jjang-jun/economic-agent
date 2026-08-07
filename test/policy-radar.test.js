@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  fetchPolicySourcesWithOutageRetry,
   isBootstrapRecent,
   selectPolicyNotifications,
   runPolicyRadar,
@@ -34,6 +35,27 @@ function event(overrides = {}) {
     ...overrides,
   };
 }
+
+test('policy sources retry the whole batch only when every configured source fails', async () => {
+  let rssAttempts = 0;
+  const waits = [];
+  const result = await fetchPolicySourcesWithOutageRetry({
+    allSourcesRetryCount: 1,
+    allSourcesRetryDelayMs: 15,
+    wait: async ms => waits.push(ms),
+    fetchDocuments: async () => {
+      rssAttempts += 1;
+      return rssAttempts === 1
+        ? { documents: [], sourceResults: [{ id: 'rss', ok: false, error: 'ENOTFOUND' }] }
+        : { documents: [{ title: '복구' }], sourceResults: [{ id: 'rss', ok: true, count: 1 }] };
+    },
+    fetchAssemblyDocuments: async () => ({ documents: [], sourceResults: [] }),
+    fetchLawDocuments: async () => ({ documents: [], sourceResults: [] }),
+  });
+  assert.equal(rssAttempts, 2);
+  assert.deepEqual(waits, [15]);
+  assert.equal(result.documents.length, 1);
+});
 
 test('bootstrap notification suppresses old documents but keeps recent changes', () => {
   const now = new Date('2026-08-04T03:00:00.000Z');
